@@ -14,21 +14,21 @@ interface Slide {
 
 const slides: Slide[] = [
   {
-    image: "/volvo1.webp?height=600&width=1200",
+    image: "/volvo1.webp?height=500&width=1200",
     title: "Vill du få ut mer från din bil?",
     description: "Vi har specialtillverkade turbon som passar just din bil",
     buttonText: "Shoppa nu!",
     buttonLink: "/category/turbo",
   },
   {
-    image: "/turbo2.webp?height=600&width=1200",
+    image: "/turbo2.webp?height=500&width=1200",
     title: "Explore Our Latest Collection",
     description: "Find the perfect items to match your style and needs.",
     buttonText: "Get Started",
     buttonLink: "/get-started",
   },
   {
-    image: "/turbo3.webp?height=600&width=1200",
+    image: "/turbo3.webp?height=500&width=1200",
     title: "Join Our Community",
     description:
       "Connect with like-minded individuals and share your experiences.",
