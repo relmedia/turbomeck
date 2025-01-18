@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const invoice = session.invoice
       ? await stripe.invoices.retrieve(session.invoice as string)
       : null;
-    // console.log("session", session, "invoice", invoice);
+    console.log("session", session, "invoice", invoice);
 
     try {
       await createOrderInSanity(session, invoice);
@@ -116,7 +116,7 @@ async function createOrderInSanity(
 
     products: sanityProducts,
     totalPrice: amount_total ? amount_total / 100 : 0,
-    status: "paid",
+    status: "betald",
     orderDate: new Date().toISOString(),
     invoice: invoice
       ? {
