@@ -7,7 +7,7 @@ const HomeBanner = () => {
       <Title className="uppercase text-3xl md:text-4xl font-bold text-center">
         Hitta dina turbodelar
       </Title>
-      <p className="text-sm text-center text-lightColor/80 font-medium max-w-[480px] ">
+      <p className="text-lg text-center text-lightColor/80 font-medium max-w-[480px] ">
         Vi har 40 års erfarenhet av utbytesturbo! Vi erbjuder nya och renoverade
         turbosystem med fabriksstandard. Vi kan också hjälpa dig att renovera
         din gamla.
