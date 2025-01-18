@@ -100,7 +100,7 @@ export default function HeroSlider() {
             className="brightness-50"
           />
           <div className="absolute inset-0 flex items-center">
-            <div className="container px-4 md:px-8 lg:px-40 min-h-[500px] flex flex-col justify-center">
+            <div className="container px-4 min-h-[500px] flex flex-col justify-items-center">
               <div className="max-w-lg">
                 <motion.h2
                   initial={{ opacity: 0, x: -20 }}
