@@ -14,7 +14,7 @@ interface Slide {
 
 const slides: Slide[] = [
   {
-    image: "/volvo1.webp?height=500&width=1200",
+    image: "/turbo.webp?height=500&width=1200",
     title: "Vill du få ut mer från din bil?",
     description: "Vi har specialtillverkade turbon som passar just din bil",
     buttonText: "Shoppa nu!",
