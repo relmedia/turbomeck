@@ -215,6 +215,19 @@ export type Category = {
     crop?: SanityImageCrop;
     _type: "image";
   };
+  parent?: {
+    _ref: string;
+    _type: "reference";
+    _weak?: boolean;
+    [internalGroqTypeReferenceTo]?: "category";
+  };
+  subcategories?: Array<{
+    _ref: string;
+    _type: "reference";
+    _weak?: boolean;
+    _key: string;
+    [internalGroqTypeReferenceTo]?: "category";
+  }>;
 };
 
 export type Slug = {
@@ -402,6 +415,19 @@ export type CATEGORIES_QUERYResult = Array<{
     crop?: SanityImageCrop;
     _type: "image";
   };
+  parent?: {
+    _ref: string;
+    _type: "reference";
+    _weak?: boolean;
+    [internalGroqTypeReferenceTo]?: "category";
+  };
+  subcategories?: Array<{
+    _ref: string;
+    _type: "reference";
+    _weak?: boolean;
+    _key: string;
+    [internalGroqTypeReferenceTo]?: "category";
+  }>;
 }>;
 // Variable: ACTIVE_COUPON_CODE
 // Query: *[_type == 'sale' && isActive == true && couponCode == $couponCode] | order(validFrom desc)[0]
