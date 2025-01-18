@@ -10,8 +10,6 @@ import { Toaster } from "react-hot-toast";
 import { VisualEditing } from "next-sanity";
 import { draftMode } from "next/headers";
 import DisableDraftMode from "@/components/DisableDraftMode";
-import ChatIcon from "@/components/ChatIcon";
-import Chat from "@/components/Chat";
 
 const poppins = localFont({
   src: "../fonts/Poppins.woff2",
