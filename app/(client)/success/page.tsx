@@ -62,7 +62,7 @@ const SuccessPage = () => {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="w-24 h-24 bg-black rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
+          className="w-24 h-24 bg-lightGreen rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
           <Check className="text-white w-12 h-12" />
         </motion.div>
 
@@ -76,24 +76,26 @@ const SuccessPage = () => {
             kommer skickas till din inkorg inom kort.
           </p>
           <p className="text-gray-700">
-            Order Number:{" "}
+            Order Nummer:{" "}
             <span className="text-black font-semibold">{orderNumber}</span>
           </p>
         </div>
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-8">
           <h2 className="font-semibold text-gray-900 mb-2">
-            What&apos;s Next?
+            Vad händer härnäst?
           </h2>
           <ul className="text-gray-700 text-sm space-y-1">
-            <li>Check your email for order confirmation</li>
-            <li>We&apos;ll notify you when your order ships</li>
-            <li>Track your order status anytime</li>
+            <li>Kolla din e-post för orderbekräftelse</li>
+            <li>Vi meddelar dig när din beställning skickas</li>
+            <li>Följ din beställningsstatus när som helst</li>
           </ul>
         </div>
 
         <div className="mb-8">
-          <h3 className="font-semibold text-gray-900 mb-2">Recent Orders</h3>
+          <h3 className="font-semibold text-gray-900 mb-2">
+            Senaste beställningarna
+          </h3>
           <div className="space-y-2">
             {orders.map((order) => (
               <div
