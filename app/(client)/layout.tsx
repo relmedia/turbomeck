@@ -10,6 +10,7 @@ import { Toaster } from "react-hot-toast";
 import { VisualEditing } from "next-sanity";
 import { draftMode } from "next/headers";
 import DisableDraftMode from "@/components/DisableDraftMode";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const poppins = localFont({
   src: "../fonts/Poppins.woff2",
@@ -55,6 +56,7 @@ export default async function RootLayout({
               },
             }}
           />
+          <SpeedInsights />
           <SanityLive />
           {/* <Chat pageId="106453562488245" appId="560672463472073" />
           <ChatIcon /> */}
