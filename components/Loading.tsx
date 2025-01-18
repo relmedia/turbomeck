@@ -15,7 +15,7 @@ const Loading = () => {
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ repeat: Infinity, duration: 1.5 }}
           className="flex items-center space-x-2 text-darkColor">
-          <Loader2 className="animate-spin" />
+          <Loader2 className="animate-spin text-lightGreen" />
           <span className="font-semibold tracking-wide">
             Turbomeck sidan laddas...
           </span>
