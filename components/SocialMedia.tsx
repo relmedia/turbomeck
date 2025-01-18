@@ -48,7 +48,7 @@ const SocialMedia = ({ className, iconClassName, tooltipClassName }: Props) => {
             </TooltipTrigger>
             <TooltipContent
               className={cn(
-                "bg-white text-neutral-800 font-semibold",
+                "bg-white text-neutral-800 font-medium",
                 tooltipClassName
               )}>
               {item?.title}
