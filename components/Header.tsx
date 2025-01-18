@@ -8,8 +8,8 @@ import { ClerkLoaded, SignedIn, SignInButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { ListOrdered } from "lucide-react";
 import { getAllCategories, getMyOrders } from "@/sanity/helpers";
-import MobileMenu from "./MobileMenu";
 import SearchBar from "./SearchBar";
+import MobileMenu from "./MobileMenu";
 
 const Header = async () => {
   const user = await currentUser();
@@ -24,7 +24,7 @@ const Header = async () => {
     <header className="bg-white border-b border-b-gray-300 py-5 sticky top-0 z-50">
       <Container className="flex items-center justify-between gap-7 text-lightColor">
         <div className="w-auto lg:w-1/3 flex items-center">
-          <MobileMenu categories={[]} />
+          <MobileMenu />
           <Logo>
             Turbo<p className="text-darkColor items-center">meck</p>
           </Logo>
