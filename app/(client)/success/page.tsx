@@ -25,8 +25,10 @@ const SuccessPage = () => {
   useEffect(() => {
     if (!orderNumber && !sessionId) {
       router.push("/");
+    } else {
+      clearCart();
     }
-  });
+  }, [orderNumber, sessionId, clearCart]);
 
   const query =
     defineQuery(`*[_type == 'order' && clerkUserId == $userId] | order(orderData desc){
