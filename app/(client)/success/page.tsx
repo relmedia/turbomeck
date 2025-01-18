@@ -117,19 +117,19 @@ const SuccessPage = () => {
             href="/"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-300 shadow-md">
             <Home className="w-5 h-5 mr-2" />
-            Home
+            Start
           </Link>
           <Link
             href="/orders"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-all duration-300 shadow-md">
             <Package className="w-5 h-5 mr-2" />
-            Orders
+            Ordrar
           </Link>
           <Link
             href="/"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-300 shadow-md">
             <ShoppingBag className="w-5 h-5 mr-2" />
-            Shop
+            Shoppa
           </Link>
         </div>
       </motion.div>
