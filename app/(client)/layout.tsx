@@ -24,7 +24,7 @@ const raleway = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Turbomeckkkkkkk",
+  title: "Turbomeck",
   description: "Allt från tubo till avgassystem",
 };
 
