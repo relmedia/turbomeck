@@ -5,11 +5,12 @@ const HomeBanner = () => {
   return (
     <div className="flex flex-col items-center justify-center gap-5 mt-10">
       <Title className="uppercase text-3xl md:text-4xl font-bold text-center">
-        Best Clothing Collection
+        Hitta dina turbodelar
       </Title>
       <p className="text-sm text-center text-lightColor/80 font-medium max-w-[480px] ">
-        Find everything you need to look and feel your best, and shop the latest
-        men&apos;s fashion and lifestyle products.
+        Vi har 40 års erfarenhet av utbytesturbo! Vi erbjuder nya och renoverade
+        turbosystem med fabriksstandard. Vi kan också hjälpa dig att renovera
+        din gamla.
       </p>
     </div>
   );
