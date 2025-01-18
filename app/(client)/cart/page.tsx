@@ -121,18 +121,6 @@ const CartPage = () => {
                                 <p className="text-sm text-lightColor font-medium">
                                   {product?.intro}
                                 </p>
-                                <p className="text-sm capitalize">
-                                  Variant:{" "}
-                                  <span className="font-semibold">
-                                    {product?.variant}
-                                  </span>
-                                </p>
-                                <p className="text-sm capitalize">
-                                  Status:{" "}
-                                  <span className="font-semibold">
-                                    {product?.status}
-                                  </span>
-                                </p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <TooltipProvider>
