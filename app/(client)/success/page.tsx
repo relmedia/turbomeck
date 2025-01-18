@@ -87,7 +87,7 @@ const SuccessPage = () => {
           </h2>
           <ul className="text-gray-700 text-sm space-y-1">
             <li>Kolla din e-post för orderbekräftelse</li>
-            <li>Vi meddelar dig när din beställning skickas</li>
+            <li>Vi meddelar dig när din beställning skickats</li>
             <li>Följ din beställningsstatus när som helst</li>
           </ul>
         </div>
