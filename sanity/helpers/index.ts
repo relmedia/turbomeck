@@ -47,24 +47,24 @@ export const getAllCategories = async () => {
   }
 };
 
-// export const getActiveSaleByCouponCode = async (couponCode: CouponCode) => {
-//   const ACTIVE_COUPON_CODE = defineQuery(
-//     `*[_type == 'sale' && isActive == true && couponCode == $couponCode] | order(validFrom desc)[0]`
-//   );
+export const getActiveSaleByCouponCode = async (couponCode: CouponCode) => {
+  const ACTIVE_COUPON_CODE = defineQuery(
+    `*[_type == 'sale' && isActive == true && couponCode == $couponCode] | order(validFrom desc)[0]`
+  );
 
-//   try {
-//     const activeSale = await sanityFetch({
-//       query: ACTIVE_COUPON_CODE,
-//       params: {
-//         couponCode,
-//       },
-//     });
-//     return activeSale ? activeSale?.data : null;
-//   } catch (error) {
-//     console.error("Error fetching active sale by coupon code:", error);
-//     return null;
-//   }
-// };
+  try {
+    const activeSale = await sanityFetch({
+      query: ACTIVE_COUPON_CODE,
+      params: {
+        couponCode,
+      },
+    });
+    return activeSale ? activeSale?.data : null;
+  } catch (error) {
+    console.error("Error fetching active sale by coupon code:", error);
+    return null;
+  }
+};
 
 export const searchProductsByName = async (searchParam: string) => {
   const PRODUCT_SEARCH_QUERY = defineQuery(
