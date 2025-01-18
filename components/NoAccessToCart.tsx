@@ -16,30 +16,32 @@ const NoAccessToCart = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center">
-            <Logo>Tulos</Logo>
+            <Logo>
+              Turbo<p className="text-darkColor items-center">meck</p>
+            </Logo>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            Welcome Back!
+            Välkommen tillbaka!
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground text-center font-medium">
-            Log in to view your cart items and checkout. Don&rsquo;t miss out on
-            your favorite products!
+            Logga in för att se dina varor i kundvagnen och slutför ditt köp i
+            kassan. Gå inte miste om dina favoritprodukter!
           </p>
           <SignInButton mode="modal">
             <Button className="w-full font-semibold" size="lg">
-              Sign in
+              Logga in
             </Button>
           </SignInButton>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-sm text-muted-foreground text-center">
-            Don&rsquo;t have an account?
+            Har du inget konto?
           </div>
           <SignUpButton mode="modal">
             <Button variant="outline" className="w-full" size="lg">
-              Create an account
+              Skapa ett konto här
             </Button>
           </SignUpButton>
         </CardFooter>
