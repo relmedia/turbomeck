@@ -99,7 +99,7 @@ export default function HeroSlider() {
             style={{ objectFit: "cover" }}
             className="brightness-50"
           />
-          <div className="absolute inset-0 flex items-center">
+          <div className="flex flex-col items-center justify-center">
             <div className="container px-4 min-h-[500px] flex flex-col justify-items-center">
               <div className="max-w-lg">
                 <motion.h2
