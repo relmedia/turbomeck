@@ -10,6 +10,7 @@ import { MY_ORDERS_QUERYResult } from "@/sanity.types";
 import { client } from "@/sanity/lib/client";
 import { defineQuery } from "next-sanity";
 import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/router";
 
 const SuccessPage = () => {
   const [orders, setOrders] = useState<MY_ORDERS_QUERYResult>([]);
@@ -18,6 +19,14 @@ const SuccessPage = () => {
   const clearCart = useCartStore((state) => state.resetCart);
   const { user } = useUser();
   const userId = user?.id;
+  const sessionId = searchParams.get("sesssion_id");
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!orderNumber && !sessionId) {
+      router.push("/");
+    }
+  });
 
   const query =
     defineQuery(`*[_type == 'order' && clerkUserId == $userId] | order(orderData desc){
