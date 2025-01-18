@@ -30,36 +30,12 @@ export const categoryType = defineType({
         hotspot: true,
       },
     }),
-    defineField({
-      name: "parent",
-      title: "Parent Category",
-      type: "reference",
-      to: [{ type: "category" }],
-      options: {
-        disableNew: true,
-      },
-    }),
-    defineField({
-      name: "subcategories",
-      title: "Subcategories",
-      type: "array",
-      of: [{ type: "reference", to: [{ type: "category" }] }],
-      validation: (Rule) => Rule.unique(),
-    }),
   ],
   preview: {
     select: {
       title: "title",
       subtitle: "description",
       media: "image",
-      parent: "parent.title",
-    },
-    prepare({ title, subtitle, media, parent }) {
-      return {
-        title,
-        subtitle: parent ? `${parent} > ${subtitle || ""}` : subtitle,
-        media,
-      };
     },
   },
 });
