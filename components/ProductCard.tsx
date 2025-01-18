@@ -20,7 +20,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               height={500}
               // loading="lazy"
               priority
-              className={`w-full h-72 object-contain overflow-hidden  transition-transform duration-500 ${product?.stock !== 0 && "group-hover:scale-105"}`}
+              className={`w-full lg-h-72 object-contain overflow-hidden  transition-transform duration-500 ${product?.stock !== 0 && "group-hover:scale-105"}`}
             />
           </Link>
         )}
