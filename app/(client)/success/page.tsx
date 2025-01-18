@@ -28,31 +28,31 @@ const SuccessPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="bg-white rounded-2xl shadow-2xl px-8 py-12 max-w-xl w-full text-center">
-        <motion.div className="w-24 h-24 bg-black rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
+        <motion.div className="w-24 h-24 bg-lightGreen rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
           <Check className="text-white w-12 h-12" />
         </motion.div>
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Order confirmed!
+          Beställningen är bekräftad!
         </h1>
         <div className="space-y-4 mb-8 text-left">
           <p className="text-gray-700">
-            Thank your for your purchase. We&apos;re processing your order and
-            will ship it soon. A confirmation email with your order details will
-            be sent to your inbox shortly.
+            Tack för ditt köp. Vi bearbetar din order och kommer att skicka den
+            med Postnord snart. Ett bekräftelsemeddelande med dina
+            beställningsuppgifter kommer skickas till din e-post inom kort.
           </p>
           <p className="text-gray-700">
-            Order Number:{" "}
+            Order Nummer:{" "}
             <span className="text-black font-semibold">{orderNumber}</span>
           </p>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-8">
           <h2 className="font-semibold text-gray-900 mb-2">
-            What&apos;s Next?
+            Vad händer härnäst?
           </h2>
           <ul className="text-gray-700 text-sm space-y-1">
-            <li>Check your email for order confirmation</li>
-            <li>We&apos;ll notify you when your order ships</li>
-            <li>Track your order status anytime</li>
+            <li>Kontrollera din e-post för orderbekräftelse</li>
+            <li>Vi meddelar dig när din beställning har skickats</li>
+            <li>Följ din beställningsstatus när som helst</li>
           </ul>
         </div>
         {/* Order tracker */}
@@ -61,19 +61,19 @@ const SuccessPage = () => {
             href="/"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-300 shadow-md">
             <Home className="w-5 h-5 mr-2" />
-            Home
+            Start
           </Link>
           <Link
             href="/orders"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-all duration-300 shadow-md">
             <Package className="w-5 h-5 mr-2" />
-            Orders
+            Ordrar
           </Link>
           <Link
             href="/"
             className="flex items-center justify-center px-4 py-3 font-semibold bg-black text-white rounded-lg hover:bg-gray-800 transition-all duration-300 shadow-md">
             <ShoppingBag className="w-5 h-5 mr-2" />
-            Shop
+            Shoppa
           </Link>
         </div>
       </motion.div>
