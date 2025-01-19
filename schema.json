@@ -1187,27 +1187,23 @@
           "of": [
             {
               "type": "string",
-              "value": "tshirt"
+              "value": "saab"
             },
             {
               "type": "string",
-              "value": "jacket"
+              "value": "volvo"
             },
             {
               "type": "string",
-              "value": "pants"
+              "value": "turbo"
             },
             {
               "type": "string",
-              "value": "hoodie"
+              "value": "wastegate"
             },
             {
               "type": "string",
-              "value": "short"
-            },
-            {
-              "type": "string",
-              "value": "others"
+              "value": "övriga"
             }
           ]
         },

@@ -192,7 +192,7 @@ export type Product = {
   }>;
   stock?: number;
   status?: "new" | "hot" | "sale";
-  variant?: "tshirt" | "jacket" | "pants" | "hoodie" | "short" | "others";
+  variant?: "saab" | "volvo" | "turbo" | "wastegate" | "\xF6vriga";
 };
 
 export type Category = {
@@ -378,7 +378,7 @@ export type PRODUCTS_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+  variant?: "\xF6vriga" | "saab" | "turbo" | "volvo" | "wastegate";
 }>;
 // Variable: CATEGORIES_QUERY
 // Query: *[_type=="category"] | order(name asc)
@@ -495,7 +495,7 @@ export type PRODUCT_SEARCH_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+  variant?: "\xF6vriga" | "saab" | "turbo" | "volvo" | "wastegate";
 }>;
 // Variable: PRODUCT_BY_ID_QUERY
 // Query: *[_type == "product" && slug.current == $slug] | order(name asc) [0]
@@ -561,7 +561,7 @@ export type PRODUCT_BY_ID_QUERYResult = {
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+  variant?: "\xF6vriga" | "saab" | "turbo" | "volvo" | "wastegate";
 } | null;
 // Variable: PRODUCT_BY_CATEGORY_QUERY
 // Query: *[_type == 'product' && references(*[_type == "category" && slug.current == $categorySlug]._id)] | order(name asc)
@@ -627,7 +627,7 @@ export type PRODUCT_BY_CATEGORY_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+  variant?: "\xF6vriga" | "saab" | "turbo" | "volvo" | "wastegate";
 }>;
 // Variable: SALE_QUERY
 // Query: *[_type == 'sale'] | order(name asc)
@@ -740,7 +740,7 @@ export type MY_ORDERS_QUERYResult = Array<{
       }>;
       stock?: number;
       status?: "hot" | "new" | "sale";
-      variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+      variant?: "\xF6vriga" | "saab" | "turbo" | "volvo" | "wastegate";
     } | null;
     quantity?: number;
     _key: string;
