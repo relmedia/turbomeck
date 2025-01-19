@@ -3,7 +3,8 @@ import React from "react";
 
 const page = async () => {
   await requiredUser();
-  return <div>OrderPage</div>;
+  const orders =await
+  return [];
 };
 
 export default page;
