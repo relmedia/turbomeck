@@ -69,9 +69,9 @@ export const productType = defineType({
       type: "string",
       options: {
         list: [
-          { title: "New", value: "new" },
-          { title: "Hot", value: "hot" },
-          { title: "Sale", value: "sale" },
+          { title: "Ny", value: "new" },
+          { title: "Het", value: "hot" },
+          { title: "Försäljning", value: "sale" },
         ],
       },
     }),
@@ -82,11 +82,11 @@ export const productType = defineType({
       options: {
         list: [
           { title: "Tshirt", value: "tshirt" },
-          { title: "Jacket", value: "jacket" },
-          { title: "Pants", value: "pants" },
-          { title: "Hoodie", value: "hoodie" },
-          { title: "Short", value: "short" },
-          { title: "Others", value: "others" },
+          { title: "Saab", value: "saab" },
+          { title: "Volvo", value: "volvo" },
+          { title: "Turbo", value: "turbo" },
+          { title: "Wastegate", value: "wastegate" },
+          { title: "Övriga", value: "övriga" },
         ],
       },
     }),
