@@ -1,8 +1,8 @@
 export const headerData = [
   { title: "Start", href: "/" },
-  { title: "Produkter", href: "/produkter" },
-  { title: "Saab anpassat", href: "/saab-anpassat" },
-  { title: "Volvo anpassat", href: "/volvo-anpassat" },
+  { title: "Övriga", href: "/oevriga" },
+  { title: "Saab anpassat", href: "/saab" },
+  { title: "Volvo anpassat", href: "/volvo" },
   { title: "Turbo", href: "/turbo" },
 ];
 
