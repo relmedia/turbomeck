@@ -658,8 +658,99 @@ export type SALE_QUERYResult = Array<{
   };
 }>;
 // Variable: MY_ORDERS_QUERY
-// Query: *[_type == 'order' && clerkUserId == $userId] | order(orderData desc){    ...products[]{      ...product->    }  }
-export type MY_ORDERS_QUERYResult = Array<{}>;
+// Query: *[_type == 'order' && clerkUserId == $userId] | order(orderData desc){    ...,products[]{      ...,product->    }  }
+export type MY_ORDERS_QUERYResult = Array<{
+  _id: string;
+  _type: "order";
+  _createdAt: string;
+  _updatedAt: string;
+  _rev: string;
+  orderNumber?: string;
+  invoice?: {
+    id?: string;
+    number?: string;
+    hosted_invoice_url?: string;
+  };
+  stripeCheckoutSessionId?: string;
+  stripeCustomerId?: string;
+  clerkUserId?: string;
+  customerName?: string;
+  email?: string;
+  stripePaymentIntentId?: string;
+  products: Array<{
+    product: {
+      _id: string;
+      _type: "product";
+      _createdAt: string;
+      _updatedAt: string;
+      _rev: string;
+      name?: string;
+      slug?: Slug;
+      images?: Array<{
+        asset?: {
+          _ref: string;
+          _type: "reference";
+          _weak?: boolean;
+          [internalGroqTypeReferenceTo]?: "sanity.imageAsset";
+        };
+        hotspot?: SanityImageHotspot;
+        crop?: SanityImageCrop;
+        _type: "image";
+        _key: string;
+      }>;
+      intro?: string;
+      description?: Array<{
+        children?: Array<{
+          marks?: Array<string>;
+          text?: string;
+          _type: "span";
+          _key: string;
+        }>;
+        style?: "blockquote" | "h1" | "h2" | "h3" | "h4" | "normal";
+        listItem?: "bullet";
+        markDefs?: Array<{
+          href?: string;
+          _type: "link";
+          _key: string;
+        }>;
+        level?: number;
+        _type: "block";
+        _key: string;
+      } | {
+        asset?: {
+          _ref: string;
+          _type: "reference";
+          _weak?: boolean;
+          [internalGroqTypeReferenceTo]?: "sanity.imageAsset";
+        };
+        hotspot?: SanityImageHotspot;
+        crop?: SanityImageCrop;
+        alt?: string;
+        _type: "image";
+        _key: string;
+      }>;
+      price?: number;
+      discount?: number;
+      categories?: Array<{
+        _ref: string;
+        _type: "reference";
+        _weak?: boolean;
+        _key: string;
+        [internalGroqTypeReferenceTo]?: "category";
+      }>;
+      stock?: number;
+      status?: "hot" | "new" | "sale";
+      variant?: "hoodie" | "jacket" | "others" | "pants" | "short" | "tshirt";
+    } | null;
+    quantity?: number;
+    _key: string;
+  }> | null;
+  totalPrice?: number;
+  currency?: string;
+  amountDiscount?: number;
+  status?: "cancelled" | "delivered" | "paid" | "pending" | "shipped";
+  orderDate?: string;
+}>;
 
 // Query TypeMap
 import "@sanity/client";
@@ -672,6 +763,6 @@ declare module "@sanity/client" {
     "*[_type == \"product\" && slug.current == $slug] | order(name asc) [0]": PRODUCT_BY_ID_QUERYResult;
     "*[_type == 'product' && references(*[_type == \"category\" && slug.current == $categorySlug]._id)] | order(name asc)": PRODUCT_BY_CATEGORY_QUERYResult;
     "*[_type == 'sale'] | order(name asc)": SALE_QUERYResult;
-    "*[_type == 'order' && clerkUserId == $userId] | order(orderData desc){\n    ...products[]{\n      ...product->\n    }\n  }": MY_ORDERS_QUERYResult;
+    "*[_type == 'order' && clerkUserId == $userId] | order(orderData desc){\n    ...,products[]{\n      ...,product->\n    }\n  }": MY_ORDERS_QUERYResult;
   }
 }
