@@ -7,7 +7,7 @@ export const headerData = [
 ];
 
 export const productType = [
-  { title: "Produkter", value: "produkter" },
+  { title: "Övriga", value: "övriga" },
   { title: "Saab", value: "saab" },
   { title: "Volvo", value: "volvo" },
   { title: "Turbo", value: "turbo" },
