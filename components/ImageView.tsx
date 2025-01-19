@@ -34,9 +34,8 @@ const ImageView = ({ images = [] }: Props) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-h-[550px] min-h-[450px] border border-darkColor/10 rounded-md group overflow-hidden"
-        >
+          transition={{ duration: 0.2 }}
+          className="w-full max-h-[550px] min-h-[450px] border border-darkColor/10 rounded-md group overflow-hidden">
           <Image
             src={urlFor(active).url()}
             alt="productImage"
@@ -54,8 +53,7 @@ const ImageView = ({ images = [] }: Props) => {
             onClick={() => setActive(image)}
             className={`border rounded-md overflow-hidden ${
               active._key === image._key ? "ring-1 ring-darkColor" : ""
-            }`}
-          >
+            }`}>
             <Image
               src={urlFor(image).url()}
               alt={`Thumbnail ${image._key}`}
