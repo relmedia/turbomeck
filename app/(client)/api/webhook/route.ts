@@ -13,14 +13,13 @@ export async function POST(req: NextRequest) {
   if (!sig) {
     return NextResponse.json(
       {
-        error: "No Signature",
+        error: "No signature",
       },
       { status: 400 }
     );
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_KEY;
-
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.log("Stripe webhook secret is not set");
     return NextResponse.json(
@@ -30,7 +29,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
   let event: Stripe.Event;
+
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (error) {
@@ -48,9 +49,12 @@ export async function POST(req: NextRequest) {
     const invoice = session.invoice
       ? await stripe.invoices.retrieve(session.invoice as string)
       : null;
+    // console.log("session", session, "invoice", invoice);
 
     try {
-      await createOrderInsanity(session, invoice);
+      await createOrderInSanity(session, invoice);
+      // const order = await createOrderInSanity(session);
+      // console.log("Order created in Sanity:", order);
     } catch (error) {
       console.error("Error creating order in sanity:", error);
       return NextResponse.json(
@@ -64,10 +68,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
-async function createOrderInsanity(
+async function createOrderInSanity(
   session: Stripe.Checkout.Session,
   invoice: Stripe.Invoice | null
 ) {
+  // console.log("createOrderInSanity", invoice);
+
   const {
     id,
     amount_total,
@@ -76,6 +82,7 @@ async function createOrderInsanity(
     payment_intent,
     total_details,
   } = session;
+
   const { orderNumber, customerName, customerEmail, clerkUserId } =
     metadata as unknown as Metadata;
 
@@ -100,15 +107,16 @@ async function createOrderInsanity(
     stripePaymentIntentId: payment_intent,
     customerName,
     stripeCustomerId: customerEmail,
-    clerkUserId,
+    clerkUserId: clerkUserId,
     email: customerEmail,
     currency,
     amountDiscount: total_details?.amount_discount
-      ? total_details?.amount_discount / 100
+      ? total_details.amount_discount / 100
       : 0,
+
     products: sanityProducts,
     totalPrice: amount_total ? amount_total / 100 : 0,
-    status: "betald",
+    status: "paid",
     orderDate: new Date().toISOString(),
     invoice: invoice
       ? {

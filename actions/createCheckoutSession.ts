@@ -39,8 +39,8 @@ export async function createCheckoutSession(
       invoice_creation: {
         enabled: true,
       },
-      success_url: `https://turbomeck.vercel.app/success?session_id={CHECKOUT_SESSION_ID} & orderNumber=${metadata.orderNumber}`,
-      cancel_url: `https://turbomeck.vercel.app/cart`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID} & orderNumber=${metadata.orderNumber}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/cart`,
       line_items: items.map((item) => ({
         price_data: {
           currency: "SEK",
