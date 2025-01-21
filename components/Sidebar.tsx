@@ -48,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, categories }) => {
             }`}>
             Home
           </Link>
-          {categories?.map((item) => (
+          {/* {categories?.map((item) => (
             <Link
               onClick={onClose}
               key={item?.title}
@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, categories }) => {
               }`}>
               {item?.title}
             </Link>
-          ))}
+          ))} */}
         </div>
         <SocialMedia />
       </motion.div>
