@@ -11,9 +11,6 @@ import { VisualEditing } from "next-sanity";
 import { draftMode } from "next/headers";
 import DisableDraftMode from "@/components/DisableDraftMode";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import ReactCookieBot from "react-cookiebot";
-
-const domainGroupId = "a7df86b2-32fa-4f79-9e33-ef640f3e9f9b";
 
 const poppins = localFont({
   src: "../fonts/Poppins.woff2",
@@ -38,37 +35,33 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
-      <ReactCookieBot domainGroupId={domainGroupId} language="SE" />
-      <ClerkProvider localization={svSE}>
-        <html lang="sv">
-          <body
-            className={`${poppins.variable} ${raleway.variable} antialiased`}>
-            {(await draftMode()).isEnabled && (
-              <>
-                <DisableDraftMode />
-                <VisualEditing />
-              </>
-            )}
-            <Header />
-            {children}
-            <Footer />
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: "#2b2b2b",
-                  color: "#fff",
-                },
-              }}
-            />
-            <SpeedInsights />
-            <SanityLive />
-            {/* <Chat pageId="106453562488245" appId="560672463472073" />
+    <ClerkProvider localization={svSE}>
+      <html lang="sv">
+        <body className={`${poppins.variable} ${raleway.variable} antialiased`}>
+          {(await draftMode()).isEnabled && (
+            <>
+              <DisableDraftMode />
+              <VisualEditing />
+            </>
+          )}
+          <Header />
+          {children}
+          <Footer />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "#2b2b2b",
+                color: "#fff",
+              },
+            }}
+          />
+          <SpeedInsights />
+          <SanityLive />
+          {/* <Chat pageId="106453562488245" appId="560672463472073" />
     <ChatIcon /> */}
-          </body>
-        </html>
-      </ClerkProvider>
-    </>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
