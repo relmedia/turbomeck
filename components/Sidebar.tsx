@@ -7,7 +7,6 @@ import { useOutsideClick } from "@/hooks";
 import { CATEGORIES_QUERYResult } from "@/sanity.types";
 import Logo from "./Logo";
 import SocialMedia from "./SocialMedia";
-import { headerData } from "@/constants";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -49,13 +48,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, categories }) => {
             }`}>
             Home
           </Link>
-          {headerData?.map((Item) => (
+          {categories?.map((item) => (
             <Link
               onClick={onClose}
-              key={Item?.title}
-              href={Item?.href}
-              className={`hover:text-white hoverEffect w-32 ${pathname === Item?.href && "text-white"}`}>
-              {Item?.title}
+              key={item?.title}
+              href={`/category/${item?.slug?.current}`}
+              className={`hover:text-white hoverEffect ${
+                pathname === `/category/${item?.slug?.current}` && "text-white"
+              }`}>
+              {item?.title}
             </Link>
           ))}
         </div>
