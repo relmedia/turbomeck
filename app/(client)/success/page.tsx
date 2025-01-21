@@ -37,7 +37,7 @@ const SuccessPage = () => {
         <div className="space-y-4 mb-8 text-left">
           <p className="text-gray-700">
             Tack för ditt köp. Vi bearbetar din order och kommer att skicka den
-            med Postnord snart. Ett bekräftelsemeddelande med dina
+            med Postnord. Ett bekräftelsemeddelande med dina
             beställningsuppgifter kommer skickas till din e-post inom kort.
           </p>
           <p className="text-gray-700">
