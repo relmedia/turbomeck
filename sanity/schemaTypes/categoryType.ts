@@ -3,7 +3,7 @@ import { defineField, defineType } from "sanity";
 
 export const categoryType = defineType({
   name: "category",
-  title: "Category",
+  title: "Kategori",
   type: "document",
   icon: TagIcon,
   fields: [
@@ -13,6 +13,7 @@ export const categoryType = defineType({
     }),
     defineField({
       name: "slug",
+      title: "Permalänk",
       type: "slug",
       options: {
         source: "title",
@@ -20,11 +21,12 @@ export const categoryType = defineType({
     }),
     defineField({
       name: "description",
+      title: "beskrivning",
       type: "text",
     }),
     defineField({
       name: "image",
-      title: "Category Image",
+      title: "Kategori Bild",
       type: "image",
       options: {
         hotspot: true,
