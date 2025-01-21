@@ -9,13 +9,13 @@ export const productType = defineType({
   fields: [
     defineField({
       name: "name",
-      title: "Product Name",
+      title: "Produkt Namn",
       type: "string",
       validation: (Rule) => Rule.required(),
     }),
     defineField({
       name: "slug",
-      title: "Slug",
+      title: "Permalänk",
       type: "slug",
       options: {
         source: "name",
@@ -25,47 +25,47 @@ export const productType = defineType({
     }),
     defineField({
       name: "images",
-      title: "Product Images",
+      title: "Produkt Bilder",
       type: "array",
       of: [{ type: "image", options: { hotspot: true } }],
     }),
     defineField({
       name: "intro",
-      title: "Product Intro",
+      title: "Produkt kort beskrivning",
       type: "string",
     }),
     defineField({
       name: "description",
-      title: "Description",
+      title: "Beskrivning",
       type: "blockContent",
     }),
     defineField({
       name: "price",
-      title: "Price",
+      title: "Pris",
       type: "number",
       validation: (Rule) => Rule.required().min(0),
     }),
     defineField({
       name: "discount",
-      title: "Discount",
+      title: "Rabatt",
       type: "number",
     }),
     defineField({
       name: "categories",
-      title: "Categories",
+      title: "Kategorier",
       type: "array",
       of: [{ type: "reference", to: { type: "category" } }],
     }),
     defineField({
       name: "stock",
-      title: "Stock",
+      title: "Antal i Lager",
       type: "number",
       validation: (Rule) => Rule.min(0),
     }),
 
     defineField({
       name: "status",
-      title: "Product Status",
+      title: "Produkt Status",
       type: "string",
       options: {
         list: [
@@ -77,7 +77,7 @@ export const productType = defineType({
     }),
     defineField({
       name: "variant",
-      title: "Product Type",
+      title: "Produkt Typ",
       type: "string",
       options: {
         list: [
