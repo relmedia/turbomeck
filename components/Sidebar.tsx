@@ -1,48 +1,60 @@
-import React, { FC } from "react";
+import { X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import React from "react";
 import { motion } from "motion/react";
 import Logo from "./Logo";
-import { headerData } from "@/constants";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { useOutsideClick } from "@/hooks";
 import SocialMedia from "./SocialMedia";
-import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { CATEGORIES_QUERYResult } from "@/sanity.types";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  categories: CATEGORIES_QUERYResult;
 }
 
-const Sidebar: FC<SidebarProps> = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, categories }) => {
   const pathname = usePathname();
   const sidebarRef = useOutsideClick<HTMLDivElement>(onClose);
+
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-50 bg-black/50 shadow-xl hoverEffect cursor-auto w-full ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      className={`fixed inset-y-0 left-0 z-50 w-full bg-primary/50 shadow-xl transform ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      } transition-transform ease-in-out duration-300`}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.3 }}
         ref={sidebarRef}
-        className="min-w-72 max-w-96 bg-black/95 text-white/70 h-full p-10 border-r border-r-white/20 flex flex-col gap-7">
+        className="min-w-72 max-w-96 bg-primary h-full text-primary-foreground p-10 border-r border-r-hoverColor/30 flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <button onClick={onClose}>
-            <Logo>
-              Turbo<p className="text-white items-center">meck</p>
-            </Logo>
-          </button>
-          <button className="hover:text-red-500 hoverEffect" onClick={onClose}>
+          <Logo className="text-white">Tulos</Logo>
+          <button
+            onClick={onClose}
+            className="hover:text-hoverColor hoverEffect">
             <X />
           </button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-semibold tracking-wide">
-          {headerData?.map((Item) => (
+        <div className="flex flex-col gap-3.5 text-base font-semibold tracking-wide text-zinc-400">
+          <Link
+            onClick={onClose}
+            href={"/"}
+            className={`hover:text-white hoverEffect ${
+              pathname === `/` && "text-white"
+            }`}>
+            Home
+          </Link>
+          {categories?.map((item) => (
             <Link
               onClick={onClose}
-              key={Item?.title}
-              href={Item?.href}
-              className={`hover:text-white hoverEffect w-32 ${pathname === Item?.href && "text-white"}`}>
-              {Item?.title}
+              key={item?.title}
+              href={`/category/${item?.slug?.current}`}
+              className={`hover:text-white hoverEffect ${
+                pathname === `/category/${item?.slug?.current}` && "text-white"
+              }`}>
+              {item?.title}
             </Link>
           ))}
         </div>
