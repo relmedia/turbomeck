@@ -83,7 +83,7 @@ export default function HeroSlider() {
   }, [nextSlide]);
 
   return (
-    <div className="relative min-h-[600px] overflow-hidden">
+    <div className="relative min-h-[500px] overflow-hidden">
       <AnimatePresence initial={false} mode="wait">
         <motion.div
           key={currentSlide}
