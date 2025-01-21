@@ -83,7 +83,7 @@ export default function HeroSlider() {
   }, [nextSlide]);
 
   return (
-    <div className="relative min-h-[500px] overflow-hidden rounded-lg">
+    <div className="relative min-h-[600px] overflow-hidden">
       <AnimatePresence initial={false} mode="wait">
         <motion.div
           key={currentSlide}
@@ -99,9 +99,9 @@ export default function HeroSlider() {
             style={{ objectFit: "cover" }}
             className="brightness-50"
           />
-          <div className="flex flex-col items-center justify-center">
-            <div className="container px-4 min-h-[500px] flex flex-col justify-items-center">
-              <div className="max-w-lg">
+          <div className="absolute inset-0 flex items-center">
+            <div className="container mx-auto px-4 md:px-8 lg:px-16 min-h-[600px] flex items-center justify-center">
+              <div className="max-w-lg w-full text-center">
                 <motion.h2
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -131,13 +131,13 @@ export default function HeroSlider() {
       </AnimatePresence>
       <button
         onClick={prevSlide}
-        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 bg-opacity-50 text-white rounded-lg px-4 py-2 hover:bg-white hover:text-black hoverEffect"
+        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg hover:bg-white hover:text-black hoverEffect"
         aria-label="Previous slide">
         &#10094;
       </button>
       <button
         onClick={nextSlide}
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 bg-opacity-50 text-white rounded-lg px-4 py-2 hover:bg-white hover:text-black hoverEffect"
+        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg hover:bg-white hover:text-black hoverEffect"
         aria-label="Next slide">
         &#10095;
       </button>
@@ -146,7 +146,7 @@ export default function HeroSlider() {
           <button
             key={index}
             onClick={() => goToSlide(index)}
-            className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-black text-sm font-semibold relative overflow-hidden"
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-blak text-sm relative overflow-hidden"
             aria-label={`Go to slide ${index + 1}`}>
             <span className="z-10 flex items-center justify-center">
               {index === currentSlide ? (
@@ -167,7 +167,7 @@ export default function HeroSlider() {
                   r="48%"
                   fill="none"
                   stroke="black"
-                  strokeWidth="4"
+                  strokeWidth="2"
                   strokeDasharray="0 100"
                   initial={{ strokeDasharray: "0 100" }}
                   animate={{
