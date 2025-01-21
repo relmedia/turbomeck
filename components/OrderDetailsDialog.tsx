@@ -74,7 +74,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <TableHead>Pris</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="border-b">
             {order.products?.map((product, index) => (
               <TableRow key={index}>
                 <TableCell className="flex items-center gap-2">
