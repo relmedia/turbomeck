@@ -12,28 +12,28 @@ const data: Props[] = [
     title: "Besök oss",
     subtitle: "Husholmsgatan 4, 425 30 Hisings Kärra",
     icon: (
-      <MapPin className="text-gray-600 group-hover:text-neutral-800 transition-colors" />
+      <MapPin className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
     ),
   },
   {
     title: "Ring oss",
     subtitle: "+46 70-916 50 06",
     icon: (
-      <Phone className="text-gray-600 group-hover:text-neutral-800 transition-colors" />
+      <Phone className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
     ),
   },
   {
     title: "Våra öppetider",
     subtitle: "24/7",
     icon: (
-      <Clock className="text-gray-600 group-hover:text-neutral-800 transition-colors" />
+      <Clock className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
     ),
   },
   {
     title: "Maila oss",
     subtitle: "info@turbomeck.se",
     icon: (
-      <Mail className="text-gray-600 group-hover:text-neutral-800 transition-colors" />
+      <Mail className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
     ),
   },
 ];
