@@ -81,11 +81,13 @@ export const productType = defineType({
       type: "string",
       options: {
         list: [
-          { title: "Saab", value: "saab" },
-          { title: "Volvo", value: "volvo" },
-          { title: "Turbo", value: "turbo" },
-          { title: "Wastegate", value: "wastegate" },
-          { title: "Övriga", value: "övriga" },
+          { title: "Bränslepumpar", value: "Bränslepumpar" },
+          { title: "Bränsletryck", value: "Bränsletryck" },
+          { title: "Downpipes", value: "Downpipes" },
+          { title: "Flänsar & V-band", value: "Flänsar & V-band" },
+          { title: "Intercooler", value: "Intercooler" },
+          { title: "Renoveringssatser", value: "Renoveringssatser" },
+          { title: "Wastegate", value: "Wastegate" },
         ],
       },
     }),
