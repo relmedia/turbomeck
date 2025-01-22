@@ -39,10 +39,10 @@ const ImageView = ({ images = [] }: Props) => {
           <Image
             src={urlFor(active).url()}
             alt="productImage"
-            width={700}
-            height={700}
+            width={800}
+            height={800}
             priority
-            className="w-full h-96 max-h-[550px] min-h-[500px] object-cover group-hover:scale-110 hoverEffect rounded-md"
+            className="w-full h-96 max-h-[550px] min-h-[500px] object-fill group-hover:scale-110 hoverEffect rounded-md"
           />
         </motion.div>
       </AnimatePresence>
