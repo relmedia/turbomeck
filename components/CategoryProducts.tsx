@@ -40,13 +40,13 @@ const CategoryProducts = ({ categories, slug }: Props) => {
   }, [currentSlug]);
 
   return (
-    <div className="py-5 flex flex-col md:flex-row items-start gap-5">
-      <div className="flex flex-col md:min-w-40 border">
+    <div className="py-10 flex flex-col md:flex-row gap-5">
+      <div className="flex flex-col md:min-w-40">
         {categories?.map((item) => (
           <Button
             key={item?._id}
             onClick={() => setCurrentSlug(item?.slug?.current as string)}
-            className={`bg-transparent border-0 rounded-none text-darkColor shadow-none hover:bg-darkColor hover:text-white font-semibold hoverEffect border-b last:border-b-0 ${item?.slug?.current === currentSlug && "bg-darkColor text-white border-darkColor"}`}>
+            className={`border-r justify-start px-0 bg-transparent border-right rounded-none text-darkColor shadow-none hover:text-lightGreen hover:border-r-darkColor/50 hover:bg-white font-semibold hoverEffect ${item?.slug?.current === currentSlug && "text-lightGreen border-r-lightGreen"}`}>
             {item?.title}
           </Button>
         ))}

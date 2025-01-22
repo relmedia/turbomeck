@@ -11,6 +11,7 @@ import { VisualEditing } from "next-sanity";
 import { draftMode } from "next/headers";
 import DisableDraftMode from "@/components/DisableDraftMode";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
 
 const poppins = localFont({
   src: "../fonts/Poppins.woff2",
@@ -42,6 +43,7 @@ export default async function RootLayout({
             <>
               <DisableDraftMode />
               <VisualEditing />
+              <Analytics />
             </>
           )}
           <Header />
