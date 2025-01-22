@@ -7,10 +7,13 @@ export const headerData = [
 ];
 
 export const productType = [
-  { title: "Alla produkter", value: "alla produkter" },
-  { title: "Saab", value: "saab" },
-  { title: "Volvo", value: "volvo" },
-  { title: "Turbo", value: "turbo" },
+  { title: "Bränslepumpar", value: "Bränslepumpar" },
+  { title: "Bränsletryck", value: "Bränsletryck" },
+  { title: "Downpipes", value: "Downpipes" },
+  { title: "Flänsar & V-band", value: "Flänsar & V-band" },
+  { title: "Intercooler", value: "Intercooler" },
+  { title: "Renoveringssatser", value: "Renoveringssatser" },
+  { title: "Wastegate", value: "Wastegate" },
 ];
 
 export const quickLinksData = [
