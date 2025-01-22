@@ -9,7 +9,7 @@ interface Props {
 
 const Logo = ({ children, className }: Props) => {
   return (
-    <Link href={"/"} className="flex md:gap-2.5">
+    <Link href={"/"} className="flex md:gap-2">
       <Image
         priority
         src="/logo.svg"
