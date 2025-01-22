@@ -1,5 +1,4 @@
 import Container from "@/components/Container";
-import DiscountBanner from "@/components/DiscountBanner";
 import HeroSlide from "@/components/HeroSlide";
 //import HomeBanner from "@/components/HomeBanner";
 import ProductGrid from "@/components/ProductGrid";
