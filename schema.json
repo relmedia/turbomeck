@@ -1187,23 +1187,31 @@
           "of": [
             {
               "type": "string",
-              "value": "saab"
+              "value": "Bränslepumpar"
             },
             {
               "type": "string",
-              "value": "volvo"
+              "value": "Bränsletryck"
             },
             {
               "type": "string",
-              "value": "turbo"
+              "value": "Downpipes"
             },
             {
               "type": "string",
-              "value": "wastegate"
+              "value": "Flänsar & V-band"
             },
             {
               "type": "string",
-              "value": "övriga"
+              "value": "Intercooler"
+            },
+            {
+              "type": "string",
+              "value": "Renoveringssatser"
+            },
+            {
+              "type": "string",
+              "value": "Wastegate"
             }
           ]
         },
