@@ -1,9 +1,9 @@
 export const headerData = [
   { title: "Start", href: "/" },
+  { title: "Alla produkter", href: "/category/alla-produkter" },
   { title: "Saab anpassat", href: "/category/saab" },
   { title: "Volvo anpassat", href: "/category/volvo" },
   { title: "Turbo", href: "/category/turbo" },
-  { title: "Övriga", href: "/category/oevriga" },
 ];
 
 export const productType = [
