@@ -8,7 +8,6 @@ export default function Home() {
   return (
     <Container className="py-10">
       <HeroSlide />
-      <DiscountBanner sales={[]} />
       {/* <HomeBanner /> */}
       <ProductGrid />
     </Container>
