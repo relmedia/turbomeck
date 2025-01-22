@@ -43,7 +43,6 @@ export default async function RootLayout({
             <>
               <DisableDraftMode />
               <VisualEditing />
-              <Analytics />
             </>
           )}
           <Header />
@@ -58,6 +57,7 @@ export default async function RootLayout({
               },
             }}
           />
+          <Analytics />
           <SpeedInsights />
           <SanityLive />
           {/* <Chat pageId="106453562488245" appId="560672463472073" />
