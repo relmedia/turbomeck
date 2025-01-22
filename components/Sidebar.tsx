@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, categories }) => {
         className="min-w-72 max-w-96 bg-primary h-full text-primary-foreground p-10 border-r border-r-hoverColor/30 flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <Logo>
-            Turbo<p className="text-darkColor items-center">meck</p>
+            Turbo<p className="text-white items-center">meck</p>
           </Logo>
           <button
             onClick={onClose}
