@@ -15,7 +15,6 @@ const MobileMenu = () => {
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
-          categories={[]}
         />
       </div>
     </>
