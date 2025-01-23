@@ -62,7 +62,6 @@ export default async function RootLayout({
           <SanityLive />
           {/* <Chat pageId="106453562488245" appId="560672463472073" />
     <ChatIcon /> */}
-          <script src="https://cookiechimp.com/widget/XeEt53w.js"></script>
         </body>
       </html>
     </ClerkProvider>
