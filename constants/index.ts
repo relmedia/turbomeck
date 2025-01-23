@@ -10,6 +10,7 @@ export const productType = [
   { title: "Bränslepumpar", value: "Bränslepumpar" },
   { title: "Bränsletryck", value: "Bränsletryck" },
   { title: "Downpipes", value: "Downpipes" },
+  { title: "Dumpventiler", value: "Dumpventiler" },
   { title: "Flänsar & V-band", value: "Flänsar & V-band" },
   { title: "Intercooler", value: "Intercooler" },
   { title: "Renoveringssatser", value: "Renoveringssatser" },

@@ -1,6 +1,7 @@
 "use client";
+
 import { productType } from "@/constants";
-import { Repeat } from "lucide-react";
+
 interface Props {
   selectedTab: string;
   onTabSelect: (tab: string) => void;
@@ -8,21 +9,19 @@ interface Props {
 
 const HomeTabbar = ({ selectedTab, onTabSelect }: Props) => {
   return (
-    <div className="flex items-center gap-1.5 text-sm font-semibold">
-      <div className="flex items-center gap-1.5">
+    <div className="flex items-center">
+      <div className="flex items-center flex-wrap gap-1.5 text-sm font-semibold pb-2">
         {productType?.map((item) => (
           <button
             onClick={() => onTabSelect(item?.title)}
             key={item?.title}
-            className={`border border-darkColor px-4 py-1.5 md:px-6 md:py-2 rounded-full hover:bg-darkColor hover:text-white hoverEffect ${selectedTab === item?.title && "bg-darkColor text-white"}`}
-          >
+            className={`flex-shrink-0 border border-darkColor px-4 py-1.5 md:px-6 md:py-2 rounded-full hover:bg-darkColor hover:text-white hoverEffect ${
+              selectedTab === item?.title && "bg-darkColor text-white"
+            }`}>
             {item?.title}
           </button>
         ))}
       </div>
-      <button className="border border-darkColor px-2 py-2 rounded-full hover:bg-darkColor hover:text-white hoverEffect">
-        <Repeat className="w-5 h-5" />
-      </button>
     </div>
   );
 };
