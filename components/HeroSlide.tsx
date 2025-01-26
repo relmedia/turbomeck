@@ -129,7 +129,7 @@ export default function HeroSlider() {
           </div>
         </motion.div>
       </AnimatePresence>
-      <button
+      {/* <button
         onClick={prevSlide}
         className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg hover:bg-white hover:text-black hoverEffect"
         aria-label="Previous slide">
@@ -140,7 +140,7 @@ export default function HeroSlider() {
         className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-lg hover:bg-white hover:text-black hoverEffect"
         aria-label="Next slide">
         &#10095;
-      </button>
+      </button> */}
       <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-4 px-4">
         {slides.map((_, index) => (
           <button
