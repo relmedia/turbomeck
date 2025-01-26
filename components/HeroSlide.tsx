@@ -48,10 +48,10 @@ export default function HeroSlider() {
     setProgress(0);
   }, []);
 
-  const prevSlide = useCallback(() => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-    setProgress(0);
-  }, []);
+  //  const prevSlide = useCallback(() => {
+  //    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  //    setProgress(0);
+  //  }, []);
 
   const goToSlide = useCallback((index: number) => {
     setCurrentSlide(index);
