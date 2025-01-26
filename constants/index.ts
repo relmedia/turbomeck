@@ -7,7 +7,7 @@ export const headerData = [
 ];
 
 export const productType = [
-  { title: "Bränslepumpar", value: "Bränslepumpar" },
+  { title: "Bränslepumpar", value: "Branslepumpar" },
   { title: "Bränsletryck", value: "Bränsletryck" },
   { title: "Downpipes", value: "Downpipes" },
   { title: "Dumpventiler", value: "Dumpventiler" },
