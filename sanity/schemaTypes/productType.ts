@@ -85,7 +85,7 @@ export const productType = defineType({
           { title: "Bränsletryck", value: "Bransletryck" },
           { title: "Downpipes", value: "Downpipes" },
           { title: "Dumpventiler", value: "Dumpventiler" },
-          { title: "Flänsar & V-band", value: "Flänsar & V-band" },
+          { title: "Flänsar & V-band", value: "Flansar & V-band" },
           { title: "Intercooler", value: "Intercooler" },
           { title: "Renoveringssatser", value: "Renoveringssatser" },
           { title: "Wastegate", value: "Wastegate" },
