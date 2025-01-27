@@ -82,7 +82,7 @@ export const productType = defineType({
       options: {
         list: [
           { title: "Bränslepumpar", value: "Branslepumpar" },
-          { title: "Bränsletryck", value: "Bränsletryck" },
+          { title: "Bränsletryck", value: "Bransletryck" },
           { title: "Downpipes", value: "Downpipes" },
           { title: "Dumpventiler", value: "Dumpventiler" },
           { title: "Flänsar & V-band", value: "Flänsar & V-band" },
