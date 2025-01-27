@@ -29,7 +29,7 @@ const ProductPage = async ({
     <div>
       <Container className="flex flex-col md:flex-row gap-10 py-10">
         {product?.images && <ImageView images={product?.images} />}
-        <div className="md:w-1/2 flex flex-col gap-5">
+        <div className="w-full md:w-1/2 flex flex-col gap-5">
           <div>
             <p className="text-4xl font-bold mb-2">{product?.name}</p>
             <PriceView
