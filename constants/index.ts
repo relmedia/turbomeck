@@ -7,14 +7,14 @@ export const headerData = [
 ];
 
 export const productType = [
-  { title: "Bränslepumpar", value: "Branslepumpar" },
-  { title: "Bränsletryck", value: "Bransletryck" },
-  { title: "Downpipes", value: "Downpipes" },
-  { title: "Dumpventiler", value: "Dumpventiler" },
-  { title: "Flänsar & V-band", value: "Flansar & V-band" },
-  { title: "Intercooler", value: "Intercooler" },
-  { title: "Renoveringssatser", value: "Renoveringssatser" },
-  { title: "Wastegate", value: "Wastegate" },
+  { title: "Branslepumpar", value: "branslepumpar" },
+  { title: "Bränsletryck", value: "bransletryck" },
+  { title: "Downpipes", value: "downpipes" },
+  { title: "Dumpventiler", value: "dumpventiler" },
+  { title: "Flänsar & V-band", value: "flansar-v-band" },
+  { title: "Intercooler", value: "intercooler" },
+  { title: "Renoveringssatser", value: "renoveringssatser" },
+  { title: "Wastegate", value: "wastegate" },
 ];
 
 export const quickLinksData = [

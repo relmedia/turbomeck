@@ -1187,35 +1187,35 @@
           "of": [
             {
               "type": "string",
-              "value": "Branslepumpar"
+              "value": "branslepumpar"
             },
             {
               "type": "string",
-              "value": "Bransletryck"
+              "value": "bransletryck"
             },
             {
               "type": "string",
-              "value": "Downpipes"
+              "value": "downpipes"
             },
             {
               "type": "string",
-              "value": "Dumpventiler"
+              "value": "dumpventiler"
             },
             {
               "type": "string",
-              "value": "Flansar & V-band"
+              "value": "flansar-v-band"
             },
             {
               "type": "string",
-              "value": "Intercooler"
+              "value": "intercooler"
             },
             {
               "type": "string",
-              "value": "Renoveringssatser"
+              "value": "renoveringssatser"
             },
             {
               "type": "string",
-              "value": "Wastegate"
+              "value": "wastegate"
             }
           ]
         },
