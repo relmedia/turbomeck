@@ -81,9 +81,10 @@ export const productType = defineType({
       type: "string",
       options: {
         list: [
-          { title: "Bränslepumpar", value: "Bränslepumpar" },
+          { title: "Bränslepumpar", value: "Branslepumpar" },
           { title: "Bränsletryck", value: "Bränsletryck" },
           { title: "Downpipes", value: "Downpipes" },
+          { title: "Dumpventiler", value: "Dumpventiler" },
           { title: "Flänsar & V-band", value: "Flänsar & V-band" },
           { title: "Intercooler", value: "Intercooler" },
           { title: "Renoveringssatser", value: "Renoveringssatser" },
