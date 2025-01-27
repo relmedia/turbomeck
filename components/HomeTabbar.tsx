@@ -1,6 +1,6 @@
 "use client";
 import { productType } from "@/constants";
-import { Repeat } from "lucide-react";
+//import { Repeat } from "lucide-react";
 interface Props {
   selectedTab: string;
   onTabSelect: (tab: string) => void;
