@@ -29,7 +29,7 @@ const ProductPage = async ({
     <div>
       <Container className="flex flex-col md:flex-row gap-10 py-10">
         {product?.images && <ImageView images={product?.images} />}
-        <div className="w-full md:w-1/2 flex flex-col gap-5">
+        <div className="md:w-1/2 flex flex-col gap-5">
           <div>
             <p className="text-4xl font-bold mb-2">{product?.name}</p>
             <PriceView
@@ -54,12 +54,12 @@ const ProductPage = async ({
               product={product}
               className="bg-darkColor/80 text-white hover:bg-darkColor hoverEffect"
             />
-            <button className="border-2 border-darkColor/30 text-darkColor/60 px-2.5 py-1.5 rounded-md hover:text-darkColor hover:border-darkColor hoverEffect">
+            {/* <button className="border-2 border-darkColor/30 text-darkColor/60 px-2.5 py-1.5 rounded-md hover:text-darkColor hover:border-darkColor hoverEffect">
               <Heart className="w-5 h-5" />
-            </button>
+            </button> */}
           </div>
           <ProductCharacteristics product={product} />
-          <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-b-gray-200 py-5 -mt-2">
+          {/* <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-b-gray-200 py-5 -mt-2">
             <div className="flex items-center gap-2 text-sm text-black hover:text-red-600 hoverEffect">
               <RxBorderSplit className="text-lg" />
               <p>Compare color</p>
@@ -76,22 +76,14 @@ const ProductPage = async ({
               <FiShare2 className="text-lg" />
               <p>Share</p>
             </div>
-          </div>
+          </div> */}
           <div className="flex flex-wrap items-center gap-5">
             <div className="border border-darkBlue/20 text-center p-3 hover:border-darkBlue hoverEffect rounded-md">
               <p className="text-base font-semibold text-black">
-                Free Shipping
+                Flexibel Betalning
               </p>
               <p className="text-sm text-gray-500">
-                Free shipping over order $120
-              </p>
-            </div>
-            <div className="border border-darkBlue/20 text-center p-3 hover:border-darkBlue hoverEffect rounded-md">
-              <p className="text-base font-semibold text-black">
-                Flexible Payment
-              </p>
-              <p className="text-sm text-gray-500">
-                Pay with Multiple Credit Cards
+                Betala med kort eller dela upp din betalning
               </p>
             </div>
           </div>

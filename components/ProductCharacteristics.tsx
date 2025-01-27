@@ -12,7 +12,7 @@ const ProductCharacteristics = ({ product }: { product: Product }) => {
     <Accordion type="single" collapsible>
       <AccordionItem value="item-1">
         <AccordionTrigger className="font-bold">
-          {product?.name}: Characteristics
+          {product?.name}: Egenskaper
         </AccordionTrigger>
         <AccordionContent className="flex flex-col gap-1">
           <p className="flex items-center justify-between">
