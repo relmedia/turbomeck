@@ -4,14 +4,14 @@ import ImageView from "@/components/ImageView";
 import PriceView from "@/components/PriceView";
 import ProductCharacteristics from "@/components/ProductCharacteristics";
 import { getProductBySlug } from "@/sanity/helpers";
-import { Heart } from "lucide-react";
+//import { Heart } from "lucide-react";
 import { PortableText } from "next-sanity";
 import { notFound } from "next/navigation";
 import React from "react";
-import { FaRegQuestionCircle } from "react-icons/fa";
-import { FiShare2 } from "react-icons/fi";
-import { RxBorderSplit } from "react-icons/rx";
-import { TbTruckDelivery } from "react-icons/tb";
+//import { FaRegQuestionCircle } from "react-icons/fa";
+//import { FiShare2 } from "react-icons/fi";
+//import { RxBorderSplit } from "react-icons/rx";
+//import { TbTruckDelivery } from "react-icons/tb";
 
 const ProductPage = async ({
   params,
