@@ -1203,7 +1203,7 @@
             },
             {
               "type": "string",
-              "value": "flansar-v-band"
+              "value": "v-band"
             },
             {
               "type": "string",
