@@ -13,7 +13,7 @@ interface Props {
   slug: string;
 }
 
-const PRODUCTS_PER_PAGE = 8; // Adjust this number as needed
+const PRODUCTS_PER_PAGE = 12; // Adjust this number as needed
 
 const CategoryProducts = ({ categories, slug }: Props) => {
   const [currentSlug, setCurrentSlug] = useState(slug);
