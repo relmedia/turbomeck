@@ -11,7 +11,7 @@ export const productType = [
   { title: "Bransletryck", value: "bransletryck" },
   { title: "Downpipes", value: "downpipes" },
   { title: "Dumpventiler", value: "dumpventiler" },
-  { title: "Flansar & V-band", value: "flansar-v-band" },
+  { title: "Flansar och V-band", value: "flansar-v-band" },
   { title: "Intercooler", value: "intercooler" },
   { title: "Renoveringssatser", value: "renoveringssatser" },
   { title: "Wastegate", value: "wastegate" },
