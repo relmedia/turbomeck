@@ -68,6 +68,29 @@ export type Geopoint = {
   alt?: number;
 };
 
+export type Banner = {
+  _id: string;
+  _type: "banner";
+  _createdAt: string;
+  _updatedAt: string;
+  _rev: string;
+  title?: string;
+  subtitle?: string;
+  price?: number;
+  description?: string;
+  image?: {
+    asset?: {
+      _ref: string;
+      _type: "reference";
+      _weak?: boolean;
+      [internalGroqTypeReferenceTo]?: "sanity.imageAsset";
+    };
+    hotspot?: SanityImageHotspot;
+    crop?: SanityImageCrop;
+    _type: "image";
+  };
+};
+
 export type Sale = {
   _id: string;
   _type: "sale";
@@ -192,7 +215,7 @@ export type Product = {
   }>;
   stock?: number;
   status?: "new" | "hot" | "sale";
-  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "v-band" | "intercooler" | "renoveringssatser" | "wastegate";
+  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "vband" | "intercooler" | "renoveringssatser" | "wastegate";
 };
 
 export type Category = {
@@ -311,7 +334,7 @@ export type SanityImageMetadata = {
   isOpaque?: boolean;
 };
 
-export type AllSanitySchemaTypes = SanityImagePaletteSwatch | SanityImagePalette | SanityImageDimensions | SanityFileAsset | Geopoint | Sale | Order | Product | Category | Slug | BlockContent | SanityImageCrop | SanityImageHotspot | SanityImageAsset | SanityAssetSourceData | SanityImageMetadata;
+export type AllSanitySchemaTypes = SanityImagePaletteSwatch | SanityImagePalette | SanityImageDimensions | SanityFileAsset | Geopoint | Banner | Sale | Order | Product | Category | Slug | BlockContent | SanityImageCrop | SanityImageHotspot | SanityImageAsset | SanityAssetSourceData | SanityImageMetadata;
 export declare const internalGroqTypeReferenceTo: unique symbol;
 // Source: ./sanity/helpers/index.ts
 // Variable: PRODUCTS_QUERY
@@ -378,7 +401,7 @@ export type PRODUCTS_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "v-band" | "wastegate";
+  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: CATEGORIES_QUERY
 // Query: *[_type=="category"] | order(name asc)
@@ -495,7 +518,7 @@ export type PRODUCT_SEARCH_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "v-band" | "wastegate";
+  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: PRODUCT_BY_ID_QUERY
 // Query: *[_type == "product" && slug.current == $slug] | order(name asc) [0]
@@ -561,7 +584,7 @@ export type PRODUCT_BY_ID_QUERYResult = {
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "v-band" | "wastegate";
+  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 } | null;
 // Variable: PRODUCT_BY_CATEGORY_QUERY
 // Query: *[_type == 'product' && references(*[_type == "category" && slug.current == $categorySlug]._id)] | order(name asc)
@@ -627,7 +650,7 @@ export type PRODUCT_BY_CATEGORY_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
-  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "v-band" | "wastegate";
+  variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: SALE_QUERY
 // Query: *[_type == 'sale'] | order(name asc)
@@ -740,7 +763,7 @@ export type MY_ORDERS_QUERYResult = Array<{
       }>;
       stock?: number;
       status?: "hot" | "new" | "sale";
-      variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "v-band" | "wastegate";
+      variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
     } | null;
     quantity?: number;
     _key: string;
