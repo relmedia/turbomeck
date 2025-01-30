@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { urlFor } from "@/sanity/lib/image";
 import useCartStore from "@/store";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { Heart, ShoppingBag, Trash } from "lucide-react";
+import { ShoppingBag, Trash } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -124,14 +124,14 @@ const CartPage = () => {
                               </div>
                               <div className="flex items-center gap-2">
                                 <TooltipProvider>
-                                  <Tooltip>
+                                  {/* <Tooltip>
                                     <TooltipTrigger>
                                       <Heart className="w-4 h-4 md:w-5 md:h-5 mr-1 text-gray-500 hover:text-red-600 hoverEffect" />
                                     </TooltipTrigger>
                                     <TooltipContent className="font-bold">
                                       Lägg i favoriter
                                     </TooltipContent>
-                                  </Tooltip>
+                                  </Tooltip> */}
                                   <Tooltip>
                                     <TooltipTrigger>
                                       <Trash

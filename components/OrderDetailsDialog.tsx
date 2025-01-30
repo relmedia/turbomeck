@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   Table,
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "./ui/table";
 import PriceFormatter from "./PriceFormatter";
-import { MY_ORDERS_QUERYResult } from "@/sanity.types";
+import type { MY_ORDERS_QUERYResult } from "@/sanity.types";
 import Image from "next/image";
 import { urlFor } from "@/sanity/lib/image";
 import { Button } from "./ui/button";
@@ -30,6 +30,12 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
   console.log("order", order);
 
+  // Calculate VAT (25% of the total price)
+  const vatRate = 0.25;
+  const totalPrice = order.totalPrice ?? 0;
+  const vatAmount = (totalPrice * vatRate) / (1 + vatRate);
+  const priceBeforeVat = totalPrice - vatAmount;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-auto overflow-hidden">
@@ -49,7 +55,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </p>
           <p>
             <strong>Status:</strong>{" "}
-            <span className="capitalize text-green-600 font-medium">
+            <span className="capitalize text-green-600 font-medium text-sm">
               {order.status}
             </span>
           </p>
@@ -57,7 +63,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
             <strong>Faktura Nummer:</strong> {order?.invoice?.number}
           </p>
           {order?.invoice && (
-            <Button className="bg-transparent border text-darkColor/80 mt-2 hover:text-darkColor hover:border-darkColor hover:bg-darkColor/10 hoverEffect ">
+            <Button className="bg-transparent border text-darkColor/80 mt-2 hover:text-darkColor hover:bg-darkColor/10 hoverEffect ">
               {order?.invoice?.hosted_invoice_url && (
                 <Link href={order?.invoice?.hosted_invoice_url} target="_blank">
                   Ladda ner Faktura
@@ -66,7 +72,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
             </Button>
           )}
         </div>
-        <Table>
+        <Table className="border-b">
           <TableHeader>
             <TableRow>
               <TableHead>Produkt</TableHead>
@@ -80,7 +86,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 <TableCell className="flex items-center gap-2">
                   {product?.product?.images && (
                     <Image
-                      src={urlFor(product?.product?.images[0]).url()}
+                      src={
+                        urlFor(product?.product?.images[0]).url() ||
+                        "/placeholder.svg"
+                      }
                       alt="productImage"
                       width={50}
                       height={50}
@@ -103,7 +112,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         </Table>
 
         <div className="mt-4 text-right flex items-center justify-end pt-4">
-          <div className="w-44 flex flex-col gap-1">
+          <div className="w-56 flex flex-col gap-1">
             {order?.amountDiscount !== 0 && (
               <div className="w-full flex items-center justify-between">
                 <strong>Rabatt: </strong>
@@ -126,7 +135,33 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               </div>
             )}
             <div className="w-full flex items-center justify-between">
-              <strong>Totalt: </strong>
+              <strong className="flex gap-1">
+                Pris{" "}
+                <p className="flex text-sm items-center font-normal">
+                  (exkl. moms)
+                </p>
+                :{" "}
+              </strong>
+              <PriceFormatter
+                amount={priceBeforeVat}
+                className="text-black font-bold"
+              />
+            </div>
+            <div className="w-full flex items-center justify-between">
+              <strong>Moms: </strong>
+              <PriceFormatter
+                amount={vatAmount}
+                className="text-black font-bold"
+              />
+            </div>
+            <div className="w-full flex items-center justify-between">
+              <strong className="flex gap-1">
+                Totalt{" "}
+                <p className="flex text-sm items-center font-normal">
+                  (inkl. moms)
+                </p>
+                :{" "}
+              </strong>
               <PriceFormatter
                 amount={order?.totalPrice}
                 className="text-black font-bold"
