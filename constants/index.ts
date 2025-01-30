@@ -1,9 +1,9 @@
 export const headerData = [
   { title: "Start", href: "/" },
-  { title: "Alla produkter", href: "/category/alla-produkter" },
-  { title: "Saab anpassat", href: "/category/saab" },
-  { title: "Volvo anpassat", href: "/category/volvo" },
-  { title: "Turbo", href: "/category/turbo" },
+  { title: "Alla produkter", href: "alla-produkter" },
+  { title: "Saab anpassat", href: "/saab" },
+  { title: "Volvo anpassat", href: "/volvo" },
+  { title: "Turbo", href: "/turbo" },
 ];
 
 export const productType = [
@@ -26,10 +26,10 @@ export const quickLinksData = [
 ];
 
 export const categoriesData = [
-  { title: "Alla produkter", href: "/alla-produkter" },
-  { title: "Saab anpassat", href: "/saab" },
-  { title: "Volvo anpassat", href: "/volvo" },
-  { title: "Turbo", href: "/turbo" },
+  { title: "Alla produkter", href: "/category/alla-produkter" },
+  { title: "Saab anpassat", href: "/category/saab" },
+  { title: "Volvo anpassat", href: "/category/volvo" },
+  { title: "Turbo", href: "/category/turbo" },
 ];
 
 export const faqsData = [
