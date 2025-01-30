@@ -8,7 +8,7 @@ interface Props {
 const HomeTabbar = ({ selectedTab, onTabSelect }: Props) => {
   return (
     <div className="flex items-center gap-1.5 text-sm font-semibold">
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {productType?.map((item) => (
           <button
             onClick={() => onTabSelect(item?.title)}
