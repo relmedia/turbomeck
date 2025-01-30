@@ -1,5 +1,44 @@
-import { BasketIcon } from "@sanity/icons";
+import { BasketIcon, PackageIcon } from "@sanity/icons";
 import { defineArrayMember, defineField, defineType } from "sanity";
+
+export const shippingAddress = defineType({
+  name: "shippingAddress",
+  title: "Shipping Address",
+  type: "object",
+  icon: PackageIcon,
+  fields: [
+    defineField({
+      name: "name",
+      title: "Full Name",
+      type: "string",
+    }),
+    defineField({
+      name: "address",
+      title: "Adress",
+      type: "string",
+    }),
+    defineField({
+      name: "ort",
+      title: "Ort",
+      type: "string",
+    }),
+    defineField({
+      name: "postnummer",
+      title: "Postnummer",
+      type: "string",
+    }),
+    defineField({
+      name: "phone",
+      title: "Mobil",
+      type: "string",
+    }),
+    defineField({
+      name: "country",
+      title: "Land",
+      type: "string",
+    }),
+  ],
+});
 
 export const orderType = defineType({
   name: "order",
@@ -103,6 +142,11 @@ export const orderType = defineType({
       validation: (Rule) => Rule.required().min(0),
     }),
     defineField({
+      name: "shippingAddress",
+      title: "Shipping Address",
+      type: "shippingAddress",
+    }),
+    defineField({
       name: "currency",
       title: "Currency",
       type: "string",
@@ -122,23 +166,23 @@ export const orderType = defineType({
         list: [
           {
             title: "Avvaktande",
-            value: "pending",
+            value: "PENDING",
           },
           {
             title: "Betald",
-            value: "paid",
+            value: "PAID",
           },
           {
             title: "Skickad",
-            value: "shipped",
+            value: "SHIPPED",
           },
           {
             title: "Levererad",
-            value: "delivered",
+            value: "DELIVERED",
           },
           {
             title: "Avbruten",
-            value: "cancelled",
+            value: "CANCELLED",
           },
         ],
       },

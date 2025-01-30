@@ -147,10 +147,21 @@ export type Order = {
     _key: string;
   }>;
   totalPrice?: number;
+  shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
-  status?: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+  status?: "PENDING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   orderDate?: string;
+};
+
+export type ShippingAddress = {
+  _type: "shippingAddress";
+  name?: string;
+  address?: string;
+  ort?: string;
+  postnummer?: string;
+  phone?: string;
+  country?: string;
 };
 
 export type Product = {
@@ -334,7 +345,7 @@ export type SanityImageMetadata = {
   isOpaque?: boolean;
 };
 
-export type AllSanitySchemaTypes = SanityImagePaletteSwatch | SanityImagePalette | SanityImageDimensions | SanityFileAsset | Geopoint | Banner | Sale | Order | Product | Category | Slug | BlockContent | SanityImageCrop | SanityImageHotspot | SanityImageAsset | SanityAssetSourceData | SanityImageMetadata;
+export type AllSanitySchemaTypes = SanityImagePaletteSwatch | SanityImagePalette | SanityImageDimensions | SanityFileAsset | Geopoint | Banner | Sale | Order | ShippingAddress | Product | Category | Slug | BlockContent | SanityImageCrop | SanityImageHotspot | SanityImageAsset | SanityAssetSourceData | SanityImageMetadata;
 export declare const internalGroqTypeReferenceTo: unique symbol;
 // Source: ./sanity/helpers/index.ts
 // Variable: PRODUCTS_QUERY
@@ -769,9 +780,10 @@ export type MY_ORDERS_QUERYResult = Array<{
     _key: string;
   }> | null;
   totalPrice?: number;
+  shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
-  status?: "cancelled" | "delivered" | "paid" | "pending" | "shipped";
+  status?: "CANCELLED" | "DELIVERED" | "PAID" | "PENDING" | "SHIPPED";
   orderDate?: string;
 }>;
 

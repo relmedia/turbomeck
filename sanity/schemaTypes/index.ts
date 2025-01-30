@@ -3,7 +3,7 @@ import banner from "./banner";
 import { blockContentType } from "./blockContentType";
 import { categoryType } from "./categoryType";
 import { productType } from "./productType";
-import { orderType } from "./orderType";
+import { orderType, shippingAddress } from "./orderType";
 import { salesType } from "./saleType";
 
 export const schema: { types: SchemaTypeDefinition[] } = {
@@ -12,6 +12,7 @@ export const schema: { types: SchemaTypeDefinition[] } = {
     categoryType,
     productType,
     orderType,
+    shippingAddress,
     salesType,
     banner,
   ],

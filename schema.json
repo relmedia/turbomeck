@@ -788,6 +788,14 @@
         },
         "optional": true
       },
+      "shippingAddress": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "inline",
+          "name": "shippingAddress"
+        },
+        "optional": true
+      },
       "currency": {
         "type": "objectAttribute",
         "value": {
@@ -809,23 +817,23 @@
           "of": [
             {
               "type": "string",
-              "value": "pending"
+              "value": "PENDING"
             },
             {
               "type": "string",
-              "value": "paid"
+              "value": "PAID"
             },
             {
               "type": "string",
-              "value": "shipped"
+              "value": "SHIPPED"
             },
             {
               "type": "string",
-              "value": "delivered"
+              "value": "DELIVERED"
             },
             {
               "type": "string",
-              "value": "cancelled"
+              "value": "CANCELLED"
             }
           ]
         },
@@ -837,6 +845,64 @@
           "type": "string"
         },
         "optional": true
+      }
+    }
+  },
+  {
+    "name": "shippingAddress",
+    "type": "type",
+    "value": {
+      "type": "object",
+      "attributes": {
+        "_type": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string",
+            "value": "shippingAddress"
+          }
+        },
+        "name": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
+        "address": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
+        "ort": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
+        "postnummer": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
+        "phone": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
+        "country": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        }
       }
     }
   },
