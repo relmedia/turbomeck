@@ -102,7 +102,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </TableBody>
         </Table>
 
-        <div className="mt-4 text-right flex items-center justify-end border-t pt-4">
+        <div className="mt-4 text-right flex items-center justify-end pt-4">
           <div className="w-44 flex flex-col gap-1">
             {order?.amountDiscount !== 0 && (
               <div className="w-full flex items-center justify-between">
