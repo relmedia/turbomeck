@@ -26,7 +26,7 @@ export const quickLinksData = [
 ];
 
 export const categoriesData = [
-  { title: "Övriga", href: "/oevriga" },
+  { title: "Alla produkter", href: "/alla-produkter" },
   { title: "Saab anpassat", href: "/saab" },
   { title: "Volvo anpassat", href: "/volvo" },
   { title: "Turbo", href: "/turbo" },
