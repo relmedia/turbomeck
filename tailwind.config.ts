@@ -19,7 +19,7 @@ export default {
         darkBlue: "#6c7fd8",
         darkText: "#686e7d",
         lightBg: "#F8F8Fb",
-        bgLight: "#F5F5F5",
+        bgLight: "#F6F6F6",
         //Our colors end
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

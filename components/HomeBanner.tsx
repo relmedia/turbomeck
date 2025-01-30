@@ -3,7 +3,7 @@ import Title from "./Title";
 
 const HomeBanner = () => {
   return (
-    <div className="flex flex-col items-center justify-center gap-5 mt-10">
+    <div className="flex flex-col items-center justify-center gap-5 pt-16">
       <Title className="uppercase text-3xl md:text-4xl font-bold text-center">
         Hitta dina turbodelar
       </Title>

@@ -1,6 +1,5 @@
 import React from "react";
 import Container from "./Container";
-import FooterTop from "./FooterTop";
 import Logo from "./Logo";
 import SocialMedia from "./SocialMedia";
 import { Input } from "./ui/input";
@@ -11,8 +10,7 @@ const Footer = () => {
   return (
     <footer className="bg-white border-t ">
       <Container>
-        <FooterTop />
-        <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="space-y-4 ">
             <Logo>
               Turbo<p className="text-neutral-800 items-center">meck</p>

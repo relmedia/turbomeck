@@ -11,35 +11,27 @@ const data: Props[] = [
   {
     title: "Besök oss",
     subtitle: "Husholmsgatan 4, 425 30 Hisings Kärra",
-    icon: (
-      <MapPin className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
-    ),
+    icon: <MapPin className="h-8 w-8 text-lightGreen transition-colors" />,
   },
   {
     title: "Ring oss",
     subtitle: "+46 70-916 50 06",
-    icon: (
-      <Phone className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
-    ),
+    icon: <Phone className="h-8 w-8 text-lightGreen transition-colors" />,
   },
   {
     title: "Våra öppetider",
     subtitle: "24/7",
-    icon: (
-      <Clock className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
-    ),
+    icon: <Clock className="h-8 w-8 text-lightGreen transition-colors" />,
   },
   {
     title: "Maila oss",
     subtitle: "info@turbomeck.se",
-    icon: (
-      <Mail className="h-6 w-6 text-gray-600 group-hover:text-neutral-800 transition-colors" />
-    ),
+    icon: <Mail className="h-8 w-8 text-lightGreen transition-colors" />,
   },
 ];
 const FooterTop = () => {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 border-b">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 border-b py-4">
       {data?.map((item, index) => (
         <ContactItem
           key={index}
@@ -54,7 +46,7 @@ const FooterTop = () => {
 
 const ContactItem = ({ icon, title, subtitle }: Props) => {
   return (
-    <div className="flex items-center gap-3 group hover:bg-gray-50 p-4 transition-colors">
+    <div className="flex items-center gap-5 group hover:bg-neutral-50 transition-colors p-4 rounded">
       {icon}
       <div>
         <h3 className="font-semibold text-gray-900 group-hover:text-neutral-800 transition-colors">
