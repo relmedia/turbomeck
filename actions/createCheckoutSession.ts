@@ -33,12 +33,39 @@ export async function createCheckoutSession(
         customerEmail: metadata?.customerEmail,
         clerkUserId: metadata?.clerkUserId,
       },
+
       mode: "payment",
       allow_promotion_codes: true,
       payment_method_types: ["card"],
       invoice_creation: {
         enabled: true,
       },
+      shipping_address_collection: {
+        allowed_countries: ["SE"],
+      },
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            fixed_amount: {
+              currency: "sek",
+              amount: 10,
+            },
+            display_name: "dsds",
+            delivery_estimate: {
+              minimum: {
+                unit: "business_day",
+                value: 3,
+              },
+              maximum: {
+                unit: "business_day",
+                value: 5,
+              },
+            },
+          },
+        },
+      ],
+
       success_url: `${
         process.env.NEXT_PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}`
       }/success?session_id={CHECKOUT_SESSION_ID}&orderNumber=${metadata.orderNumber}`,
