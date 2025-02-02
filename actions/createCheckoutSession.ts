@@ -51,7 +51,7 @@ const postnordShippingOptions = [
 export async function createCheckoutSession(
   items: CartItem[],
   metadata: Metadata,
-  selectedShippingOptionId: string
+  selectedShippingOptionId?: string
 ) {
   try {
     const customers = await stripe.customers.list({
@@ -60,10 +60,14 @@ export async function createCheckoutSession(
     });
     const customerId = customers.data.length > 0 ? customers.data[0].id : "";
 
-    // Find the selected shipping option
-    const selectedShipping = postnordShippingOptions.find(
-      (option) => option.id === selectedShippingOptionId
-    );
+    // If no shipping option is selected, default to standard shipping
+    const selectedShipping = selectedShippingOptionId
+      ? postnordShippingOptions.find(
+          (option) => option.id === selectedShippingOptionId
+        )
+      : postnordShippingOptions.find(
+          (option) => option.id === "postnord_standard"
+        );
 
     if (!selectedShipping) {
       throw new Error("Invalid shipping option selected");
@@ -75,7 +79,7 @@ export async function createCheckoutSession(
         customerName: metadata?.customerName,
         customerEmail: metadata?.customerEmail,
         clerkUserId: metadata?.clerkUserId,
-        shippingOptionId: selectedShippingOptionId,
+        shippingOptionId: selectedShipping.id,
       },
       mode: "payment",
       allow_promotion_codes: true,
