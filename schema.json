@@ -817,23 +817,23 @@
           "of": [
             {
               "type": "string",
-              "value": "PENDING"
+              "value": "AVVAKTANDE"
             },
             {
               "type": "string",
-              "value": "PAID"
+              "value": "BETALD"
             },
             {
               "type": "string",
-              "value": "SHIPPED"
+              "value": "SKICKAD"
             },
             {
               "type": "string",
-              "value": "DELIVERED"
+              "value": "LEVERERAD"
             },
             {
               "type": "string",
-              "value": "CANCELLED"
+              "value": "AVBRUTEN"
             }
           ]
         },

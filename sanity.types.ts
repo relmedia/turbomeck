@@ -150,7 +150,7 @@ export type Order = {
   shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
-  status?: "PENDING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+  status?: "AVVAKTANDE" | "BETALD" | "SKICKAD" | "LEVERERAD" | "AVBRUTEN";
   orderDate?: string;
 };
 
@@ -783,7 +783,7 @@ export type MY_ORDERS_QUERYResult = Array<{
   shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
-  status?: "CANCELLED" | "DELIVERED" | "PAID" | "PENDING" | "SHIPPED";
+  status?: "AVBRUTEN" | "AVVAKTANDE" | "BETALD" | "LEVERERAD" | "SKICKAD";
   orderDate?: string;
 }>;
 
