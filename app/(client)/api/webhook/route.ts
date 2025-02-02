@@ -124,7 +124,7 @@ async function createOrderInSanity(
 
     products: sanityProducts,
     totalPrice: amount_total ? amount_total / 100 : 0,
-    status: "PAID",
+    status: "BETALD",
     orderDate: new Date().toISOString(),
     invoice: invoice
       ? {
