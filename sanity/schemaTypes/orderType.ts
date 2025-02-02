@@ -166,23 +166,23 @@ export const orderType = defineType({
         list: [
           {
             title: "Avvaktande",
-            value: "PENDING",
+            value: "AVVAKTANDE",
           },
           {
             title: "Betald",
-            value: "PAID",
+            value: "BETALD",
           },
           {
             title: "Skickad",
-            value: "SHIPPED",
+            value: "SKICKAD",
           },
           {
             title: "Levererad",
-            value: "DELIVERED",
+            value: "LEVERERAD",
           },
           {
             title: "Avbruten",
-            value: "CANCELLED",
+            value: "AVBRUTEN",
           },
         ],
       },

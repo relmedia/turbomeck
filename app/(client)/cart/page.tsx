@@ -33,6 +33,10 @@ const CartPage = () => {
     getSubTotalPrice,
     resetCart,
   } = useCartStore();
+
+  const subtotal = getSubTotalPrice();
+  const vatAmount = Math.ceil(subtotal * 0.25);
+
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const groupedItems = useCartStore((state) => state.getGroupedItems());
@@ -181,6 +185,10 @@ const CartPage = () => {
                         <PriceFormatter amount={getSubTotalPrice()} />
                       </div>
                       <div className="flex justify-between">
+                        <span>Moms</span>
+                        <PriceFormatter amount={vatAmount} />
+                      </div>
+                      <div className="flex justify-between">
                         <span>Rabatt</span>
                         <PriceFormatter
                           amount={getSubTotalPrice() - getTotalPrice()}
@@ -190,7 +198,6 @@ const CartPage = () => {
                       <Separator />
                       <div className="flex justify-between font-semibold text-lg">
                         <span>Totalt</span>
-
                         <PriceFormatter
                           amount={useCartStore?.getState().getTotalPrice()}
                           className="text-lg font-bold text-black"
@@ -216,6 +223,10 @@ const CartPage = () => {
                       <div className="flex justify-between">
                         <span>Delsumma</span>
                         <PriceFormatter amount={getSubTotalPrice()} />
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Moms</span>
+                        <PriceFormatter amount={vatAmount} />
                       </div>
                       <div className="flex justify-between">
                         <span>Rabatt</span>
