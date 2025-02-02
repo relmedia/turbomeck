@@ -33,7 +33,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
   // Calculate VAT (25% of the total price)
   const vatRate = 0.25;
   const totalPrice = order.totalPrice ?? 0;
-  const vatAmount = (totalPrice * vatRate) / (1 + vatRate);
+  const vatAmount = Math.ceil((totalPrice * vatRate) / (1 + vatRate));
   const priceBeforeVat = totalPrice - vatAmount;
 
   return (
