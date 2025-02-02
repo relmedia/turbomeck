@@ -35,7 +35,7 @@ const CartPage = () => {
   } = useCartStore();
 
   const subtotal = getSubTotalPrice();
-  const vatAmount = Math.ceil(subtotal * 0.25);
+  const vatAmount = Math.ceil((subtotal * 0.25) / 1.25);
 
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
