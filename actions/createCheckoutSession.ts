@@ -51,7 +51,7 @@ export async function createCheckoutSession(
               currency: "sek",
               amount: 10,
             },
-            display_name: "dsds",
+            display_name: "",
             delivery_estimate: {
               minimum: {
                 unit: "business_day",
