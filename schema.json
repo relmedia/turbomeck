@@ -861,14 +861,14 @@
             "value": "shippingAddress"
           }
         },
-        "name": {
+        "line1": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
           },
           "optional": true
         },
-        "address": {
+        "line2": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
@@ -882,7 +882,7 @@
           },
           "optional": true
         },
-        "postalcode": {
+        "postalCode": {
           "type": "objectAttribute",
           "value": {
             "type": "string"

@@ -8,28 +8,28 @@ export const shippingAddress = defineType({
   icon: PackageIcon,
   fields: [
     defineField({
-      name: "name",
-      title: "Full Name",
+      name: "line1",
+      title: "Address Line 1",
       type: "string",
     }),
     defineField({
-      name: "address",
-      title: "Adress",
+      name: "line2",
+      title: "Address Line 2",
       type: "string",
     }),
     defineField({
       name: "City",
-      title: "Ort",
+      title: "City",
       type: "string",
     }),
     defineField({
-      name: "postalcode",
-      title: "Postnummer",
+      name: "postalCode",
+      title: "Postal Code",
       type: "string",
     }),
     defineField({
       name: "country",
-      title: "Land",
+      title: "Country",
       type: "string",
     }),
   ],
