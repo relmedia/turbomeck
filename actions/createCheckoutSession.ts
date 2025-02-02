@@ -36,12 +36,17 @@ export async function createCheckoutSession(
 
       mode: "payment",
       allow_promotion_codes: true,
-      payment_method_types: ["card"],
+      payment_method_types: ["card", "klarna"],
       invoice_creation: {
         enabled: true,
       },
+      payment_method_options: {
+        klarna: {
+          setup_future_usage: "none",
+        },
+      },
       shipping_address_collection: {
-        allowed_countries: ["SE"],
+        allowed_countries: ["SE", "NO", "DK", "FI", "IS"],
       },
       shipping_options: [
         {
@@ -49,9 +54,9 @@ export async function createCheckoutSession(
             type: "fixed_amount",
             fixed_amount: {
               currency: "sek",
-              amount: 10,
+              amount: 4900,
             },
-            display_name: "",
+            display_name: "Standard Shipping",
             delivery_estimate: {
               minimum: {
                 unit: "business_day",
@@ -60,6 +65,46 @@ export async function createCheckoutSession(
               maximum: {
                 unit: "business_day",
                 value: 5,
+              },
+            },
+          },
+        },
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            fixed_amount: {
+              currency: "sek",
+              amount: 9900,
+            },
+            display_name: "Express Shipping",
+            delivery_estimate: {
+              minimum: {
+                unit: "business_day",
+                value: 1,
+              },
+              maximum: {
+                unit: "business_day",
+                value: 2,
+              },
+            },
+          },
+        },
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            fixed_amount: {
+              currency: "sek",
+              amount: 0,
+            },
+            display_name: "Free Shipping",
+            delivery_estimate: {
+              minimum: {
+                unit: "business_day",
+                value: 5,
+              },
+              maximum: {
+                unit: "business_day",
+                value: 7,
               },
             },
           },
