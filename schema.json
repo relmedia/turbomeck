@@ -868,7 +868,7 @@
           },
           "optional": true
         },
-        "address": {
+        "adress": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
@@ -889,14 +889,14 @@
           },
           "optional": true
         },
-        "phone": {
+        "mobil": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
           },
           "optional": true
         },
-        "country": {
+        "land": {
           "type": "objectAttribute",
           "value": {
             "type": "string"

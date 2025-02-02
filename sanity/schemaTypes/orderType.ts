@@ -13,7 +13,7 @@ export const shippingAddress = defineType({
       type: "string",
     }),
     defineField({
-      name: "address",
+      name: "adress",
       title: "Adress",
       type: "string",
     }),
@@ -28,12 +28,12 @@ export const shippingAddress = defineType({
       type: "string",
     }),
     defineField({
-      name: "phone",
+      name: "mobil",
       title: "Mobil",
       type: "string",
     }),
     defineField({
-      name: "country",
+      name: "land",
       title: "Land",
       type: "string",
     }),
