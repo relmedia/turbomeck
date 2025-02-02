@@ -6,11 +6,14 @@ interface Props {
 }
 
 const PriceFormatter = ({ amount, className }: Props) => {
-  const formattedPrice = new Number(amount).toLocaleString("sv-SE", {
-    currency: "SEK",
-    style: "currency",
-    minimumFractionDigits: 0,
-  });
+  const roundedAmount = amount ? Math.ceil(amount) : 0;
+  const formattedPrice = roundedAmount
+    .toLocaleString("sv-SE", {
+      currency: "SEK",
+      style: "currency",
+      minimumFractionDigits: 0,
+    })
+    .replace(/,/g, "");
   return (
     <span
       className={twMerge("text-sm font-semibold text-darkColor", className)}>
