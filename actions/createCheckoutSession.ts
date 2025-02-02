@@ -17,37 +17,6 @@ export interface GroupedCartItems {
   quantity: number;
 }
 
-// Define PostNord shipping options
-const postnordShippingOptions = [
-  {
-    id: "postnord_standard",
-    name: "PostNord Standard",
-    price: 4900, // 49 SEK in öre
-    delivery_estimate: {
-      minimum: { unit: "business_day", value: 3 },
-      maximum: { unit: "business_day", value: 5 },
-    },
-  },
-  {
-    id: "postnord_express",
-    name: "PostNord Express",
-    price: 9900, // 99 SEK in öre
-    delivery_estimate: {
-      minimum: { unit: "business_day", value: 1 },
-      maximum: { unit: "business_day", value: 2 },
-    },
-  },
-  {
-    id: "postnord_free",
-    name: "Gratis Frakt",
-    price: 0,
-    delivery_estimate: {
-      minimum: { unit: "business_day", value: 5 },
-      maximum: { unit: "business_day", value: 7 },
-    },
-  },
-];
-
 export async function createCheckoutSession(
   items: CartItem[],
   metadata: Metadata,
@@ -60,26 +29,12 @@ export async function createCheckoutSession(
     });
     const customerId = customers.data.length > 0 ? customers.data[0].id : "";
 
-    // If no shipping option is selected, default to standard shipping
-    const selectedShipping = selectedShippingOptionId
-      ? postnordShippingOptions.find(
-          (option) => option.id === selectedShippingOptionId
-        )
-      : postnordShippingOptions.find(
-          (option) => option.id === "postnord_standard"
-        );
-
-    if (!selectedShipping) {
-      throw new Error("Invalid shipping option selected");
-    }
-
     const sessionPayload: Stripe.Checkout.SessionCreateParams = {
       metadata: {
         orderNumber: metadata?.orderNumber,
         customerName: metadata?.customerName,
         customerEmail: metadata?.customerEmail,
         clerkUserId: metadata?.clerkUserId,
-        shippingOptionId: selectedShipping.id,
       },
       mode: "payment",
       allow_promotion_codes: true,
@@ -118,18 +73,6 @@ export async function createCheckoutSession(
           },
           quantity: item.quantity,
         })),
-        // Add shipping as a line item
-        {
-          price_data: {
-            currency: "SEK",
-            unit_amount: selectedShipping.price,
-            product_data: {
-              name: selectedShipping.name,
-              description: `Delivery in ${selectedShipping.delivery_estimate.minimum.value}-${selectedShipping.delivery_estimate.maximum.value} ${selectedShipping.delivery_estimate.minimum.unit}s`,
-            },
-          },
-          quantity: 1,
-        },
       ],
     };
 
