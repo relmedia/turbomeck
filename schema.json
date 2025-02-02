@@ -868,35 +868,28 @@
           },
           "optional": true
         },
-        "adress": {
+        "address": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
           },
           "optional": true
         },
-        "ort": {
+        "City": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
           },
           "optional": true
         },
-        "postnummer": {
+        "postalcode": {
           "type": "objectAttribute",
           "value": {
             "type": "string"
           },
           "optional": true
         },
-        "mobil": {
-          "type": "objectAttribute",
-          "value": {
-            "type": "string"
-          },
-          "optional": true
-        },
-        "land": {
+        "country": {
           "type": "objectAttribute",
           "value": {
             "type": "string"

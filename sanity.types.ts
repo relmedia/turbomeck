@@ -157,11 +157,10 @@ export type Order = {
 export type ShippingAddress = {
   _type: "shippingAddress";
   name?: string;
-  adress?: string;
-  ort?: string;
-  postnummer?: string;
-  mobil?: string;
-  land?: string;
+  address?: string;
+  City?: string;
+  postalcode?: string;
+  country?: string;
 };
 
 export type Product = {

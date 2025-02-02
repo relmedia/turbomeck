@@ -50,6 +50,7 @@ export async function createCheckoutSession(
       shipping_address_collection: {
         allowed_countries: ["SE", "NO", "DK", "FI"],
       },
+
       success_url: `${
         process.env.NEXT_PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL}`
       }/success?session_id={CHECKOUT_SESSION_ID}&orderNumber=${metadata.orderNumber}`,

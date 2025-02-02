@@ -113,6 +113,14 @@ async function createOrderInSanity(
     amountDiscount: total_details?.amount_discount
       ? total_details.amount_discount / 100
       : 0,
+    shipping_address: {
+      _type: "shippingaddress",
+      name: session.shipping_details?.name,
+      address: session.shipping_details?.address?.line1,
+      city: session.shipping_details?.address?.line2,
+      postalCode: session.shipping_details?.address?.postal_code,
+      country: session.shipping_details?.address?.country,
+    },
 
     products: sanityProducts,
     totalPrice: amount_total ? amount_total / 100 : 0,
