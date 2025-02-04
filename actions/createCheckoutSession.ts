@@ -19,8 +19,7 @@ export interface GroupedCartItems {
 
 export async function createCheckoutSession(
   items: CartItem[],
-  metadata: Metadata,
-  selectedShippingOptionId?: string
+  metadata: Metadata
 ) {
   try {
     const customers = await stripe.customers.list({
