@@ -48,7 +48,8 @@ export const orderType = defineType({
       validation: (Rule) => Rule.required(),
     }),
     {
-      name: "faktura",
+      name: "invoice",
+      title: "Faktura",
       type: "object",
       fields: [
         { name: "id", type: "string" },

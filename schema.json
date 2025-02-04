@@ -649,7 +649,7 @@
         },
         "optional": true
       },
-      "faktura": {
+      "invoice": {
         "type": "objectAttribute",
         "value": {
           "type": "object",
