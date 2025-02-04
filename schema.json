@@ -649,7 +649,7 @@
         },
         "optional": true
       },
-      "invoice": {
+      "faktura": {
         "type": "objectAttribute",
         "value": {
           "type": "object",
@@ -714,45 +714,18 @@
         },
         "optional": true
       },
-      "line1": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "string"
-        },
-        "optional": true
-      },
-      "line2": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "string"
-        },
-        "optional": true
-      },
-      "City": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "string"
-        },
-        "optional": true
-      },
-      "postalCode": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "string"
-        },
-        "optional": true
-      },
-      "country": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "string"
-        },
-        "optional": true
-      },
       "stripePaymentIntentId": {
         "type": "objectAttribute",
         "value": {
           "type": "string"
+        },
+        "optional": true
+      },
+      "shippingAddress": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "inline",
+          "name": "shippingAddress"
         },
         "optional": true
       },
@@ -820,14 +793,6 @@
         "type": "objectAttribute",
         "value": {
           "type": "number"
-        },
-        "optional": true
-      },
-      "shippingAddress": {
-        "type": "objectAttribute",
-        "value": {
-          "type": "inline",
-          "name": "shippingAddress"
         },
         "optional": true
       },
