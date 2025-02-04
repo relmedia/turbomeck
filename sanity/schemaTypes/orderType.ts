@@ -5,8 +5,12 @@ export const shippingAddress = defineType({
   name: "shippingAddress",
   title: "Shipping Address",
   type: "object",
-  icon: PackageIcon,
   fields: [
+    defineField({
+      name: "name",
+      title: "Full Name",
+      type: "string",
+    }),
     defineField({
       name: "line1",
       title: "Adresslinje 1",

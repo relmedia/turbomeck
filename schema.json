@@ -861,6 +861,13 @@
             "value": "shippingAddress"
           }
         },
+        "name": {
+          "type": "objectAttribute",
+          "value": {
+            "type": "string"
+          },
+          "optional": true
+        },
         "line1": {
           "type": "objectAttribute",
           "value": {
