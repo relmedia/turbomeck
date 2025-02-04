@@ -125,7 +125,7 @@ export type Order = {
   _updatedAt: string;
   _rev: string;
   orderNumber?: string;
-  invoice?: {
+  faktura?: {
     id?: string;
     number?: string;
     hosted_invoice_url?: string;
@@ -135,12 +135,8 @@ export type Order = {
   clerkUserId?: string;
   customerName?: string;
   email?: string;
-  line1?: string;
-  line2?: string;
-  City?: string;
-  postalCode?: string;
-  country?: string;
   stripePaymentIntentId?: string;
+  shippingAddress?: ShippingAddress;
   products?: Array<{
     product?: {
       _ref: string;
@@ -152,7 +148,6 @@ export type Order = {
     _key: string;
   }>;
   totalPrice?: number;
-  shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
   status?: "AVVAKTANDE" | "BETALD" | "SKICKAD" | "LEVERERAD" | "AVBRUTEN";
@@ -704,7 +699,7 @@ export type MY_ORDERS_QUERYResult = Array<{
   _updatedAt: string;
   _rev: string;
   orderNumber?: string;
-  invoice?: {
+  faktura?: {
     id?: string;
     number?: string;
     hosted_invoice_url?: string;
@@ -714,12 +709,8 @@ export type MY_ORDERS_QUERYResult = Array<{
   clerkUserId?: string;
   customerName?: string;
   email?: string;
-  line1?: string;
-  line2?: string;
-  City?: string;
-  postalCode?: string;
-  country?: string;
   stripePaymentIntentId?: string;
+  shippingAddress?: ShippingAddress;
   products: Array<{
     product: {
       _id: string;
@@ -789,7 +780,6 @@ export type MY_ORDERS_QUERYResult = Array<{
     _key: string;
   }> | null;
   totalPrice?: number;
-  shippingAddress?: ShippingAddress;
   currency?: string;
   amountDiscount?: number;
   status?: "AVBRUTEN" | "AVVAKTANDE" | "BETALD" | "LEVERERAD" | "SKICKAD";
