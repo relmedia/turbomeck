@@ -135,6 +135,11 @@ export type Order = {
   clerkUserId?: string;
   customerName?: string;
   email?: string;
+  line1?: string;
+  line2?: string;
+  City?: string;
+  postalCode?: string;
+  country?: string;
   stripePaymentIntentId?: string;
   products?: Array<{
     product?: {
@@ -709,6 +714,11 @@ export type MY_ORDERS_QUERYResult = Array<{
   clerkUserId?: string;
   customerName?: string;
   email?: string;
+  line1?: string;
+  line2?: string;
+  City?: string;
+  postalCode?: string;
+  country?: string;
   stripePaymentIntentId?: string;
   products: Array<{
     product: {
