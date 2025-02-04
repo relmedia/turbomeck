@@ -1,40 +1,6 @@
 import { BasketIcon, PackageIcon } from "@sanity/icons";
 import { defineArrayMember, defineField, defineType } from "sanity";
 
-export const shippingAddress = defineType({
-  name: "shippingAddress",
-  title: "Shipping Address",
-  type: "object",
-  icon: PackageIcon,
-  fields: [
-    defineField({
-      name: "line1",
-      title: "Address Line 1",
-      type: "string",
-    }),
-    defineField({
-      name: "line2",
-      title: "Address Line 2",
-      type: "string",
-    }),
-    defineField({
-      name: "City",
-      title: "City",
-      type: "string",
-    }),
-    defineField({
-      name: "postalCode",
-      title: "Postal Code",
-      type: "string",
-    }),
-    defineField({
-      name: "country",
-      title: "Country",
-      type: "string",
-    }),
-  ],
-});
-
 export const orderType = defineType({
   name: "order",
   title: "Order",
@@ -84,6 +50,31 @@ export const orderType = defineType({
       title: "Customer Email",
       type: "string",
       validation: (Rule) => Rule.required().email(),
+    }),
+    defineField({
+      name: "line1",
+      title: "Address Line 1",
+      type: "string",
+    }),
+    defineField({
+      name: "line2",
+      title: "Address Line 2",
+      type: "string",
+    }),
+    defineField({
+      name: "City",
+      title: "City",
+      type: "string",
+    }),
+    defineField({
+      name: "postalCode",
+      title: "Postal Code",
+      type: "string",
+    }),
+    defineField({
+      name: "country",
+      title: "Country",
+      type: "string",
     }),
     defineField({
       name: "stripePaymentIntentId",
