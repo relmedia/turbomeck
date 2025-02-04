@@ -9,27 +9,27 @@ export const shippingAddress = defineType({
   fields: [
     defineField({
       name: "line1",
-      title: "Address Line 1",
+      title: "Adresslinje 1",
       type: "string",
     }),
     defineField({
       name: "line2",
-      title: "Address Line 2",
+      title: "Adresslinje 2",
       type: "string",
     }),
     defineField({
       name: "City",
-      title: "City",
+      title: "Ort",
       type: "string",
     }),
     defineField({
       name: "postalCode",
-      title: "Postal Code",
+      title: "Postnummer",
       type: "string",
     }),
     defineField({
       name: "country",
-      title: "Country",
+      title: "Land",
       type: "string",
     }),
   ],
@@ -43,12 +43,12 @@ export const orderType = defineType({
   fields: [
     defineField({
       name: "orderNumber",
-      title: "Order Number",
+      title: "Order Nummer",
       type: "string",
       validation: (Rule) => Rule.required(),
     }),
     {
-      name: "invoice",
+      name: "faktura",
       type: "object",
       fields: [
         { name: "id", type: "string" },
@@ -75,13 +75,13 @@ export const orderType = defineType({
     }),
     defineField({
       name: "customerName",
-      title: "Customer Name",
+      title: "Kundens namn",
       type: "string",
       validation: (Rule) => Rule.required(),
     }),
     defineField({
       name: "email",
-      title: "Customer Email",
+      title: "E-post till kund",
       type: "string",
       validation: (Rule) => Rule.required().email(),
     }),
@@ -92,8 +92,13 @@ export const orderType = defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: "shippingAddress",
+      title: "Leveransadress",
+      type: "shippingAddress",
+    }),
+    defineField({
       name: "products",
-      title: "Products",
+      title: "Produkter",
       type: "array",
       of: [
         defineArrayMember({
@@ -101,13 +106,13 @@ export const orderType = defineType({
           fields: [
             defineField({
               name: "product",
-              title: "Product Bought",
+              title: "Produkt som köpts",
               type: "reference",
               to: [{ type: "product" }],
             }),
             defineField({
               name: "quantity",
-              title: "Quantity Purchased",
+              title: "Köpt kvantitet",
               type: "number",
             }),
           ],
@@ -132,24 +137,19 @@ export const orderType = defineType({
     }),
     defineField({
       name: "totalPrice",
-      title: "Total Price",
+      title: "Totalt pris",
       type: "number",
       validation: (Rule) => Rule.required().min(0),
     }),
     defineField({
-      name: "shippingAddress",
-      title: "Shipping Address",
-      type: "shippingAddress",
-    }),
-    defineField({
       name: "currency",
-      title: "Currency",
+      title: "Valuta",
       type: "string",
       validation: (Rule) => Rule.required(),
     }),
     defineField({
       name: "amountDiscount",
-      title: "Amount Discount",
+      title: "Rabatt",
       type: "number",
       validation: (Rule) => Rule.required(),
     }),
@@ -184,7 +184,7 @@ export const orderType = defineType({
     }),
     defineField({
       name: "orderDate",
-      title: "Order Date",
+      title: "Order Datum",
       type: "datetime",
       validation: (Rule) => Rule.required(),
     }),
