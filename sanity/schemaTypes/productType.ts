@@ -76,6 +76,11 @@ export const productType = defineType({
       },
     }),
     defineField({
+      name: "Weight",
+      title: "Vikt",
+      type: "number",
+    }),
+    defineField({
       name: "variant",
       title: "Produkt Typ",
       type: "string",

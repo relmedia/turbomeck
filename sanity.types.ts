@@ -226,6 +226,7 @@ export type Product = {
   }>;
   stock?: number;
   status?: "new" | "hot" | "sale";
+  Weight?: number;
   variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "vband" | "intercooler" | "renoveringssatser" | "wastegate";
 };
 
@@ -412,6 +413,7 @@ export type PRODUCTS_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
+  Weight?: number;
   variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: CATEGORIES_QUERY
@@ -529,6 +531,7 @@ export type PRODUCT_SEARCH_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
+  Weight?: number;
   variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: PRODUCT_BY_ID_QUERY
@@ -595,6 +598,7 @@ export type PRODUCT_BY_ID_QUERYResult = {
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
+  Weight?: number;
   variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 } | null;
 // Variable: PRODUCT_BY_CATEGORY_QUERY
@@ -661,6 +665,7 @@ export type PRODUCT_BY_CATEGORY_QUERYResult = Array<{
   }>;
   stock?: number;
   status?: "hot" | "new" | "sale";
+  Weight?: number;
   variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
 }>;
 // Variable: SALE_QUERY
@@ -775,6 +780,7 @@ export type MY_ORDERS_QUERYResult = Array<{
       }>;
       stock?: number;
       status?: "hot" | "new" | "sale";
+      Weight?: number;
       variant?: "branslepumpar" | "bransletryck" | "downpipes" | "dumpventiler" | "intercooler" | "renoveringssatser" | "vband" | "wastegate";
     } | null;
     quantity?: number;

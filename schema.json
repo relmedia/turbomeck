@@ -1373,6 +1373,13 @@
         },
         "optional": true
       },
+      "Weight": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "number"
+        },
+        "optional": true
+      },
       "variant": {
         "type": "objectAttribute",
         "value": {
