@@ -6,12 +6,13 @@ import ProductGrid from "@/components/ProductGrid";
 
 export default function Home() {
   return (
-    <Container className="py-10">
-      {/* <HeroSlide /> */}
+    <>
       <HeroSlide />
-      <FooterTop />
-      <HomeBanner />
-      <ProductGrid />
-    </Container>
+      <Container>
+        <FooterTop />
+        <HomeBanner />
+        <ProductGrid />
+      </Container>
+    </>
   );
 }

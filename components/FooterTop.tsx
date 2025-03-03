@@ -46,15 +46,17 @@ const FooterTop = () => {
 
 const ContactItem = ({ icon, title, subtitle }: Props) => {
   return (
-    <div className="flex items-center gap-5 group hover:bg-neutral-50 transition-colors p-4 rounded">
-      {icon}
-      <div>
-        <h3 className="font-semibold text-gray-900 group-hover:text-neutral-800 transition-colors">
-          {title}
-        </h3>
-        <p className="text-gray-600 text-sm mt-1 group-hover:text-gray-900 transition-colors">
-          {subtitle}
-        </p>
+    <div className="py-10 w-full">
+      <div className="flex items-center h-full gap-5 group bg-[#F5F5F5] hover:bg-neutral-50 transition-colors p-4 rounded">
+        {icon}
+        <div>
+          <h3 className="font-semibold text-gray-900 group-hover:text-neutral-800 transition-colors">
+            {title}
+          </h3>
+          <p className="text-gray-600 text-sm mt-1 group-hover:text-gray-900 transition-colors">
+            {subtitle}
+          </p>
+        </div>
       </div>
     </div>
   );

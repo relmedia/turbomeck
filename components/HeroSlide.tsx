@@ -83,7 +83,7 @@ export default function HeroSlider() {
   }, [nextSlide]);
 
   return (
-    <div className="relative min-h-[500px] overflow-hidden rounded-lg">
+    <div className="relative min-h-[600px] overflow-hidden">
       <AnimatePresence initial={false} mode="wait">
         <motion.div
           key={currentSlide}
@@ -100,8 +100,8 @@ export default function HeroSlider() {
             className="brightness-50"
           />
           <div className="absolute inset-0 flex items-center">
-            <div className="container mx-auto px-4 md:px-8 lg:px-16 min-h-[600px] flex items-center justify-center">
-              <div className="max-w-lg w-full text-center">
+            <div className="max-w-screen-xl mx-auto relative px-4 md:px-8 lg:px-16 h-full flex items-center justify-center">
+              <div className="relative space-y-5 lg:space-y-10 px-4">
                 <motion.h2
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
