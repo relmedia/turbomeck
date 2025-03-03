@@ -16,8 +16,7 @@ import { Analytics } from "@vercel/analytics/react";
 const poppins = localFont({
   src: "../fonts/Poppins.woff2",
   variable: "--font-poppins",
-  weight: "400",
-  preload: false,
+  weight: "100 900",
 });
 const raleway = localFont({
   src: "../fonts/Raleway.woff2",
@@ -27,7 +26,7 @@ const raleway = localFont({
 
 export const metadata: Metadata = {
   title: "Turbomeck",
-  description: "Allt från tubo till avgassystem",
+  description: "Allt från turbo till avgassystem",
 };
 
 export default async function RootLayout({
