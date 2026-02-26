@@ -2,7 +2,6 @@
 
 import {
   ColumnDef,
-  ColumnVisibilityState,
   FilterFn,
   flexRender,
   getCoreRowModel,
@@ -73,7 +72,7 @@ export function DataTable<TData extends { id: number | string }, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState({});
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
   const [globalFilter, setGlobalFilter] = useState("");
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
@@ -132,9 +131,9 @@ export function DataTable<TData extends { id: number | string }, TValue>({
     });
   }, [data, statusFilters, categoryFilters, priceFilters, categories]);
 
-  const table = useReactTable({
+  const table = useReactTable<TData>({
     data: filteredData,
-    columns,
+    columns: columns as ColumnDef<TData, unknown>[],
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -149,7 +148,7 @@ export function DataTable<TData extends { id: number | string }, TValue>({
       columnVisibility,
       globalFilter,
     },
-    globalFilterFn: productGlobalFilterFn,
+    globalFilterFn: productGlobalFilterFn as FilterFn<TData>,
   });
 
   const selectedRows = table.getFilteredSelectedRowModel().rows;

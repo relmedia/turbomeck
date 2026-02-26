@@ -2,7 +2,6 @@
 
 import {
   ColumnDef,
-  ColumnVisibilityState,
   FilterFn,
   flexRender,
   getCoreRowModel,
@@ -72,12 +71,12 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState({});
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
   const [globalFilter, setGlobalFilter] = useState("");
 
-  const table = useReactTable({
+  const table = useReactTable<TData>({
     data,
-    columns,
+    columns: columns as ColumnDef<TData, unknown>[],
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -92,7 +91,7 @@ export function DataTable<TData, TValue>({
       columnVisibility,
       globalFilter,
     },
-    globalFilterFn,
+    globalFilterFn: globalFilterFn as FilterFn<TData>,
   });
 
   return (

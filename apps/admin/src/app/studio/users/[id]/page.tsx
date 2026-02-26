@@ -1,4 +1,6 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { db } from "@repo/database";
+import { users } from "@repo/database/schema";
+import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,9 +30,10 @@ type Props = { params: Promise<{ id: string }> };
 
 async function getUserData(userId: string) {
   try {
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId);
-    const savedAddress = user.publicMetadata?.savedAddress as
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) return null;
+
+    const savedAddress = user.metadata?.savedAddress as
       | {
         firstName?: string;
         lastName?: string;
@@ -42,9 +45,10 @@ async function getUserData(userId: string) {
         country?: string;
       }
       | undefined;
-    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
-    const email = user.primaryEmailAddress?.emailAddress ?? "—";
-    const phone = savedAddress?.phone ?? user.primaryPhoneNumber?.phoneNumber ?? "—";
+
+    const fullName = user.name ?? "—";
+    const email = user.email ?? "—";
+    const phone = savedAddress?.phone ?? "—";
     const address = savedAddress?.address ?? "—";
     const city = savedAddress?.city ?? "—";
     const postalCode = savedAddress?.postalCode ?? "—";
@@ -72,7 +76,7 @@ async function getUserData(userId: string) {
       city,
       postalCode,
       country,
-      imageUrl: user.imageUrl,
+      imageUrl: user.image,
       createdAt,
       completionPercent,
     };

@@ -2,12 +2,13 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Package, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const POSTNORD_TRACKING_BASE = "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const trackingId = searchParams.get("tracking");
 
@@ -61,5 +62,13 @@ export default function OrderSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center text-muted-foreground">Laddar...</div>}>
+      <OrderSuccessContent />
+    </Suspense>
   );
 }

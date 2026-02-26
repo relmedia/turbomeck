@@ -81,6 +81,7 @@ export function getDefaultCountryFromBrowser(): string {
     const region = parts[1]?.toUpperCase();
     if (region && EUROPEAN_COUNTRY_CODES.has(region)) return region;
     const langOnly = parts[0];
+    if (langOnly == null) continue;
     const mapped = LANGUAGE_TO_COUNTRY[langOnly];
     if (mapped) return mapped;
   }

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { svSE } from "@clerk/localizations";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { SessionProvider } from "@/components/providers/SessionProvider";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -23,20 +22,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={svSE}>
-      <html lang="sv" className={outfit.variable} suppressHydrationWarning>
-        <body className="antialiased font-sans">
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-            <ToastContainer position="top-right" />
-          </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="sv" className={outfit.variable} suppressHydrationWarning>
+      <body className="antialiased font-sans">
+        <SessionProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <ToastContainer position="top-right" />
+        </ThemeProvider>
+      </SessionProvider>
+      </body>
+    </html>
   );
 }

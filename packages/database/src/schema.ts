@@ -1,6 +1,62 @@
 import { pgTable, serial, text, integer, timestamp, decimal, jsonb, foreignKey, primaryKey } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
+// ============ AUTH.JS ============
+export const users = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image: text("image"),
+  password: text("password"), // hashed, for credentials provider
+  role: text("role").default("customer").notNull(), // "admin" | "customer"
+  metadata: jsonb("metadata").$type<{ savedAddress?: Record<string, string>; savedWishlist?: number[] }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const accounts = pgTable(
+  "account",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })]
+);
+
+export const sessions = pgTable("session", {
+  sessionToken: text("session_token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationTokens = pgTable("verification_token", {
+  identifier: text("identifier").notNull(),
+  token: text("token").notNull(),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const passwordResetTokens = pgTable("password_reset_token", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
 // ============ PRODUCTS ============
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -31,12 +87,22 @@ export const productCategories = pgTable(
 );
 
 export const productCategoriesRelations = relations(productCategories, ({ one }) => ({
-  product: one(products),
-  category: one(categories),
+  product: one(products, {
+    fields: [productCategories.productId],
+    references: [products.id],
+    relationName: "product_productCategories",
+  }),
+  category: one(categories, {
+    fields: [productCategories.categoryId],
+    references: [categories.id],
+    relationName: "category_productCategories",
+  }),
 }));
 
 export const productsRelations = relations(products, ({ many }) => ({
-  productCategories: many(productCategories),
+  productCategories: many(productCategories, {
+    relationName: "product_productCategories",
+  }),
 }));
 
 // ============ CATEGORIES ============
@@ -66,14 +132,16 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
     relationName: "parent",
   }),
   children: many(categories, { relationName: "parent" }),
-  productCategories: many(productCategories),
+  productCategories: many(productCategories, {
+    relationName: "category_productCategories",
+  }),
 }));
 
 // ============ ORDERS ============
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: text("order_number").notNull(), // Human-readable, e.g. TM-2025-0001
-  userId: text("user_id"), // Clerk user ID when signed in
+  userId: text("user_id"), // Auth.js user ID when signed in
   email: text("email").notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
@@ -108,14 +176,23 @@ export const orderItems = pgTable("order_items", {
 });
 
 export const ordersRelations = relations(orders, ({ many }) => ({
-  items: many(orderItems),
+  items: many(orderItems, {
+    relationName: "order_items",
+  }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-  order: one(orders),
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+    relationName: "order_items",
+  }),
 }));
 
 // ============ TYPE EXPORTS ============
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 

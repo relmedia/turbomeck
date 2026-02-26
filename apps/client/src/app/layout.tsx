@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { svSE } from "@clerk/localizations";
 import "./globals.css";
+import { SessionProvider } from "@/components/providers/SessionProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ToastContainer } from "react-toastify";
@@ -29,17 +28,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={svSE}>
-      <html lang="sv">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="sv">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SessionProvider>
           <div className="max-w-screen-xl mx-auto p-4">
             <Navbar />
             {children}
             <Footer />
           </div>
           <ToastContainer position="top-right" />
-        </body>
-      </html>
-    </ClerkProvider>
+        </SessionProvider>
+      </body>
+    </html>
   );
 }

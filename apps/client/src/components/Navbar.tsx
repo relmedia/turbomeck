@@ -1,21 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SearchBar from "./SearchBar";
 import { Bell, Home, User } from "lucide-react";
 import ShoppingCartIcon from "./ShoppingCartIcon";
+import { useSession, signOut } from "next-auth/react";
 import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  useAuth,
-  UserButton,
-} from "@clerk/nextjs";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Button } from "./ui/button";
+import { AuthModal } from "./AuthModal";
 
 const Navbar = () => {
-  const { isLoaded } = useAuth();
+  const { data: session, status } = useSession();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+
   return (
     <nav className="w-full flex items-center justify-between border-b border-gray-200 pb-4">
       {/*LEFT*/}
@@ -36,27 +41,56 @@ const Navbar = () => {
         </Link>
         <Bell className="w-4 h-4 text-gray-600" />
         <ShoppingCartIcon />
-        {isLoaded && (
+        {status !== "loading" && (
           <>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="text-sm cursor-pointer">Logga in</button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="text-sm cursor-pointer">Skapa konto</button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton afterSignOutUrl="/">
-                <UserButton.MenuItems>
-                  <UserButton.Link
-                    label="Mitt konto"
-                    labelIcon={<User className="w-4 h-4" />}
-                    href="/account"
-                  />
-                </UserButton.MenuItems>
-              </UserButton>
-            </SignedIn>
+            {!session ? (
+              <>
+                <button
+                  type="button"
+                  className="text-sm cursor-pointer"
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthOpen(true);
+                  }}
+                >
+                  Logga in
+                </button>
+                <button
+                  type="button"
+                  className="text-sm cursor-pointer"
+                  onClick={() => {
+                    setAuthMode("register");
+                    setAuthOpen(true);
+                  }}
+                >
+                  Skapa konto
+                </button>
+                <AuthModal
+                  open={authOpen}
+                  onOpenChange={setAuthOpen}
+                  defaultMode={authMode}
+                />
+              </>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <User className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/account">
+                      <User className="w-4 h-4 mr-2" />
+                      Mitt konto
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
+                    Logga ut
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </>
         )}
       </div>

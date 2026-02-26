@@ -1,4 +1,6 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { db } from "@repo/database";
+import { users } from "@repo/database/schema";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -7,9 +9,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const client = await clerkClient();
-    const user = await client.users.getUser(id);
-    const savedAddress = user.publicMetadata?.savedAddress as
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    const saved = user.metadata?.savedAddress as
       | {
         firstName?: string;
         lastName?: string;
@@ -23,18 +27,18 @@ export async function GET(
       | undefined;
     return NextResponse.json({
       id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      fullName: [user.firstName, user.lastName].filter(Boolean).join(" ") || "—",
-      email: user.primaryEmailAddress?.emailAddress ?? "—",
-      imageUrl: user.imageUrl,
-      createdAt: user.createdAt,
-      lastSignInAt: user.lastSignInAt,
-      phone: savedAddress?.phone ?? user.primaryPhoneNumber?.phoneNumber ?? "—",
-      address: savedAddress?.address ?? "—",
-      city: savedAddress?.city ?? "—",
-      postalCode: savedAddress?.postalCode ?? "—",
-      country: savedAddress?.country ?? "—",
+      firstName: saved?.firstName ?? user.name?.split(" ")[0] ?? "",
+      lastName: saved?.lastName ?? user.name?.split(" ").slice(1).join(" ") ?? "",
+      fullName: user.name ?? "—",
+      email: user.email ?? "—",
+      imageUrl: user.image,
+      createdAt: null,
+      lastSignInAt: null,
+      phone: saved?.phone ?? "—",
+      address: saved?.address ?? "—",
+      city: saved?.city ?? "—",
+      postalCode: saved?.postalCode ?? "—",
+      country: saved?.country ?? "SE",
     });
   } catch (err) {
     console.error("Failed to fetch user:", err);
@@ -52,31 +56,45 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const client = await clerkClient();
 
-    const updates: Parameters<typeof client.users.updateUser>[1] = {};
-
-    if (body.firstName != null) updates.firstName = String(body.firstName);
-    if (body.lastName != null) updates.lastName = String(body.lastName);
-
-    if (body.address && typeof body.address === "object") {
-      const user = await client.users.getUser(id);
-      const currentAddress = (user.publicMetadata?.savedAddress as Record<string, string> | undefined) ?? {};
-      const savedAddress = {
-        ...currentAddress,
-        firstName: body.firstName ?? currentAddress.firstName ?? user.firstName ?? "",
-        lastName: body.lastName ?? currentAddress.lastName ?? user.lastName ?? "",
-        email: currentAddress.email ?? user.primaryEmailAddress?.emailAddress ?? "",
-        phone: body.address.phone ?? currentAddress.phone ?? "",
-        address: body.address.address ?? currentAddress.address ?? "",
-        city: body.address.city ?? currentAddress.city ?? "",
-        postalCode: currentAddress.postalCode ?? "",
-        country: currentAddress.country ?? "SE",
-      };
-      updates.publicMetadata = { ...user.publicMetadata, savedAddress };
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    await client.users.updateUser(id, updates);
+    const currentMetadata = user.metadata ?? {};
+    const currentAddress = currentMetadata.savedAddress ?? {};
+
+    const nameUpdate = body.firstName != null || body.lastName != null
+      ? [body.firstName ?? currentAddress.firstName ?? "", body.lastName ?? currentAddress.lastName ?? ""].filter(Boolean).join(" ")
+      : undefined;
+
+    const savedAddress =
+      body.address && typeof body.address === "object"
+        ? {
+            ...currentAddress,
+            firstName: body.firstName ?? currentAddress.firstName ?? user.name?.split(" ")[0] ?? "",
+            lastName: body.lastName ?? currentAddress.lastName ?? user.name?.split(" ").slice(1).join(" ") ?? "",
+            email: currentAddress.email ?? user.email ?? "",
+            phone: body.address.phone ?? currentAddress.phone ?? "",
+            address: body.address.address ?? currentAddress.address ?? "",
+            city: body.address.city ?? currentAddress.city ?? "",
+            postalCode: currentAddress.postalCode ?? "",
+            country: currentAddress.country ?? "SE",
+          }
+        : undefined;
+
+    await db
+      .update(users)
+      .set({
+        ...(nameUpdate != null && { name: nameUpdate }),
+        ...(body.email != null && { email: body.email }),
+        ...(savedAddress != null && {
+          metadata: { ...currentMetadata, savedAddress },
+        }),
+      })
+      .where(eq(users.id, id));
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Failed to update user:", err);

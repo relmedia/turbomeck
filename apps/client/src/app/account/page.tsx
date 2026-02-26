@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -32,30 +32,43 @@ function getMemberSince(date: Date): string {
   return date.toLocaleDateString("sv-SE", { month: "short", year: "numeric" });
 }
 
+type UserProfile = {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+  createdAt: string | null;
+  savedAddress?: SavedAddress;
+};
+
 export default function AccountPage() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  const { user } = useUser();
+  const { data: session, status } = useSession();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAddress, setEditingAddress] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [wishlistProducts, setWishlistProducts] = useState<Awaited<ReturnType<typeof fetchProductsByIds>>>([]);
-  const { wishlist, toggle: toggleWishlist, isInWishlist } = useWishlist();
+  const { wishlist, toggle: toggleWishlist } = useWishlist();
 
-  const savedAddress = user?.publicMetadata?.savedAddress as
-    | SavedAddress
-    | undefined;
+  const savedAddress = profile?.savedAddress;
 
   useEffect(() => {
-    if (!isLoaded || !userId) {
+    if (status !== "authenticated" || !session?.user?.id) {
       setLoading(false);
       return;
     }
-    fetchOrders(userId)
-      .then(setOrders)
-      .catch(() => setOrders([]))
+    Promise.all([
+      fetch(`/api/user/me`).then((r) => r.json()),
+      fetchOrders(session.user.id),
+    ])
+      .then(([profileData, ordersData]) => {
+        setProfile(profileData);
+        setOrders(ordersData ?? []);
+      })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isLoaded, userId]);
+  }, [status, session?.user?.id]);
 
   useEffect(() => {
     if (wishlist.length === 0) {
@@ -65,7 +78,13 @@ export default function AccountPage() {
     fetchProductsByIds(wishlist).then(setWishlistProducts);
   }, [wishlist.join(",")]);
 
-  if (!isLoaded) {
+  const refreshProfile = () => {
+    fetch("/api/user/me")
+      .then((r) => r.json())
+      .then(setProfile);
+  };
+
+  if (status === "loading") {
     return (
       <div className="w-full mt-12 flex justify-center">
         <div className="animate-pulse text-muted-foreground">Laddar...</div>
@@ -73,7 +92,7 @@ export default function AccountPage() {
     );
   }
 
-  if (!isSignedIn) {
+  if (!session?.user) {
     return (
       <div className="w-full mt-12 max-w-md mx-auto">
         <Card>
@@ -84,7 +103,7 @@ export default function AccountPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <Link href="/sign-in">
+            <Link href="/">
               <Button>Logga in</Button>
             </Link>
           </CardContent>
@@ -97,7 +116,7 @@ export default function AccountPage() {
   const deliveredCount = orders.filter(
     (o) => o.status === "delivered" || o.status === "shipped"
   ).length;
-  const lastActivityOrder = orders[0]; // Most recent order
+  const lastActivityOrder = orders[0];
   const lastActivityText = lastActivityOrder
     ? (() => {
         const d = new Date(lastActivityOrder.createdAt);
@@ -110,22 +129,23 @@ export default function AccountPage() {
       })()
     : "—";
 
+  const displayName = profile?.name ?? session.user.name ?? "—";
+  const displayEmail = profile?.email ?? session.user.email ?? "—";
+
   return (
     <div className="w-full mt-8 mb-16">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold">Profil</h1>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left - User Info Card + Address */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="flex flex-col items-center text-center">
             <CardContent className="pt-6 w-full flex flex-col items-center">
               <div className="relative w-24 h-24 rounded-full overflow-hidden bg-muted shrink-0 mb-4">
-                {user?.imageUrl ? (
+                {session.user.image ? (
                   <Image
-                    src={user.imageUrl}
+                    src={session.user.image}
                     alt="Profilbild"
                     fill
                     className="object-cover"
@@ -137,15 +157,13 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
-              <h2 className="font-semibold text-lg mb-4">
-                {user?.firstName} {user?.lastName}
-              </h2>
+              <h2 className="font-semibold text-lg mb-4">{displayName}</h2>
               <div className="w-full space-y-3 text-sm border-t pt-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Medlem sedan</span>
                   <span className="font-medium">
-                    {user?.createdAt
-                      ? getMemberSince(new Date(user.createdAt))
+                    {profile?.createdAt
+                      ? getMemberSince(new Date(profile.createdAt))
                       : "—"}
                   </span>
                 </div>
@@ -162,14 +180,13 @@ export default function AccountPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">E-post</span>
                   <span className="font-medium truncate max-w-[140px]">
-                    {user?.primaryEmailAddress?.emailAddress ?? "—"}
+                    {displayEmail}
                   </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Address Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -188,7 +205,7 @@ export default function AccountPage() {
                       body: JSON.stringify(address),
                     });
                     if (!res.ok) throw new Error("Failed to save");
-                    await user?.reload();
+                    refreshProfile();
                     setEditingAddress(false);
                   }}
                   onCancel={() => setEditingAddress(false)}
@@ -229,9 +246,7 @@ export default function AccountPage() {
           </Card>
         </div>
 
-        {/* Right - Stats & Recent Activity */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Wishlist */}
           {wishlist.length > 0 && (
             <Card>
               <CardHeader>
@@ -284,7 +299,6 @@ export default function AccountPage() {
             </Card>
           )}
 
-          {/* Stats Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6 flex items-start gap-3">
@@ -295,9 +309,7 @@ export default function AccountPage() {
                   <p className="text-2xl font-semibold">
                     {loading ? "—" : orders.length}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Beställningar
-                  </p>
+                  <p className="text-sm text-muted-foreground">Beställningar</p>
                 </div>
               </CardContent>
             </Card>
@@ -314,9 +326,7 @@ export default function AccountPage() {
                           maximumFractionDigits: 0,
                         })} kr`}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Totalt köpt
-                  </p>
+                  <p className="text-sm text-muted-foreground">Totalt köpt</p>
                 </div>
               </CardContent>
             </Card>
@@ -329,15 +339,12 @@ export default function AccountPage() {
                   <p className="text-2xl font-semibold">
                     {loading ? "—" : deliveredCount}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Levererade
-                  </p>
+                  <p className="text-sm text-muted-foreground">Levererade</p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Recent Activity / Order History */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

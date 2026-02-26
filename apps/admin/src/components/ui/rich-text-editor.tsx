@@ -100,7 +100,6 @@ function Toolbar({ editor }: { editor: Editor | null }) {
 export function RichTextEditor({
   value,
   onChange,
-  placeholder = "Skriv här...",
   className,
   disabled = false,
   id,
@@ -115,7 +114,6 @@ export function RichTextEditor({
         class:
           "min-h-[120px] px-3 py-2 focus:outline-none [&_h2]:text-lg [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-2",
       },
-      placeholder,
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -125,7 +123,7 @@ export function RichTextEditor({
   // Sync value when it changes externally (e.g. form reset, product load)
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value || "", false); // false = don't emit onUpdate
+      editor.commands.setContent(value || "", { emitUpdate: false });
     }
   }, [value, editor]);
 

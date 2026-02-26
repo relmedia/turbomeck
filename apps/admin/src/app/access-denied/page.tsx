@@ -1,7 +1,9 @@
-import { SignOutButton } from "@clerk/nextjs";
+"use client";
+
 import Link from "next/link";
 import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { signOut } from "next-auth/react";
 
 export default function AccessDeniedPage() {
   return (
@@ -13,9 +15,9 @@ export default function AccessDeniedPage() {
         Kontakta en administratör för att få rollen &quot;admin&quot; tilldelad.
       </p>
       <div className="flex gap-4">
-        <SignOutButton>
-          <Button variant="outline">Logga ut</Button>
-        </SignOutButton>
+        <Button variant="outline" onClick={() => signOut({ callbackUrl: "/logga-in" })}>
+          Logga ut
+        </Button>
         <Button asChild>
           <Link href="/">Tillbaka till startsidan</Link>
         </Button>

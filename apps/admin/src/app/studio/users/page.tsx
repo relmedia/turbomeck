@@ -1,32 +1,31 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { db } from "@repo/database";
+import { users } from "@repo/database/schema";
 import { User, columns } from "./columns";
 import { DataTable } from "./data-table";
 
 const getData = async (): Promise<{ users: User[]; error?: string }> => {
   try {
-    const client = await clerkClient();
-    const response = await client.users.getUserList({ limit: 100 });
-    const users = response.data.map((u) => ({
-      id: u.id,
-      avatar: u.imageUrl ?? "/users/1.png",
-      fullName: [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
-      email: u.primaryEmailAddress?.emailAddress ?? "—",
-      status: u.banned ? ("inaktiv" as const) : ("aktiv" as const),
+    const rows = await db.select().from(users).limit(100);
+    const userList: User[] = rows.map((u) => ({
+      id: u.id ?? "",
+      avatar: u.image ?? "/users/1.png",
+      fullName: u.name ?? "—",
+      email: u.email ?? "—",
+      status: "aktiv" as const,
     }));
-    return { users };
+    return { users: userList };
   } catch (err) {
     console.error("Failed to fetch users:", err);
-    const message =
-      err instanceof Error ? err.message : "Unknown error";
+    const message = err instanceof Error ? err.message : "Unknown error";
     return {
       users: [],
-      error: `Kunde inte hämta användare: ${message}. Kontrollera att CLERK_SECRET_KEY finns i apps/admin/.env.local (samma nyckel som i apps/client/.env).`,
+      error: `Kunde inte hämta användare: ${message}. Kontrollera att DATABASE_URL finns i .env.local.`,
     };
   }
 };
 
 const UsersPage = async () => {
-  const { users, error } = await getData();
+  const { users: userList, error } = await getData();
   return (
     <div className="">
       <div className="mb-8 px-4 py-2 bg-secondary rounded-md">
@@ -37,7 +36,7 @@ const UsersPage = async () => {
           {error}
         </div>
       )}
-      <DataTable columns={columns} data={users} />
+      <DataTable columns={columns} data={userList} />
     </div>
   );
 };

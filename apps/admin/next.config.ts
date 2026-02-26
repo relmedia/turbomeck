@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  env: {
+    // Must be inlined for client - next-auth defaults to :3000 otherwise
+    NEXTAUTH_URL: "http://localhost:3001",
+  },
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+  },
   images: {
     remotePatterns: [
       {

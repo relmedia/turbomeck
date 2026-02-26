@@ -1,24 +1,27 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 
 export function useWishlist() {
-  const { user, isSignedIn } = useUser();
+  const { data: session, status } = useSession();
+  const isSignedIn = !!session?.user;
   const [wishlist, setWishlist] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const savedWishlist = (user?.publicMetadata?.savedWishlist as number[] | undefined) ?? [];
-
   useEffect(() => {
+    if (status === "loading") return;
     if (!isSignedIn) {
       setWishlist([]);
       setLoading(false);
       return;
     }
-    setWishlist(savedWishlist);
-    setLoading(false);
-  }, [isSignedIn, JSON.stringify(savedWishlist)]);
+    fetch("/api/user/wishlist")
+      .then((res) => res.json())
+      .then((data) => setWishlist(data.wishlist ?? []))
+      .catch(() => setWishlist([]))
+      .finally(() => setLoading(false));
+  }, [isSignedIn, status]);
 
   const toggle = useCallback(
     async (productId: number) => {
@@ -35,18 +38,21 @@ export function useWishlist() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productId, action }),
         });
+        const data = await res.json();
         if (!res.ok) {
-          setWishlist(savedWishlist);
-        } else {
-          const data = await res.json();
-          setWishlist(data.wishlist ?? wishlist);
-          await user?.reload();
+          setWishlist((prev) =>
+            action === "add" ? prev.filter((id) => id !== productId) : [...prev, productId]
+          );
+        } else if (Array.isArray(data.wishlist)) {
+          setWishlist(data.wishlist);
         }
       } catch {
-        setWishlist(savedWishlist);
+        setWishlist((prev) =>
+          action === "add" ? prev.filter((id) => id !== productId) : [...prev, productId]
+        );
       }
     },
-    [isSignedIn, wishlist, savedWishlist, user]
+    [isSignedIn, wishlist]
   );
 
   const isInWishlist = useCallback(

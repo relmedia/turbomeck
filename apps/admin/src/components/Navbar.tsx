@@ -2,7 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
+import { signOut } from "next-auth/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +43,9 @@ const Navbar = () => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <UserButton afterSignOutUrl="/sign-in" />
+        <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/logga-in" })}>
+          Logga ut
+        </Button>
       </div>
     </nav>
   );

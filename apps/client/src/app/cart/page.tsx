@@ -16,17 +16,16 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, ChevronUp, ShoppingCart, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import { getShippingPrice } from "@/lib/postnord";
 import { createOrder } from "@/lib/api";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
 
 const DISCOUNT_PERCENT = 10;
 
 const CartPage: React.FC = () => {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
   const [shippingPreview, setShippingPreview] = useState<{
@@ -43,11 +42,18 @@ const CartPage: React.FC = () => {
   const [expandedSection, setExpandedSection] = useState<1 | 2 | 3>(1);
 
   const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
-  const { userId } = useAuth();
-  const { user } = useUser();
-  const savedAddress = user?.publicMetadata?.savedAddress as
-    | SavedAddress
-    | undefined;
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const [savedAddress, setSavedAddress] = useState<SavedAddress | undefined>();
+  useEffect(() => {
+    if (userId) {
+      fetch("/api/user/me")
+        .then((r) => r.json())
+        .then((d) => setSavedAddress(d.savedAddress));
+    } else {
+      setSavedAddress(undefined);
+    }
+  }, [userId]);
 
   const deliveryOption =
     shippingForm?.deliveryOption ?? shippingPreview?.deliveryOption ?? "servicepoint";

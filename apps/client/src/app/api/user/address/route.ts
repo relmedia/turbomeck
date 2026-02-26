@@ -1,7 +1,9 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@repo/auth";
+import { db } from "@repo/database";
+import { users } from "@repo/database/schema";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-/** Shape of saved address stored in Clerk publicMetadata */
 const savedAddressKeys = [
   "firstName",
   "lastName",
@@ -22,8 +24,8 @@ function isValidSavedAddress(body: unknown): body is Record<string, string> {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) {
+  const session = await auth();
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -57,13 +59,21 @@ export async function POST(req: Request) {
   };
 
   try {
-    const client = await clerkClient();
-    await client.users.updateUserMetadata(userId, {
-      publicMetadata: { savedAddress },
-    });
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    await db
+      .update(users)
+      .set({
+        metadata: { ...user.metadata, savedAddress },
+      })
+      .where(eq(users.id, session.user.id));
+
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Failed to update user address metadata:", err);
+    console.error("Failed to save address:", err);
     return NextResponse.json(
       { error: "Failed to save address" },
       { status: 500 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { signOut } from "next-auth/react";
 import {
   Home,
   Inbox,
@@ -19,7 +19,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -105,9 +104,6 @@ const AppSidebar = () => {
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Produkter</SidebarGroupLabel>
-          <SidebarGroupAction>
-            <Plus /> <span className="sr-only">Lägg till produkt</span>
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -162,9 +158,6 @@ const AppSidebar = () => {
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Användare</SidebarGroupLabel>
-          <SidebarGroupAction>
-            <Plus /> <span className="sr-only">Lägg till Användare</span>
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -195,9 +188,6 @@ const AppSidebar = () => {
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Ordrar / Transaktioner</SidebarGroupLabel>
-          <SidebarGroupAction>
-            <Plus /> <span className="sr-only">Lägg till Order</span>
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -231,7 +221,13 @@ const AppSidebar = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:p-2">
-              <UserButton afterSignOutUrl="/sign-in" />
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/logga-in" })}
+                className="text-sm text-muted-foreground hover:text-foreground truncate group-data-[collapsible=icon]:hidden"
+              >
+                Logga ut
+              </button>
               <span className="truncate text-sm group-data-[collapsible=icon]:hidden">Mitt konto</span>
             </div>
           </SidebarMenuItem>

@@ -1,18 +1,18 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { db } from "@repo/database";
+import { users } from "@repo/database/schema";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const client = await clerkClient();
-    const response = await client.users.getUserList({ limit: 100 });
-    const users = response.data.map((u) => ({
+    const rows = await db.select().from(users).limit(100);
+    const list = rows.map((u) => ({
       id: u.id,
-      avatar: u.imageUrl ?? "/users/1.png",
-      fullName: [u.firstName, u.lastName].filter(Boolean).join(" ") || "—",
-      email: u.primaryEmailAddress?.emailAddress ?? "—",
-      status: u.banned ? "inaktiv" : "aktiv",
+      avatar: u.image ?? "/users/1.png",
+      fullName: u.name ?? "—",
+      email: u.email ?? "—",
+      status: "aktiv",
     }));
-    return NextResponse.json(users);
+    return NextResponse.json(list);
   } catch (err) {
     console.error("Failed to fetch users:", err);
     return NextResponse.json(
