@@ -6,7 +6,6 @@ import useCartStore from "@/stores/cartStore";
 import { CartItemType, ShippingFormInputs } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EUROPEAN_COUNTRIES } from "@/components/PhoneInput";
 import {
   Select,
   SelectContent,
@@ -37,9 +36,10 @@ const CartPage: React.FC = () => {
     sessionId?: string;
     displayName?: string;
   } | null>(null);
+  const [shippingFromApi, setShippingFromApi] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<1 | 2 | 3>(1);
+  const [expandedSection, setExpandedSection] = useState<1 | 3>(1);
 
   const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
   const { data: session } = useSession();
@@ -70,14 +70,26 @@ const CartPage: React.FC = () => {
     0
   );
   const discount = appliedCoupon ? subtotal * (DISCOUNT_PERCENT / 100) : 0;
+
+  useEffect(() => {
+    const weightKg = Math.max(0.1, totalWeightKg);
+    const params = new URLSearchParams({
+      weightKg: String(weightKg),
+      deliveryOption,
+      country: shippingCountry,
+    });
+    fetch(`/api/postnord/postpaket-price?${params}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => (d?.price != null ? setShippingFromApi(d.price) : setShippingFromApi(null)))
+      .catch(() => setShippingFromApi(null));
+  }, [totalWeightKg, deliveryOption, shippingCountry]);
+
   const shipping =
     postNordSelection?.price != null
       ? postNordSelection.price
-      : getShippingPrice(
-          totalWeightKg,
-          shippingCountry,
-          deliveryOption
-        );
+      : shippingFromApi != null
+        ? shippingFromApi
+        : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
   const total = subtotal - discount + shipping;
 
   const handleApplyCoupon = () => {
@@ -104,7 +116,7 @@ const CartPage: React.FC = () => {
       content: (
         <ShippingForm
           setShippingForm={setShippingForm}
-          onSuccess={() => setExpandedSection(2)}
+          onSuccess={() => setExpandedSection(3)}
           onDeliveryChange={handleDeliveryChange}
           defaultAddress={savedAddress}
           showSaveAddressOption={!!userId}
@@ -121,41 +133,6 @@ const CartPage: React.FC = () => {
           }
           cartItems={cart}
         />
-      ),
-    },
-    {
-      id: 2 as const,
-      title: "Fraktadress",
-      content: shippingForm ? (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Leverans till: {shippingForm.firstName} {shippingForm.lastName}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {shippingForm.address}, {shippingForm.postalCode} {shippingForm.city}
-            {shippingForm.country &&
-              `, ${
-                EUROPEAN_COUNTRIES.find((c) => c.code === shippingForm.country)
-                  ?.name ?? shippingForm.country
-              }`}
-          </p>
-          {shippingForm.servicePoint && (
-            <p className="text-sm">
-              Ombud: {shippingForm.servicePoint.name}
-            </p>
-          )}
-          <Button
-            type="button"
-            onClick={() => setExpandedSection(3)}
-            className="w-full"
-          >
-            Nästa steg
-          </Button>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Fyll i dina uppgifter först.
-        </p>
       ),
     },
     {
@@ -242,7 +219,7 @@ const CartPage: React.FC = () => {
   if (cart.length === 0) {
     return (
       <div className="w-full mt-8 lg:mt-12">
-        <div className="bg-card border rounded-lg shadow-sm p-12 text-center">
+        <div className="bg-card border rounded-lg p-12 text-center">
           <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground text-lg">Varukorgen är tom</p>
           <Button
@@ -263,7 +240,7 @@ const CartPage: React.FC = () => {
         {/* LEFT COLUMN - Shopping Cart (combined) + Coupon */}
         <div className="lg:w-2/5 space-y-6">
           {/* Shopping Cart – items + order summary + place order */}
-          <div className="bg-card border rounded-lg p-6 shadow-sm">
+          <div className="bg-card border rounded-lg p-6">
             <h2 className="text-lg font-bold mb-1">Varukorg</h2>
             <p className="text-sm text-muted-foreground mb-6">
               Du har {cart.reduce((a, i) => a + i.quantity, 0)}{" "}
@@ -310,6 +287,16 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Moms (25%)</span>
+                <span className="font-medium">
+                  {Math.round((subtotal - discount + shipping) * 0.2).toLocaleString("sv-SE", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}{" "}
+                  kr
+                </span>
+              </div>
               <div className="flex justify-between font-semibold text-base pt-1">
                 <span>Totalt</span>
                 <span>
@@ -345,7 +332,7 @@ const CartPage: React.FC = () => {
           </div>
 
           {/* Coupon Code – bottom card */}
-          <div className="bg-card border rounded-lg p-6 shadow-sm">
+          <div className="bg-card border rounded-lg p-6">
             <h2 className="text-lg font-bold mb-1">Rabattkod</h2>
             <p className="text-sm text-muted-foreground mb-4">
               Ange kod för att få rabatt direkt
@@ -375,7 +362,7 @@ const CartPage: React.FC = () => {
           {sections.map((section) => (
             <div
               key={section.id}
-              className="bg-card border rounded-lg overflow-hidden shadow-sm"
+              className="bg-card border rounded-lg overflow-hidden"
             >
               <button
                 type="button"

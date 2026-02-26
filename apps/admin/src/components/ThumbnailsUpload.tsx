@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Plus, X, Loader2 } from "lucide-react";
 import Image from "next/image";
 
@@ -71,8 +70,6 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
 
   return (
     <div className="space-y-4">
-      <Label>Miniatyrbilder</Label>
-
       {value.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {value.map((url, index) => (
@@ -90,7 +87,7 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
                 type="button"
                 variant="destructive"
                 size="icon"
-                className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 h-6 w-6 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={() => handleRemove(index)}
                 disabled={disabled || isUploading}
               >

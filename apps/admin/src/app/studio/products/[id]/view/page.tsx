@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pencil, RefreshCw, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, Activity, TrendingUp, Trash2, Star, PlusCircle } from "lucide-react";
+import { Pencil, RefreshCw, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, TrendingUp, Trash2, Star, PlusCircle } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -222,71 +222,9 @@ export default function ProductViewPage() {
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid gap-4 rounded-lg md:grid-cols-2 xl:grid-cols-5">
-        <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
-          <div className="flex items-center gap-2">
-            <Banknote className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Pris</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-4 shrink-0" aria-hidden />
-            <p className="text-lg font-semibold">
-              {product.price.toLocaleString("sv-SE")} kr
-            </p>
-          </div>
-        </Card>
-        <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Antal ordrar</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-4 shrink-0" aria-hidden />
-            <p className="text-lg font-semibold">{(product.orderCount ?? 0).toLocaleString("sv-SE")}</p>
-          </div>
-        </Card>
-        <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
-          <div className="flex items-center gap-2">
-            <FolderTree className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Kategori</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-4 shrink-0" aria-hidden />
-            <p className="text-lg font-semibold">
-              {categoryNames.length > 0 ? categoryNames.join(", ") : "—"}
-            </p>
-          </div>
-        </Card>
-        <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Status</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-4 shrink-0" aria-hidden />
-            <p className="text-lg font-semibold">
-              {product.stock > 0 ? "Aktiv" : "Slutsåld"}
-            </p>
-          </div>
-        </Card>
-        <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Totalt intäkt</span>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-4 shrink-0" aria-hidden />
-            <p className="text-lg font-semibold">
-              {(product.totalRevenue ?? 0).toLocaleString("sv-SE")} kr
-            </p>
-          </div>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Image gallery */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-4 lg:sticky lg:top-4 lg:self-start">
           <Card className="p-0 gap-0 overflow-hidden border-0 bg-transparent">
             <CardContent className="p-0">
               {allImages.length > 0 ? (
@@ -387,7 +325,56 @@ export default function ProductViewPage() {
         </div>
 
         {/* Product details */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats cards */}
+          <div className="grid gap-4 rounded-lg grid-cols-2 xl:grid-cols-4">
+            <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Pris</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-4 shrink-0" aria-hidden />
+                <p className="text-sm font-semibold">
+                  {product.price.toLocaleString("sv-SE")} kr
+                </p>
+              </div>
+            </Card>
+            <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Antal ordrar</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-4 shrink-0" aria-hidden />
+                <p className="text-sm font-semibold">{(product.orderCount ?? 0).toLocaleString("sv-SE")}</p>
+              </div>
+            </Card>
+            <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <FolderTree className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Kategori</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-4 shrink-0" aria-hidden />
+                <p className="text-sm font-semibold">
+                  {categoryNames.length > 0 ? categoryNames.join(", ") : "—"}
+                </p>
+              </div>
+            </Card>
+            <Card className="py-3 px-4 gap-1 rounded-lg bg-muted hover:border-primary/30 transition-colors">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Totalt intäkt</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-4 shrink-0" aria-hidden />
+                <p className="text-sm font-semibold">
+                  {(product.totalRevenue ?? 0).toLocaleString("sv-SE")} kr
+                </p>
+              </div>
+            </Card>
+          </div>
           <Card className="py-4">
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 px-6">
               <div>
@@ -455,7 +442,7 @@ export default function ProductViewPage() {
                 <CardTitle>Recensioner</CardTitle>
               </CardHeader>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-6 px-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 px-6 items-start">
               <div className="space-y-4">
                   {[
                     { name: "Mark P.", rating: 3.2, title: "Okej men kunde varit bättre", body: "Produkten är okej, men jag förväntade mig mer för priset. Några mindre brister, men totalt sett acceptabel.", ago: "3 dagar sedan", color: "bg-blue-500" },
@@ -492,23 +479,23 @@ export default function ProductViewPage() {
                     </div>
                   ))}
                 </div>
-              <div className="space-y-4 border rounded-lg p-5">
+              <div className="space-y-3 border rounded-lg p-3 text-sm">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-1.5 mb-1">
                     <div className="flex text-amber-500">
                       {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} className={`w-5 h-5 ${s <= 4 ? "fill-current" : "fill-amber-200"}`} />
+                        <Star key={s} className={`w-4 h-4 ${s <= 4 ? "fill-current" : "fill-amber-200"}`} />
                       ))}
                     </div>
-                    <span className="font-semibold">4.3</span>
-                    <span className="text-sm text-muted-foreground">(12 recensioner)</span>
+                    <span className="font-semibold text-sm">4.3</span>
+                    <span className="text-xs text-muted-foreground">(12)</span>
                   </div>
-                  <Button size="sm" variant="outline" className="mt-2 w-full justify-center cursor-pointer">
-                    <PlusCircle className="w-4 h-4 mr-2" />
+                  <Button size="sm" variant="outline" className="mt-1.5 w-full justify-center cursor-pointer h-8 text-xs">
+                    <PlusCircle className="h-4 w-4 mr-1.5" />
                     Skicka recension
                   </Button>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {[
                     { stars: 5, pct: 70 },
                     { stars: 4, pct: 17 },
@@ -517,14 +504,14 @@ export default function ProductViewPage() {
                     { stars: 1, pct: 2 },
                   ].map(({ stars, pct }) => (
                     <div key={stars} className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground w-14">{stars} stjärnor</span>
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <span className="text-xs text-muted-foreground w-10">{stars}★</span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary rounded-full"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-sm font-medium w-10">{pct}%</span>
+                      <span className="text-xs font-medium w-7">{pct}%</span>
                     </div>
                   ))}
                 </div>

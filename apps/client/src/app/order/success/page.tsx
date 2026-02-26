@@ -18,7 +18,7 @@ function OrderSuccessContent() {
 
   return (
     <div className="w-full max-w-lg mx-auto mt-12 mb-16">
-      <div className="bg-card border rounded-xl shadow-sm p-8 text-center">
+      <div className="bg-card border rounded-xl p-8 text-center">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 mb-6">
           <Package className="w-8 h-8" />
         </div>

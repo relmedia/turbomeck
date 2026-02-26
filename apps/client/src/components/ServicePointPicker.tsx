@@ -4,10 +4,12 @@ import type { FC } from "react";
 import { MapPin, Loader2 } from "lucide-react";
 import { useState, useCallback } from "react";
 import type { PostNordServicePoint } from "@/types";
+import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
 
 type ServicePointPickerProps = {
   postalCode: string;
   city: string;
+  country?: string;
   selectedPoint: PostNordServicePoint | null;
   onSelect: (point: PostNordServicePoint | null) => void;
   disabled?: boolean;
@@ -16,6 +18,7 @@ type ServicePointPickerProps = {
 const ServicePointPicker: FC<ServicePointPickerProps> = ({
   postalCode,
   city,
+  country = "SE",
   selectedPoint,
   onSelect,
   disabled = false,
@@ -24,15 +27,27 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isSupported = POSTNORD_SERVICE_POINT_COUNTRIES.includes(
+    country?.toUpperCase() as "SE" | "NO" | "DK"
+  );
+
   const searchServicePoints = useCallback(async () => {
-    if (!postalCode || postalCode.length < 4) {
-      setError("Ange postnummer först");
+    if (!postalCode || postalCode.length < 3) {
+      setError("Ange postnummer först (minst 3 tecken)");
+      return;
+    }
+    if (!isSupported) {
+      setError("PostNord ombud finns för Sverige, Norge och Danmark");
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ postalCode, city });
+      const params = new URLSearchParams({
+        postalCode,
+        city: city || "",
+        country: country || "SE",
+      });
       const res = await fetch(`/api/postnord/servicepoints?${params}`);
       const data = await res.json();
 
@@ -49,7 +64,7 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [postalCode, city]);
+  }, [postalCode, city, country, isSupported]);
 
   return (
     <div className="flex flex-col gap-2 mt-2 p-3 border border-gray-200 rounded-lg bg-gray-50/50">
@@ -57,12 +72,18 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
         Leverans till PostNord-ombud (valfritt)
       </p>
 
+      {!isSupported && (
+        <p className="text-xs text-amber-600">
+          PostNord ombud finns för Sverige, Norge och Danmark. För andra länder välj hemleverans.
+        </p>
+      )}
+
       {!selectedPoint ? (
         <>
           <button
             type="button"
             onClick={searchServicePoints}
-            disabled={disabled || loading || postalCode.length < 4}
+            disabled={disabled || loading || postalCode.length < 3 || !isSupported}
             className="flex items-center justify-center gap-2 text-sm border border-gray-300 hover:border-gray-600 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

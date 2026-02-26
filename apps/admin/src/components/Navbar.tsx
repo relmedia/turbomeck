@@ -1,53 +1,85 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun, User } from "lucide-react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { useTheme } from "next-themes";
-import { SidebarTrigger } from "./ui/sidebar";
+
+const THEME_ORDER = ["light", "dark", "system"] as const;
 
 const Navbar = () => {
-  const { setTheme } = useTheme();
+  const { data: session } = useSession();
+  const { theme, setTheme } = useTheme();
+
+  const initials = session?.user?.name
+    ? session.user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : session?.user?.email?.[0]?.toUpperCase() ?? "?";
+
+  const cycleTheme = () => {
+    const current = theme || "system";
+    const idx = THEME_ORDER.indexOf(current as (typeof THEME_ORDER)[number]);
+    const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
+    setTheme(next);
+  };
+
+  const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
+
   return (
-    <nav className="p-4 flex items-center justify-between sticky top-0 bg-background z-10 border-b">
-      {/* LEFT */}
-      <SidebarTrigger />
-      {/* RIGHT */}
-      <div className="flex items-center gap-4">
-        <Link href="/studio">Instrumentpanel</Link>
-        {/* THEME MENU */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="sr-only">Toggle theme</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setTheme("light")}>
-              Ljus
+    <div className="flex items-center gap-2">
+      <Button variant="ghost" size="icon" onClick={cycleTheme} title="Byt tema (Ljus → Mörk → System)">
+        <ThemeIcon className="h-[1.2rem] w-[1.2rem]" />
+        <span className="sr-only">Byt tema</span>
+      </Button>
+      {/* USER AVATAR DROPDOWN */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative size-8 rounded-full">
+            <Avatar className="size-8">
+              <AvatarImage src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} />
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">{session?.user?.name ?? "Användare"}</p>
+              <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/studio/account" className="cursor-pointer">
+                <User className="size-4" />
+                Konto
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("dark")}>
-              Mörk
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("system")}>
-              System
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/logga-in" })}>
-          Logga ut
-        </Button>
-      </div>
-    </nav>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => signOut({ callbackUrl: "/logga-in" })}
+          >
+            <LogOut className="size-4" />
+            Logga ut
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 };
 

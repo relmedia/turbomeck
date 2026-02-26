@@ -179,10 +179,7 @@ export const columns: ColumnDef<Payment>[] = [
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/studio/users/${payment.userId}`}>Visa kunddata</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/studio/payments/${payment.id}`}>Visa betalningsinformation</Link>
+              <Link href={`/studio/payments/${payment.id}`}>Visa kunddata</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

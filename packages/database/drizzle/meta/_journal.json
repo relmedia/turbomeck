@@ -15,6 +15,13 @@
       "when": 1772118855892,
       "tag": "0001_dusty_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772141035495,
+      "tag": "0002_nappy_adam_destine",
+      "breakpoints": true
     }
   ]
 }

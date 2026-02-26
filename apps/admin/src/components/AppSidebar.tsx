@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   Home,
   Inbox,
@@ -13,6 +13,8 @@ import {
   User,
   ShoppingBag,
   FolderTree,
+  LogOut,
+  EllipsisVertical,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,19 +28,26 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "./ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import Link from "next/link";
 import Image from "next/image";
 import { Sheet, SheetTrigger } from "./ui/sheet";
 import AddOrder from "./AddOrder";
 import AddUser from "./AddUser";
 import AddCategory from "./AddCategory";
-import AddProduct from "./AddProduct";
 
 const items = [
   {
-    title: "Start",
+    title: "Dashboard",
     url: "/studio",
     icon: Home,
   },
@@ -64,23 +73,38 @@ const items = [
   },
 ];
 
-const AppSidebar = () => {
+const getInitials = (name: string | null | undefined) =>
+  name
+    ? name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
+
+const AppSidebar = ({
+  variant = "inset",
+  collapsible = "icon",
+  ...props
+}: React.ComponentProps<typeof Sidebar>) => {
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const { data: session } = useSession();
+  const initials = getInitials(session?.user?.name) || session?.user?.email?.[0]?.toUpperCase() || "?";
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar variant={variant} collapsible={collapsible} {...props}>
       <SidebarHeader className="py-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/studio">
-                <Image src="/logo.svg" alt="logo" width={20} height={20} />
+              <Link href="/studio" className="[&>span]:text-lg [&>span]:font-semibold">
+                <Image src="/logo.svg" alt="logo" width={24} height={24} />
                 <span>Turbomeck</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Applikation</SidebarGroupLabel>
@@ -124,17 +148,10 @@ const AppSidebar = () => {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <SidebarMenuButton asChild>
-                        <Link href="#">
-                          <Plus />
-                          Lägg till produkt
-                        </Link>
-                      </SidebarMenuButton>
-                    </SheetTrigger>
-                    <AddProduct />
-                  </Sheet>
+                  <Link href="/studio/products/add">
+                    <Plus />
+                    Lägg till produkt
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -220,16 +237,58 @@ const AppSidebar = () => {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:p-2">
-              <button
-                type="button"
-                onClick={() => signOut({ callbackUrl: "/logga-in" })}
-                className="text-sm text-muted-foreground hover:text-foreground truncate group-data-[collapsible=icon]:hidden"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <Avatar className="h-8 w-8 rounded-lg">
+                    <AvatarImage src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} />
+                    <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                    <span className="truncate font-medium">{session?.user?.name ?? "Användare"}</span>
+                    <span className="truncate text-xs text-muted-foreground">{session?.user?.email}</span>
+                  </div>
+                  <EllipsisVertical className="ml-auto size-4 group-data-[collapsible=icon]:hidden" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="min-w-56 rounded-lg"
+                side="right"
+                align="end"
+                sideOffset={4}
               >
-                Logga ut
-              </button>
-              <span className="truncate text-sm group-data-[collapsible=icon]:hidden">Mitt konto</span>
-            </div>
+                <DropdownMenuLabel className="p-0 font-normal">
+                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                    <Avatar className="h-8 w-8 rounded-lg">
+                      <AvatarImage src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} />
+                      <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-medium">{session?.user?.name ?? "Användare"}</span>
+                      <span className="truncate text-xs text-muted-foreground">{session?.user?.email}</span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/studio/account" className="cursor-pointer">
+                    <User className="size-4" />
+                    Konto
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => signOut({ callbackUrl: "/logga-in" })}
+                >
+                  <LogOut className="size-4" />
+                  Logga ut
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

@@ -29,6 +29,7 @@ import PostNordShippingModule, {
   type PostNordShippingSelection,
 } from "./PostNordShippingModule";
 import { EUROPEAN_COUNTRIES, CountryFlag } from "./PhoneInput";
+import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
 
 /** Show PostNord widget when URL is configured (falls back to manual options on error) */
 const POSTNORD_ENABLED =
@@ -113,6 +114,17 @@ const ShippingForm: FC<ShippingFormProps> = ({
   useEffect(() => {
     onDeliveryChange?.(deliveryOption, country);
   }, [deliveryOption, country, onDeliveryChange]);
+
+  // Clear service point when switching to country without PostNord ombud
+  useEffect(() => {
+    const cc = (country ?? "SE").toUpperCase();
+    if (
+      selectedServicePoint &&
+      !POSTNORD_SERVICE_POINT_COUNTRIES.includes(cc as "SE" | "NO" | "DK")
+    ) {
+      setSelectedServicePoint(null);
+    }
+  }, [country, selectedServicePoint]);
 
   const handlePostNordSelect = useCallback(
     (selection: PostNordShippingSelection | null) => {
@@ -377,6 +389,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
               <ServicePointPicker
                 postalCode={postalCode ?? ""}
                 city={city ?? ""}
+                country={country}
                 selectedPoint={selectedServicePoint}
                 onSelect={setSelectedServicePoint}
               />

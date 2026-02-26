@@ -1,38 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getNearbyServicePoints,
-  geocodeSwedishPostalCode,
+  geocodePostalCode,
+  POSTNORD_SERVICE_POINT_COUNTRIES,
 } from "@/lib/postnord";
 
 /**
- * GET /api/postnord/servicepoints?postalCode=12345&city=Stockholm
- * Returns nearby PostNord service points for a Swedish postal code.
+ * GET /api/postnord/servicepoints?postalCode=12345&city=Stockholm&country=SE
+ * Returns nearby PostNord service points. Supports Sweden (SE), Norway (NO), Denmark (DK).
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const postalCode = searchParams.get("postalCode") ?? searchParams.get("postnummer");
-  const city = searchParams.get("city") ?? searchParams.get("ort");
+  const postalCode = (searchParams.get("postalCode") ?? searchParams.get("postnummer"))?.trim();
+  const city = (searchParams.get("city") ?? searchParams.get("ort"))?.trim();
+  const country = (searchParams.get("country") ?? searchParams.get("land") ?? "SE")
+    .toUpperCase()
+    .trim();
 
-  if (!postalCode || postalCode.length < 4) {
+  if (!postalCode || postalCode.length < 3) {
     return NextResponse.json(
-      { error: "postalCode (postnummer) krävs, minst 4 tecken" },
+      { error: "postalCode (postnummer) krävs, minst 3 tecken" },
       { status: 400 }
     );
   }
 
-  const coords = await geocodeSwedishPostalCode(postalCode, city ?? undefined);
-  if (!coords) {
+  if (!POSTNORD_SERVICE_POINT_COUNTRIES.includes(country as "SE" | "NO" | "DK")) {
     return NextResponse.json(
-      { error: "Kunde inte hitta plats för angivet postnummer" },
-      { status: 404 }
+      { error: "PostNord ombud finns för Sverige, Norge och Danmark. Välj ett av dessa länder." },
+      { status: 400 }
     );
   }
 
-  const servicePoints = await getNearbyServicePoints(coords.latitude, coords.longitude, {
-    maxResults: 10,
-    radius: 15000, // 15 km
-    locale: "sv",
-  });
+  const FALLBACK_COORDS: Record<string, [number, number]> = {
+    SE: [59.33, 18.07],
+    NO: [59.91, 10.75],
+    DK: [55.68, 12.57],
+  };
+  const [fallbackLat, fallbackLng] = FALLBACK_COORDS[country] ?? FALLBACK_COORDS.SE;
 
-  return NextResponse.json({ servicePoints });
+  try {
+    const cleanPostal = postalCode.replace(/\s/g, "").trim();
+    const coords = await geocodePostalCode(postalCode, country, city || undefined);
+
+    const servicePoints = await getNearbyServicePoints(
+      coords?.latitude ?? fallbackLat,
+      coords?.longitude ?? fallbackLng,
+      {
+        locale: country === "NO" ? "nb" : country === "DK" ? "da" : "sv",
+        countryCode: country,
+        postalCode: cleanPostal,
+        city: city || undefined,
+      }
+    );
+
+    return NextResponse.json({ servicePoints });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "PostNord API-fel";
+    console.error("[postnord/servicepoints]", err);
+    return NextResponse.json(
+      { error: message },
+      { status: 502 }
+    );
+  }
 }

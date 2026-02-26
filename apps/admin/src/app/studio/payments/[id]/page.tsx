@@ -13,6 +13,7 @@ import {
   Truck,
   CheckCircle2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type OrderItem = {
   productName: string;
@@ -25,78 +26,25 @@ type OrderItem = {
 type OrderDetail = {
   id: string;
   orderId: number;
+  orderNumber?: string;
   placedDate: string;
   customerName: string;
   customerEmail: string;
   address: string;
+  phone?: string;
   paymentMethod: string;
   paymentLast4: string;
   subtotal: number;
   shipping: number;
+  discount?: number;
   total: number;
   deliveryStatus: "processing" | "shipped" | "out_for_delivery" | "delivered";
   shippedDate?: string;
+  servicePointName?: string;
+  deliveryOption?: string;
+  postNordTrackingId?: string;
   items: OrderItem[];
 };
-
-function getOrderDetail(id: string): OrderDetail {
-  const mockOrders: Record<string, OrderDetail> = {
-    "728ed521": {
-      id: "728ed521",
-      orderId: 812312,
-      placedDate: "2025-04-15",
-      customerName: "John Doe",
-      customerEmail: "johndoe@gmail.com",
-      address: "Storgatan 123, 123 45 Stockholm",
-      paymentMethod: "Visa",
-      paymentLast4: "1234",
-      subtotal: 85,
-      shipping: 49,
-      total: 134,
-      deliveryStatus: "shipped",
-      shippedDate: "2024-12-23",
-      items: [
-        { productName: "Trådlösa hörlurar", productImage: "/products/1g.png", quantity: 2, price: 42.5, total: 85 },
-        { productName: "Bluetooth-högtalare", productImage: "/products/2g.png", quantity: 1, price: 49, total: 49 },
-      ],
-    },
-    "728ed522": {
-      id: "728ed522",
-      orderId: 812313,
-      placedDate: "2025-04-14",
-      customerName: "Jane Doe",
-      customerEmail: "janedoe@gmail.com",
-      address: "Kungsgatan 45, 111 56 Stockholm",
-      paymentMethod: "Visa",
-      paymentLast4: "5678",
-      subtotal: 75,
-      shipping: 49,
-      total: 124,
-      deliveryStatus: "delivered",
-      shippedDate: "2024-12-20",
-      items: [
-        { productName: "Bluetooth-högtalare", productImage: "/products/2g.png", quantity: 2, price: 37.5, total: 75 },
-      ],
-    },
-  };
-  const order = mockOrders[id];
-  if (order) return order;
-  return {
-    id,
-    orderId: parseInt(id.slice(-6), 16) || 812300,
-    placedDate: new Date().toISOString().slice(0, 10),
-    customerName: "Kund",
-    customerEmail: "kund@example.com",
-    address: "Adress ej tillgänglig",
-    paymentMethod: "Kort",
-    paymentLast4: "****",
-    subtotal: 0,
-    shipping: 0,
-    total: 0,
-    deliveryStatus: "processing",
-    items: [],
-  };
-}
 
 const DELIVERY_STEPS = [
   { id: "processing", label: "Behandlas", icon: Package },
@@ -108,7 +56,41 @@ const DELIVERY_STEPS = [
 export default function OrderDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const order = getOrderDetail(id);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/orders/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setOrder)
+      .catch(() => setOrder(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4 p-4 w-full">
+        <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
+          Laddar order...
+        </div>
+      </div>
+    );
+  }
+  if (!order) {
+    return (
+      <div className="space-y-4 p-4 w-full">
+        <Button variant="outline" size="icon" className="bg-white" asChild>
+          <Link href="/studio/payments">
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
+          Order hittades inte.
+        </div>
+      </div>
+    );
+  }
 
   const stepIndex = DELIVERY_STEPS.findIndex((s) => s.id === order.deliveryStatus);
   const formatCurrency = (amount: number) =>
@@ -117,7 +99,7 @@ export default function OrderDetailPage() {
     new Date(dateStr).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-4 p-4 max-w-4xl mx-auto">
+    <div className="space-y-4 p-4 w-full">
       <div className="flex items-center justify-between">
         <Button variant="outline" size="icon" className="bg-white" asChild>
           <Link href="/studio/payments">
@@ -142,14 +124,24 @@ export default function OrderDetailPage() {
             <CardContent className="pt-4 pb-4 px-4">
               <div className="space-y-3">
                 <div>
-                  <h1 className="text-xl font-semibold">Order ORD-{order.orderId}</h1>
+                  <h1 className="text-xl font-semibold">
+                    Order {order.orderNumber ?? `ORD-${order.orderId}`}
+                  </h1>
                   <p className="text-xs text-muted-foreground">Beställd {formatDate(order.placedDate)}</p>
                 </div>
                 <div className="border-t pt-3 space-y-3">
                   <p className="text-sm text-foreground mb-2">Kundinformation</p>
                   <p className="text-sm text-muted-foreground">{order.customerName}</p>
                   <p className="text-sm text-muted-foreground">{order.customerEmail}</p>
+                  {order.phone && (
+                    <p className="text-sm text-muted-foreground">{order.phone}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">{order.address}</p>
+                  {order.servicePointName && (
+                    <p className="text-sm text-muted-foreground">
+                      Ombud: {order.servicePointName}
+                    </p>
+                  )}
                 </div>
                 <div className="pt-3">
                   <div className="bg-muted flex items-center justify-between gap-4 rounded-md border p-4">
@@ -192,6 +184,12 @@ export default function OrderDetailPage() {
                 <span className="text-muted-foreground">Frakt</span>
                 <span>{formatCurrency(order.shipping)}</span>
               </div>
+              {order.discount !== undefined && order.discount > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Rabatt</span>
+                  <span>-{formatCurrency(order.discount)}</span>
+                </div>
+              )}
               <div className="border-t pt-2 flex justify-between font-semibold">
                 <span>Totalt</span>
                 <span>{formatCurrency(order.total)}</span>
@@ -240,12 +238,21 @@ export default function OrderDetailPage() {
                 style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
               />
             </div>
-            {order.shippedDate && (
-              <div className="flex items-center gap-2">
+            {(order.shippedDate || order.postNordTrackingId) && (
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
                   Skickad
                 </span>
-                <span className="text-xs text-muted-foreground">{formatDate(order.shippedDate)}</span>
+                {order.shippedDate && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(order.shippedDate)}
+                  </span>
+                )}
+                {order.postNordTrackingId && (
+                  <span className="text-xs text-muted-foreground">
+                    Spårningsnr: {order.postNordTrackingId}
+                  </span>
+                )}
               </div>
             )}
           </div>

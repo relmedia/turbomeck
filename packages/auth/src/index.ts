@@ -13,6 +13,7 @@ declare module "next-auth" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
@@ -48,10 +49,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+      }
+      if (trigger === "update" && session?.image != null) {
+        token.picture = session.image;
       }
       return token;
     },
@@ -59,11 +63,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string | undefined;
+        if (token.picture) session.user.image = token.picture as string;
       }
       return session;
     },
   },
   pages: {
-    signIn: "/",
+    signIn: "/logga-in",
   },
 });

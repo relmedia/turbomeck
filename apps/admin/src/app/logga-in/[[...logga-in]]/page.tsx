@@ -4,6 +4,9 @@ import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,24 +17,47 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
   Field,
   FieldGroup,
-  FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
+const signInSchema = z.object({
+  email: z.string().email({ message: "Ange en giltig e-postadress" }),
+  password: z.string().min(1, { message: "Lösenord krävs" }),
+  rememberMe: z.boolean().default(false),
+});
+
+type SignInValues = z.infer<typeof signInSchema>;
+
 function SignInContent() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/studio";
+  const errorParam = searchParams.get("error");
+  const error =
+    errorParam === "CredentialsSignin"
+      ? "Ogiltig e-post eller lösenord"
+      : errorParam
+        ? "Inloggningen misslyckades"
+        : "";
+
+  const form = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: "", password: "", rememberMe: false },
+  });
   const formatDateTime = () => {
       const now = new Date();
       return {
@@ -48,31 +74,19 @@ function SignInContent() {
     return () => clearInterval(id);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+  const handleSubmit = form.handleSubmit(async (values) => {
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      await signIn("credentials", {
+        email: values.email,
+        password: values.password,
         callbackUrl,
+        redirect: true,
       });
-      if (result?.error) {
-        setError("Ogiltig e-post eller lösenord");
-        return;
-      }
-      if (result?.ok) {
-        window.location.href = callbackUrl;
-        return;
-      }
-    } catch {
-      setError("Något gick fel");
     } finally {
       setLoading(false);
     }
-  };
+  });
 
   return (
     <div className={cn("flex flex-col gap-6 min-h-screen items-center justify-center bg-background py-12 px-4")}>
@@ -98,52 +112,70 @@ function SignInContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="email">E-post</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="w-full"
+          <Form {...form}>
+            <form onSubmit={handleSubmit}>
+              <FieldGroup>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="email">E-post</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="m@example.com"
+                          autoComplete="email"
+                          className="w-full"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="password">Lösenord</FieldLabel>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showPassword ? "Dölj lösenord" : "Visa lösenord"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-4 mt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      id="remember"
-                      checked={rememberMe}
-                      onCheckedChange={(checked) => setRememberMe(checked === true)}
-                    />
-                    <span className="text-sm">Kom ihåg mig</span>
-                  </label>
-                  <Link
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="password">Lösenord</FormLabel>
+                      <div className="relative">
+                        <FormControl>
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            className="pr-10"
+                            {...field}
+                          />
+                        </FormControl>
+                        <button
+                          type="button"
+                          aria-label={showPassword ? "Dölj lösenord" : "Visa lösenord"}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 mt-2">
+                        <FormField
+                          control={form.control}
+                          name="rememberMe"
+                          render={({ field }) => (
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <Checkbox
+                                id="remember"
+                                checked={field.value}
+                                onCheckedChange={(checked) => field.onChange(checked === true)}
+                              />
+                              <span className="text-sm">Kom ihåg mig</span>
+                            </label>
+                          )}
+                        />
+                        <Link
                     href="http://localhost:3002/reset-password"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -151,8 +183,10 @@ function SignInContent() {
                   >
                     Glömt lösenord?
                   </Link>
-                </div>
-              </Field>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Field>
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -167,6 +201,7 @@ function SignInContent() {
               </Field>
             </FieldGroup>
           </form>
+          </Form>
         </CardContent>
       </Card>
     </div>

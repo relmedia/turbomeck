@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Upload, X, Loader2, ImageIcon } from "lucide-react";
 import Image from "next/image";
 
@@ -113,8 +112,6 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
 
   return (
     <div className="space-y-4">
-      <Label>Produktbild</Label>
-      
       {value ? (
         <div className="relative">
           <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted border">
@@ -130,7 +127,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             type="button"
             variant="destructive"
             size="icon"
-            className="absolute top-2 right-2"
+            className="absolute top-2 right-2 cursor-pointer"
             onClick={handleRemove}
             disabled={disabled || isUploading}
           >

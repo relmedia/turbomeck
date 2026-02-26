@@ -189,6 +189,21 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   }),
 }));
 
+// ============ DISCOUNT CODES (RABATTKODER) ============
+export const discountCodes = pgTable("discount_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  discountType: text("discount_type").notNull(), // "percent" | "fixed"
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minOrderAmount: decimal("min_order_amount", { precision: 12, scale: 2 }),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").default(0).notNull(),
+  validFrom: timestamp("valid_from", { mode: "date" }),
+  validUntil: timestamp("valid_until", { mode: "date" }),
+  active: text("active").default("true").notNull(), // "true" | "false"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ============ TYPE EXPORTS ============
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -203,3 +218,6 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+
+export type DiscountCode = typeof discountCodes.$inferSelect;
+export type NewDiscountCode = typeof discountCodes.$inferInsert;

@@ -6,7 +6,8 @@ const isPublicRoute = (pathname: string) =>
   pathname === "/" ||
   pathname.startsWith("/logga-in") ||
   pathname.startsWith("/sign-up") ||
-  pathname.startsWith("/access-denied");
+  pathname.startsWith("/access-denied") ||
+  pathname.startsWith("/api/auth");
 
 const isAdminRoute = (pathname: string) =>
   pathname.startsWith("/studio") || pathname.startsWith("/api");

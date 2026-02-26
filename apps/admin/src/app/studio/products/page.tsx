@@ -1,12 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { Product, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw } from "lucide-react";
-import AddProduct from "@/components/AddProduct";
 
 const PRODUCT_SERVICE_URL = "http://localhost:8000";
 
@@ -14,7 +13,6 @@ const ProductsPage = () => {
   const [data, setData] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const [categories, setCategories] = useState<
     { id: number; name: string; parentId?: number | null; parentName?: string | null }[]
@@ -62,11 +60,6 @@ const ProductsPage = () => {
     }
   }, [fetchProducts]);
 
-  const handleProductAdded = () => {
-    setIsSheetOpen(false);
-    fetchProducts();
-  };
-
   const columns = useMemo(
     () => createColumns(handleDelete, categories),
     [handleDelete, categories]
@@ -85,15 +78,12 @@ const ProductsPage = () => {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-1" />
-                Lägg till produkt
-              </Button>
-            </SheetTrigger>
-            <AddProduct onSuccess={handleProductAdded} />
-          </Sheet>
+          <Button size="sm" asChild>
+            <Link href="/studio/products/add">
+              <Plus className="mr-1 h-4 w-4" />
+              Lägg till produkt
+            </Link>
+          </Button>
         </div>
       </div>
 
