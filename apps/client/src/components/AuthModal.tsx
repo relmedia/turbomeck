@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import {
   Dialog,
@@ -76,6 +77,7 @@ export function AuthModal({
 
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const resetForm = () => {
     setEmail("");
@@ -86,6 +88,7 @@ export function AuthModal({
     setShowPassword(false);
     setForgotSuccess(false);
     setDevResetUrl(null);
+    setAcceptTerms(false);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -153,6 +156,10 @@ export function AuthModal({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!acceptTerms) {
+      setError("Du måste godkänna integritetspolicyn och köpvillkoren.");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
@@ -413,6 +420,25 @@ export function AuthModal({
                   </button>
                 </div>
               </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox
+                  checked={acceptTerms}
+                  onCheckedChange={(v) => setAcceptTerms(v === true)}
+                  className="mt-0.5"
+                />
+                <span className="text-sm text-muted-foreground">
+                  Jag godkänner{" "}
+                  <Link href="/privacy" target="_blank" className="underline hover:text-foreground">
+                    integritetspolicyn
+                  </Link>
+                  {" "}och{" "}
+                  <Link href="/terms" target="_blank" className="underline hover:text-foreground">
+                    köpvillkoren
+                  </Link>
+                  {" "}
+                  <span className="text-destructive">*</span>
+                </span>
+              </label>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full h-10" disabled={loading}>
                 {loading ? "Skapar konto..." : "Skapa konto på Turbomeck"}

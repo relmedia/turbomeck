@@ -23,5 +23,6 @@ export async function GET() {
     image: user.image,
     createdAt: user.createdAt,
     savedAddress,
+    hasPassword: !!user.password,
   });
 }

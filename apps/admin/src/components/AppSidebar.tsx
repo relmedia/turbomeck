@@ -15,6 +15,7 @@ import {
   FolderTree,
   LogOut,
   EllipsisVertical,
+  Tag,
 } from "lucide-react";
 import {
   Sidebar,
@@ -212,6 +213,14 @@ const AppSidebar = ({
                   <Link href="/studio/payments">
                     <ShoppingBag />
                     Visa alla Transaktioner
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/studio/coupons">
+                    <Tag />
+                    Rabattkoder
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

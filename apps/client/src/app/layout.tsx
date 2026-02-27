@@ -4,6 +4,11 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import {
+  CookieConsentProvider,
+  CookieBanner,
+  CookieSettings,
+} from "@/components/cookie-consent";
 import { ToastContainer } from "react-toastify";
 
 const geistSans = Geist({
@@ -31,12 +36,48 @@ export default function RootLayout({
     <html lang="sv">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
-          <div className="max-w-screen-xl mx-auto p-4">
-            <Navbar />
-            {children}
-            <Footer />
-          </div>
-          <ToastContainer position="top-right" />
+          <CookieConsentProvider
+            config={{
+              consentVersion: "1.0.0",
+              privacyPolicyUrl: "/privacy",
+              position: "bottom",
+              categories: [
+                {
+                  key: "necessary",
+                  title: "Nödvändiga",
+                  description:
+                    "Väsentliga cookies som behövs för att webbplatsen ska fungera. Dessa kan inte stängas av.",
+                  required: true,
+                },
+                {
+                  key: "analytics",
+                  title: "Analys",
+                  description:
+                    "Cookies som hjälper oss förstå hur besökare använder webbplatsen.",
+                },
+                {
+                  key: "marketing",
+                  title: "Marknadsföring",
+                  description:
+                    "Cookies för reklam och spårning över webbplatser.",
+                },
+                {
+                  key: "preferences",
+                  title: "Inställningar",
+                  description: "Cookies som sparar dina val och preferenser.",
+                },
+              ],
+            }}
+          >
+            <div className="max-w-screen-xl mx-auto p-4">
+              <Navbar />
+              {children}
+              <Footer />
+            </div>
+            <CookieBanner />
+            <CookieSettings />
+            <ToastContainer position="top-right" />
+          </CookieConsentProvider>
         </SessionProvider>
       </body>
     </html>

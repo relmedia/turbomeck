@@ -2,6 +2,23 @@
 
 import type { FC } from "react";
 import { MapPin, Loader2 } from "lucide-react";
+
+const WEEKDAY_SV: Record<string, string> = {
+  Monday: "Måndag",
+  Tuesday: "Tisdag",
+  Wednesday: "Onsdag",
+  Thursday: "Torsdag",
+  Friday: "Fredag",
+  Saturday: "Lördag",
+  Sunday: "Söndag",
+};
+
+function translateOpeningHours(hours: string): string {
+  return hours.replace(
+    /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi,
+    (m) => WEEKDAY_SV[m.charAt(0).toUpperCase() + m.slice(1).toLowerCase()] ?? m
+  );
+}
 import { useState, useCallback } from "react";
 import type { PostNordServicePoint } from "@/types";
 import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
@@ -118,7 +135,7 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
                   </p>
                   {point.openingHours && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {point.openingHours}
+                      {translateOpeningHours(point.openingHours)}
                     </p>
                   )}
                 </button>

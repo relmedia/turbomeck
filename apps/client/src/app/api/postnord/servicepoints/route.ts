@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
     NO: [59.91, 10.75],
     DK: [55.68, 12.57],
   };
-  const [fallbackLat, fallbackLng] = FALLBACK_COORDS[country] ?? FALLBACK_COORDS.SE;
+  const DEFAULT_COORDS: [number, number] = [59.33, 18.07];
+  const [fallbackLat, fallbackLng] = FALLBACK_COORDS[country] ?? DEFAULT_COORDS;
 
   try {
     const cleanPostal = postalCode.replace(/\s/g, "").trim();

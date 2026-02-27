@@ -108,6 +108,9 @@ const ShippingForm: FC<ShippingFormProps> = ({
   const postalCode = watch("postalCode");
   const city = watch("city");
   const country = watch("country") ?? "SE";
+  const isPostNordCountry = POSTNORD_SERVICE_POINT_COUNTRIES.includes(
+    country.toUpperCase() as "SE" | "NO" | "DK"
+  );
 
   const router = useRouter();
 
@@ -125,6 +128,28 @@ const ShippingForm: FC<ShippingFormProps> = ({
       setSelectedServicePoint(null);
     }
   }, [country, selectedServicePoint]);
+
+  // Auto-update country from postal code when user enters address
+  useEffect(() => {
+    const code = (postalCode ?? "").replace(/\s/g, "").trim();
+    if (code.length < 4) return;
+
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ postalCode: code });
+      if (city?.trim()) params.set("city", city.trim());
+      fetch(`/api/address/lookup-country?${params}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const cc = data?.countryCode?.toUpperCase();
+          if (cc && EUROPEAN_COUNTRIES.some((c) => c.code === cc)) {
+            setValue("country", cc);
+          }
+        })
+        .catch(() => {});
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [postalCode, city, setValue]);
 
   const handlePostNordSelect = useCallback(
     (selection: PostNordShippingSelection | null) => {
@@ -331,17 +356,25 @@ const ShippingForm: FC<ShippingFormProps> = ({
         </div>
       </div>
 
-      {showSaveAddressOption && (
-        <label className="flex items-center gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
-            checked={saveToAccount}
-            onChange={(e) => setSaveToAccount(e.target.checked)}
-            className="w-4 h-4 accent-primary rounded"
-          />
-          Spara adress till mitt konto för framtida beställningar
-        </label>
-      )}
+      {showSaveAddressOption &&
+        (defaultAddress &&
+        (defaultAddress.address ||
+          defaultAddress.postalCode ||
+          defaultAddress.city) ? (
+          <p className="text-sm text-muted-foreground">
+            Adress sparad på ditt konto
+          </p>
+        ) : (
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={saveToAccount}
+              onChange={(e) => setSaveToAccount(e.target.checked)}
+              className="w-4 h-4 accent-primary rounded"
+            />
+            Spara adress till mitt konto för framtida beställningar
+          </label>
+        ))}
 
       {/* PostNord Shipping Module or fallback delivery options */}
       <div className="flex flex-col gap-3 pt-4 border-t border-border">
@@ -381,19 +414,28 @@ const ShippingForm: FC<ShippingFormProps> = ({
                   className="w-4 h-4 accent-primary"
                 />
                 <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">PostNord Postpaket (ombud)</span>
+                <span className="text-sm">
+                  {isPostNordCountry
+                    ? "PostNord Postpaket (ombud)"
+                    : "Postpaket utrikes"}
+                </span>
               </label>
             </div>
 
-            {deliveryOption === "servicepoint" && (
-              <ServicePointPicker
-                postalCode={postalCode ?? ""}
-                city={city ?? ""}
-                country={country}
-                selectedPoint={selectedServicePoint}
-                onSelect={setSelectedServicePoint}
-              />
-            )}
+            {deliveryOption === "servicepoint" &&
+              (isPostNordCountry ? (
+                <ServicePointPicker
+                  postalCode={postalCode ?? ""}
+                  city={city ?? ""}
+                  country={country}
+                  selectedPoint={selectedServicePoint}
+                  onSelect={setSelectedServicePoint}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Leverans till angiven adress
+                </p>
+              ))}
           </>
         )}
       </div>

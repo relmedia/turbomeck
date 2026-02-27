@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CookieTrigger } from "@/components/cookie-consent";
 
 const Footer = () => {
   return (
@@ -14,7 +15,7 @@ const Footer = () => {
             MECK
           </p>
         </Link>
-        <p className="text-sm text-gray-400">© 2025 Turbomeck</p>
+        <p className="text-sm text-gray-400">© 2026 Turbomeck</p>
         <p className="text-sm text-gray-400">Alla rättigheter reserverade</p>
       </div>
       <div className="flex flex-col gap-4 text-sm text-gray-400 items-center md:items-start">
@@ -22,6 +23,9 @@ const Footer = () => {
         <Link href="/about">Start</Link>
         <Link href="/privacy">Integritetspolicy</Link>
         <Link href="/terms">Användarvillkor</Link>
+        <CookieTrigger className="hover:text-amber-50 transition-colors text-inherit">
+          Cookie-inställningar
+        </CookieTrigger>
         <Link href="/terms">Frågor och svar</Link>
       </div>
       <div className="flex flex-col gap-4 text-sm text-gray-400 items-center md:items-start">

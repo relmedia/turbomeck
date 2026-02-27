@@ -4,7 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SearchBar from "./SearchBar";
-import { Bell, Home, User } from "lucide-react";
+import { Bell, Home, User, LogOut } from "lucide-react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import { useSession, signOut } from "next-auth/react";
 import {
@@ -74,8 +79,22 @@ const Navbar = () => {
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <User className="w-4 h-4" />
+                  <Button variant="ghost" size="icon" className="rounded-full overflow-hidden p-0 h-8 w-8 shrink-0 cursor-pointer">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src={session.user.image ?? undefined}
+                        alt="Profil"
+                      />
+                      <AvatarFallback>
+                        {(session.user.name ?? session.user.email ?? "?")
+                          .split(/[\s@]/)
+                          .filter(Boolean)
+                          .map((s) => s[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -86,6 +105,7 @@ const Navbar = () => {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
+                    <LogOut className="w-4 h-4 mr-2" />
                     Logga ut
                   </DropdownMenuItem>
                 </DropdownMenuContent>

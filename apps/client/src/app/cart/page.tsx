@@ -22,7 +22,6 @@ import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
 
-const DISCOUNT_PERCENT = 10;
 
 const CartPage: React.FC = () => {
   const router = useRouter();
@@ -39,6 +38,7 @@ const CartPage: React.FC = () => {
   const [shippingFromApi, setShippingFromApi] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(false);
+  const [couponError, setCouponError] = useState("");
   const [expandedSection, setExpandedSection] = useState<1 | 3>(1);
 
   const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
@@ -69,7 +69,30 @@ const CartPage: React.FC = () => {
       acc + (item.weight ?? 1) * item.quantity,
     0
   );
-  const discount = appliedCoupon ? subtotal * (DISCOUNT_PERCENT / 100) : 0;
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [lastValidatedCode, setLastValidatedCode] = useState("");
+  const discount = appliedCoupon ? couponDiscount : 0;
+
+  useEffect(() => {
+    if (appliedCoupon && lastValidatedCode && subtotal > 0) {
+      fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lastValidatedCode, subtotal }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.valid && data.discount != null) {
+            setCouponDiscount(data.discount);
+          } else {
+            setAppliedCoupon(false);
+            setCouponDiscount(0);
+            setLastValidatedCode("");
+          }
+        })
+        .catch(() => {});
+    }
+  }, [subtotal, appliedCoupon, lastValidatedCode]);
 
   useEffect(() => {
     const weightKg = Math.max(0.1, totalWeightKg);
@@ -93,9 +116,32 @@ const CartPage: React.FC = () => {
   const total = subtotal - discount + shipping;
 
   const handleApplyCoupon = () => {
-    if (couponCode.trim().toLowerCase() === "rabatt") {
-      setAppliedCoupon(true);
-    }
+    const code = couponCode.trim();
+    if (!code) return;
+    setCouponError("");
+    fetch("/api/coupons/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, subtotal }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.valid && data.discount != null) {
+          setAppliedCoupon(true);
+          setCouponDiscount(data.discount);
+          setCouponError("");
+        } else {
+          setAppliedCoupon(false);
+          setCouponDiscount(0);
+          setLastValidatedCode("");
+          setCouponError(data.message ?? "Ogiltig rabattkod");
+        }
+      })
+      .catch(() => {
+        setAppliedCoupon(false);
+        setCouponDiscount(0);
+        setCouponError("Kunde inte validera rabattkoden");
+      });
   };
 
   const handleDeliveryChange = useCallback(
@@ -140,7 +186,34 @@ const CartPage: React.FC = () => {
       title: "Betalningssätt",
       content: shippingForm ? (
         <PaymentForm
-          onComplete={async () => {
+          total={total}
+          getOrderPayload={() => ({
+            userId: userId ?? undefined,
+            email: shippingForm!.email,
+            firstName: shippingForm!.firstName,
+            lastName: shippingForm!.lastName,
+            phone: shippingForm!.phone,
+            address: shippingForm!.address,
+            city: shippingForm!.city,
+            postalCode: shippingForm!.postalCode,
+            country: shippingForm!.country,
+            servicePointName: shippingForm!.servicePoint?.name,
+            servicePointId: shippingForm!.servicePoint?.servicePointId,
+            deliveryOption: deliveryOption,
+            subtotal,
+            shippingCost: shipping,
+            discount,
+            total,
+            postNordTrackingId: undefined,
+            items: cart.map((item) => ({
+              productId: typeof item.id === "number" ? item.id : undefined,
+              productName: item.name,
+              productImage: item.images?.default || item.galleryImages?.[0],
+              price: item.price,
+              quantity: item.quantity,
+            })),
+          })}
+          onComplete={async (result) => {
             let postNordTrackingId: string | null = null;
 
             if (postNordSelection?.sessionId && shippingForm) {
@@ -187,6 +260,7 @@ const CartPage: React.FC = () => {
                 shippingCost: shipping,
                 discount,
                 total,
+                stripePaymentId: result.stripePaymentId,
                 postNordTrackingId: postNordTrackingId ?? undefined,
                 items: cart.map((item) => ({
                   productId: typeof item.id === "number" ? item.id : undefined,
@@ -200,6 +274,7 @@ const CartPage: React.FC = () => {
               const params = new URLSearchParams();
               if (order.postNordTrackingId) params.set("tracking", order.postNordTrackingId);
               params.set("orderId", String(order.id));
+              params.set("total", String(total));
               router.push(`/order/success?${params.toString()}`);
             } catch (err) {
               console.error("Failed to create order:", err);
@@ -308,27 +383,6 @@ const CartPage: React.FC = () => {
                 </span>
               </div>
             </div>
-            <Button
-              type="button"
-              onClick={() => {
-                if (cart.length > 0) setExpandedSection(3);
-              }}
-              disabled={cart.length === 0}
-              className="w-full mt-6 h-9 text-sm cursor-pointer"
-            >
-              Placera beställning
-            </Button>
-            <p className="text-xs text-muted-foreground mt-4">
-              Genom att placera din beställning godkänner du vår{" "}
-              <span className="underline cursor-pointer hover:text-foreground">
-                Integritetspolicy
-              </span>{" "}
-              och{" "}
-              <span className="underline cursor-pointer hover:text-foreground">
-                Villkor
-              </span>
-              .
-            </p>
           </div>
 
           {/* Coupon Code – bottom card */}
@@ -337,23 +391,54 @@ const CartPage: React.FC = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Ange kod för att få rabatt direkt
             </p>
-            <div className="flex items-center rounded-lg border border-input bg-white overflow-hidden focus-within:ring-2 focus-within:ring-ring/50 focus-within:ring-offset-0 focus-within:border-ring">
-              <Input
-                type="text"
-                placeholder="Kampanjkod"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                className="h-9 flex-1 border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0"
-              />
-              <Button
-                type="button"
-                onClick={handleApplyCoupon}
-                size="sm"
-                className="h-6 py-0 px-1.5 text-xs bg-gray-900 hover:bg-gray-800 text-white shrink-0 cursor-pointer rounded-none my-1 ml-1 mr-2"
-              >
-                Tillämpa
-              </Button>
-            </div>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-3">
+                <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Rabatt på {discount.toLocaleString("sv-SE")} kr tillämpad
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => {
+                    setAppliedCoupon(false);
+                    setCouponDiscount(0);
+                    setLastValidatedCode("");
+                    setCouponCode("");
+                    setCouponError("");
+                  }}
+                >
+                  Ta bort
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center rounded-lg border border-input bg-white overflow-hidden focus-within:ring-2 focus-within:ring-ring/50 focus-within:ring-offset-0 focus-within:border-ring">
+                  <Input
+                    type="text"
+                    placeholder="Kampanjkod"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value);
+                      setCouponError("");
+                    }}
+                    className="h-9 flex-1 border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    size="sm"
+                    className="h-6 py-0 px-1.5 text-xs bg-gray-900 hover:bg-gray-800 text-white shrink-0 cursor-pointer rounded-none my-1 ml-1 mr-2"
+                  >
+                    Tillämpa
+                  </Button>
+                </div>
+                {couponError && (
+                  <p className="text-sm text-red-600 mt-2">{couponError}</p>
+                )}
+              </>
+            )}
           </div>
         </div>
 

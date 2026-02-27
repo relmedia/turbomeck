@@ -1,161 +1,307 @@
-import { PaymentFormInputs, paymentFormSchema } from "@/types";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ShoppingBagIcon } from "lucide-react";
-import Image from "next/image";
-import { Controller, SubmitHandler, useForm } from "react-hook-form";
-import type { FC } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+"use client";
 
-type PaymentFormProps = {
-  onComplete?: () => void;
+import { useState, useEffect, useRef } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+import type { Stripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  PaymentElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+import Link from "next/link";
+import { ShoppingBagIcon, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import Image from "next/image";
+
+export type PendingOrderPayload = {
+  userId?: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country?: string;
+  servicePointName?: string;
+  servicePointId?: string;
+  deliveryOption?: string;
+  subtotal: number;
+  shippingCost: number;
+  discount: number;
+  total: number;
+  postNordTrackingId?: string;
+  items: Array<{
+    productId?: number;
+    productName: string;
+    productImage?: string;
+    price: number;
+    quantity: number;
+  }>;
 };
 
-const PaymentForm: FC<PaymentFormProps> = ({ onComplete }) => {
-  const {
-    register,
-    control,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-  } = useForm<PaymentFormInputs>({
-    resolver: zodResolver(paymentFormSchema as any),
-  });
+type PaymentFormProps = {
+  total: number;
+  getOrderPayload: () => PendingOrderPayload;
+  onComplete?: (result: { stripePaymentId: string }) => void;
+};
 
-  const handlePaymentForm: SubmitHandler<PaymentFormInputs> = (data) => {
-    if (onComplete) onComplete();
-  };
+function CheckoutForm({
+  paymentIntentId,
+  getOrderPayload,
+  onComplete,
+}: {
+  paymentIntentId: string;
+  getOrderPayload: () => PendingOrderPayload;
+  onComplete?: (r: { stripePaymentId: string }) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
-  const handleExpirationDateChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    let value = e.target.value.replace(/\D/g, ""); // Remove non-digits
-
-    // Validate month as user types
-    if (value.length >= 1) {
-      const firstDigit = Number.parseInt(value.charAt(0), 10);
-      // If first digit is > 1, it must be 0X format
-      if (firstDigit > 1) {
-        value = "0" + value;
-      }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    if (!acceptPrivacy) {
+      setError("Du måste godkänna integritetspolicyn och villkoren för att slutföra köpet.");
+      return;
     }
 
-    if (value.length >= 2) {
-      const month = Number.parseInt(value.slice(0, 2));
-      // Ensure month is between 01-12
-      if (month > 12) {
-        value = "12" + value.slice(2);
-      } else if (month === 0) {
-        value = "01" + value.slice(2);
-      }
-      value = value.slice(0, 2) + "/" + value.slice(2, 4);
+    setIsLoading(true);
+    setError(null);
+
+    const payload = getOrderPayload();
+    try {
+      sessionStorage.setItem("pendingStripeOrder", JSON.stringify(payload));
+    } catch {
+      // Non-blocking
     }
 
-    setValue("expirationDate", value, { shouldValidate: true });
+    try {
+      const { error: submitError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/order/success?from_stripe=1`,
+          payment_method_data: {
+            billing_details: {
+              name: `${payload.firstName} ${payload.lastName}`.trim() || undefined,
+              email: payload.email || undefined,
+              phone: payload.phone || undefined,
+              address: {
+                line1: payload.address || undefined,
+                city: payload.city || undefined,
+                postal_code: payload.postalCode || undefined,
+                state: "", // Required when address fields are "never" - empty for Nordic/EU addresses
+                country: payload.country || "SE",
+              },
+            },
+          },
+        },
+        redirect: "if_required",
+      });
+
+      if (submitError) {
+        setError(submitError.message ?? "Betalningen misslyckades");
+        return;
+      }
+
+      const id = paymentIntent?.id ?? paymentIntentId;
+      if (onComplete && id) {
+        onComplete({ stripePaymentId: id });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Betalningen misslyckades");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const payload = getOrderPayload();
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={handleSubmit(handlePaymentForm)}
-    >
-      <div className="space-y-2">
-        <Label htmlFor="cardHolder">Namn på kortinnehavare</Label>
-        <Input
-          id="cardHolder"
-          placeholder="Ditt namn"
-          {...register("cardHolder")}
-          className={errors.cardHolder ? "border-destructive" : ""}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <PaymentElement
+        options={{
+          layout: "tabs",
+          fields: {
+            billingDetails: {
+              name: "never",
+              email: "never",
+              phone: "never",
+              address: "never",
+            },
+          },
+          defaultValues: {
+            billingDetails: {
+              name: `${payload.firstName} ${payload.lastName}`.trim() || undefined,
+              email: payload.email || undefined,
+              phone: payload.phone || undefined,
+              address: {
+                line1: payload.address || undefined,
+                city: payload.city || undefined,
+                postal_code: payload.postalCode || undefined,
+                country: payload.country || "SE",
+              },
+            },
+          },
+        }}
+      />
+      <label className="flex items-start gap-2 cursor-pointer mt-2">
+        <Checkbox
+          checked={acceptPrivacy}
+          onCheckedChange={(v) => {
+            setAcceptPrivacy(v === true);
+            setError(null);
+          }}
+          className="mt-0.5"
         />
-        {errors.cardHolder && (
-          <p className="text-xs text-destructive">{errors.cardHolder.message}</p>
+        <span className="text-sm text-muted-foreground">
+          Jag godkänner{" "}
+          <Link href="/privacy" target="_blank" className="underline hover:text-foreground">
+            integritetspolicyn
+          </Link>
+          {" "}och{" "}
+          <Link href="/terms" target="_blank" className="underline hover:text-foreground">
+            köpvillkoren
+          </Link>
+          {" "}<span className="text-destructive">*</span>
+        </span>
+      </label>
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
+      <div className="flex items-center gap-2 mt-2">
+        <Image src="/klarna.png" alt="Klarna" width={50} height={25} className="rounded-md" />
+        <Image src="/cards.png" alt="Cards" width={50} height={25} className="rounded-md" />
+        <Image src="/stripe.png" alt="Stripe" width={50} height={25} className="rounded-md" />
+      </div>
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={!stripe || isLoading || !acceptPrivacy}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <>
+            Slutför köpet
+            <ShoppingBagIcon className="w-4 h-4" />
+          </>
         )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="cardNumber">Kortnummer</Label>
-        <Controller
-          name="cardNumber"
-          control={control}
-          render={({ field }) => (
-            <Input
-              {...field}
-              id="cardNumber"
-              type="text"
-              inputMode="numeric"
-              autoComplete="cc-number"
-              placeholder="1234 5678 9012 3456"
-              maxLength={19}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
-                const formatted = digits.replace(/(\d{4})(?=\d)/g, "$1 ");
-                field.onChange(formatted);
-              }}
-              className={errors.cardNumber ? "border-destructive" : ""}
-            />
-          )}
-        />
-        {errors.cardNumber && (
-          <p className="text-xs text-destructive">{errors.cardNumber.message}</p>
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="expirationDate">Utgångsdatum (MM/ÅÅ)</Label>
-        <Input
-          id="expirationDate"
-          placeholder="MM/ÅÅ"
-          maxLength={5}
-          {...register("expirationDate")}
-          onChange={handleExpirationDateChange}
-          className={errors.expirationDate ? "border-destructive" : ""}
-        />
-        {errors.expirationDate && (
-          <p className="text-xs text-destructive">
-            {errors.expirationDate.message}
-          </p>
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="cvv">CVV</Label>
-        <Input
-          id="cvv"
-          placeholder="123"
-          {...register("cvv")}
-          className={errors.cvv ? "border-destructive" : ""}
-        />
-        {errors.cvv && (
-          <p className="text-xs text-destructive">{errors.cvv.message}</p>
-        )}
-      </div>
-      <div className="flex items-center gap-2 mt-4">
-        <Image
-          src="/klarna.png"
-          alt="klarna"
-          width={50}
-          height={25}
-          className="rounded-md"
-        />
-        <Image
-          src="/cards.png"
-          alt="klarna"
-          width={50}
-          height={25}
-          className="rounded-md"
-        />
-        <Image
-          src="/stripe.png"
-          alt="klarna"
-          width={50}
-          height={25}
-          className="rounded-md"
-        />
-      </div>
-      <Button type="submit" className="w-full">
-        Slutför köpet
-        <ShoppingBagIcon className="w-4 h-4" />
       </Button>
     </form>
   );
-};
+}
 
-export default PaymentForm;
+export default function PaymentForm({ total, getOrderPayload, onComplete }: PaymentFormProps) {
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const configFetched = useRef(false);
+
+  useEffect(() => {
+    if (configFetched.current) return;
+    configFetched.current = true;
+
+    fetch("/api/stripe/config")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error || !data.publishableKey) {
+          throw new Error(data.error ?? "Stripe publishable key not configured");
+        }
+        setStripePromise(loadStripe(data.publishableKey));
+      })
+      .catch((err) => {
+        setApiError(err.message ?? "Kunde inte ladda Stripe-konfiguration");
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!stripePromise || total <= 0) return;
+
+    setLoading(true);
+    setApiError(null);
+
+    fetch("/api/stripe/create-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: total }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setClientSecret(data.clientSecret);
+        setPaymentIntentId(data.paymentIntentId ?? null);
+      })
+      .catch((err) => setApiError(err.message ?? "Kunde inte starta betalning"))
+      .finally(() => setLoading(false));
+  }, [stripePromise, total]);
+
+  if (!stripePromise && !apiError) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!stripePromise && apiError) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm">
+        <p className="text-amber-800 dark:text-amber-200">
+          Stripe är inte konfigurerat. Lägg till NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY i apps/payment-service/.env
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 text-sm text-red-800 dark:text-red-200">
+        {apiError}
+      </div>
+    );
+  }
+
+  if (!clientSecret) {
+    return null;
+  }
+
+  return (
+    <Elements
+      stripe={stripePromise}
+      options={{
+        clientSecret,
+        locale: "sv",
+        appearance: {
+          theme: "stripe",
+          variables: {
+            colorPrimary: "#171717",
+            borderRadius: "8px",
+          },
+        },
+      }}
+    >
+      <CheckoutForm
+        paymentIntentId={paymentIntentId ?? ""}
+        getOrderPayload={getOrderPayload}
+        onComplete={onComplete}
+      />
+    </Elements>
+  );
+}
