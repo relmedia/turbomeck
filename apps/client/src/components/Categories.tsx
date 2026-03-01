@@ -39,6 +39,12 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
       if (aSlug === "alla-produkter") return -1;
       if (bSlug === "alla-produkter") return 1;
       return 0;
+    })
+    .filter((c, i, arr) => {
+      const slug = categorySlug(c);
+      if (slug !== "alla-produkter") return true;
+      const firstIndex = arr.findIndex((x) => categorySlug(x) === "alla-produkter");
+      return i !== firstIndex;
     });
   const getChildren = (parentId: number) =>
     categories.filter((c) => c.parentId === parentId);

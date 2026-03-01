@@ -194,8 +194,13 @@ export const createColumns = (
       const names = ids
         .map((id) => categoryMap[id])
         .filter(Boolean);
+      const fullText = names.join(", ");
+      const shortNames = names.map((n) => n.replace(/^Alla Produkter › /i, ""));
+      const text = shortNames.join(", ");
       return names.length > 0 ? (
-        <span className="text-muted-foreground">{names.join(", ")}</span>
+        <span className="text-muted-foreground truncate block max-w-[220px]" title={fullText}>
+          {text}
+        </span>
       ) : (
         <span className="text-muted-foreground">—</span>
       );

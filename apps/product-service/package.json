@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/index.ts",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts"
   },
   "keywords": [],
   "author": "",

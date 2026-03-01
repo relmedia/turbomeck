@@ -6,8 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, type NewProduct, type NewOrder, type NewOrderItem } from "@repo/database";
 import { eq, inArray, desc, sql } from "drizzle-orm";
-import { removeBackground } from "@imgly/background-removal-node";
-import sharp from "sharp";
+import { processProductImage } from "./image-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,55 +54,6 @@ app.use(
     credentials: true,
   })
 );
-
-// Image processing: remove background + crop to 4:5 aspect ratio
-async function processProductImage(inputPath: string): Promise<{ outputPath: string; filename: string }> {
-  const ext = path.extname(inputPath);
-  const baseName = path.basename(inputPath, ext);
-  const dir = path.dirname(inputPath);
-  const outputFilename = `${baseName}.png`;
-  const outputPath = path.join(dir, outputFilename);
-
-  let imageBuffer: Buffer;
-
-  // Step 1: Remove background (with fallback to original if it fails)
-  // Use Blob with explicit MIME type - library needs format hint (Buffer alone causes "Unsupported format")
-  const inputBuffer = fs.readFileSync(inputPath);
-  const mimeTypes: Record<string, string> = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-  };
-  const mimeType = mimeTypes[ext.toLowerCase()] || "image/jpeg";
-
-  try {
-    const inputBlob = new Blob([inputBuffer], { type: mimeType });
-    const blob = await removeBackground(inputBlob, {
-      model: "small",
-      output: { format: "image/png", quality: 0.9 },
-    });
-    imageBuffer = Buffer.from(await blob.arrayBuffer());
-  } catch (err) {
-    console.warn("Background removal failed, using original image:", err);
-    imageBuffer = inputBuffer;
-  }
-
-  // Step 2: Crop and resize to square (1:1) - best fit for product cards and detail
-  const TARGET_SIZE = 1200;
-  await sharp(imageBuffer)
-    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "cover", position: "center" })
-    .png({ compressionLevel: 6 })
-    .toFile(outputPath);
-
-  // Delete original if we're now saving as PNG (different file)
-  if (path.resolve(inputPath) !== path.resolve(outputPath)) {
-    fs.unlinkSync(inputPath);
-  }
-
-  return { outputPath, filename: outputFilename };
-}
 
 // Upload image endpoint
 app.post("/api/upload", upload.single("image"), async (req, res) => {
