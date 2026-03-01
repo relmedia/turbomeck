@@ -209,6 +209,7 @@ const CartPage: React.FC = () => {
               productId: typeof item.id === "number" ? item.id : undefined,
               productName: item.name,
               productImage: item.images?.default || item.galleryImages?.[0],
+              variant: item.selectedVariant,
               price: item.price,
               quantity: item.quantity,
             })),
@@ -266,6 +267,7 @@ const CartPage: React.FC = () => {
                   productId: typeof item.id === "number" ? item.id : undefined,
                   productName: item.name,
                   productImage: item.images?.default || item.galleryImages?.[0],
+                  variant: item.selectedVariant,
                   price: item.price,
                   quantity: item.quantity,
                 })),
@@ -327,7 +329,7 @@ const CartPage: React.FC = () => {
             <div className="space-y-4">
               {cart.map((item) => (
                 <CartItemRow
-                  key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
+                  key={`${item.id}-${item.selectedSize}-${item.selectedColor}-${item.selectedVariant ?? ""}`}
                   item={item}
                   onRemove={() => removeFromCart(item)}
                   onQuantityChange={(q) => updateQuantity(item, q)}
@@ -492,6 +494,7 @@ function CartItemRow({
   const hasSizes = item.sizes?.length > 0 && item.sizes[0] !== "-";
   const hasColors = item.colors?.length > 1 && item.colors[0] !== "default";
   const details: string[] = [];
+  if (item.selectedVariant) details.push(item.selectedVariant);
   if (hasColors) details.push(`Färg: ${item.selectedColor}`);
   if (hasSizes) details.push(`Storlek: ${item.selectedSize}`);
   useEffect(() => {

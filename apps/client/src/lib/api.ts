@@ -25,6 +25,7 @@ export type ApiProduct = {
   stock: number;
   weight: number | null;
   categoryIds: number[];
+  attributes?: { name: string; options: string[] }[];
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +49,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     price: api.price,
     weight: api.weight ?? undefined,
     categoryIds: api.categoryIds ?? [],
+    attributes: api.attributes ?? [],
     sizes: ["-"],
     colors: ["default"],
     images: { default: mainImg },
@@ -123,6 +125,7 @@ export async function createOrder(orderData: {
     productId?: number;
     productName: string;
     productImage?: string;
+    variant?: string;
     price: number;
     quantity: number;
   }>;

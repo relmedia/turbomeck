@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, Star, Trash2 } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -275,8 +274,10 @@ export const createColumns = (
   {
     id: "actions",
     enableHiding: false,
-    cell: ({ row }: { row: { original: Product } }) => {
+    cell: ({ row, table }: { row: { original: Product }; table: { getState: () => { pagination: { pageIndex: number } } } }) => {
       const product = row.original;
+      const page = table.getState().pagination.pageIndex + 1;
+      const fromQuery = page > 1 ? `?fromPage=${page}` : "";
 
       return (
         <DropdownMenu>
@@ -287,9 +288,8 @@ export const createColumns = (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Åtgärder</DropdownMenuLabel>
             <DropdownMenuItem asChild>
-              <Link href={`/studio/products/${product.id}/view`}>Visa detaljer</Link>
+              <Link href={`/studio/products/${product.id}/view${fromQuery}`}>Visa detaljer</Link>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(String(product.id))}
@@ -298,7 +298,7 @@ export const createColumns = (
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/studio/products/${product.id}`}>Redigera</Link>
+              <Link href={`/studio/products/${product.id}${fromQuery}`}>Redigera</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DeleteProductDialog
@@ -312,7 +312,6 @@ export const createColumns = (
                   }}
                   className="text-destructive focus:text-destructive cursor-pointer"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
                   Ta bort produkt
                 </DropdownMenuItem>
               )}

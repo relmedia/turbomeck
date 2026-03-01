@@ -13,7 +13,8 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
             (p) =>
               p.id === product.id &&
               p.selectedSize === product.selectedSize &&
-              p.selectedColor === product.selectedColor
+              p.selectedColor === product.selectedColor &&
+              (p.selectedVariant ?? "") === (product.selectedVariant ?? "")
           );
           if (existingIndex !== -1) {
             const updatedCart = [...state.cart];
@@ -29,6 +30,7 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
                 quantity: product.quantity || 1,
                 selectedSize: product.selectedSize,
                 selectedColor: product.selectedColor,
+                selectedVariant: product.selectedVariant,
               },
             ],
           };
@@ -40,7 +42,8 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
               !(
                 p.id === product.id &&
                 p.selectedSize === product.selectedSize &&
-                p.selectedColor === product.selectedColor
+                p.selectedColor === product.selectedColor &&
+                (p.selectedVariant ?? "") === (product.selectedVariant ?? "")
               )
           ),
         })),
@@ -53,7 +56,8 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
                   !(
                     p.id === product.id &&
                     p.selectedSize === product.selectedSize &&
-                    p.selectedColor === product.selectedColor
+                    p.selectedColor === product.selectedColor &&
+                    (p.selectedVariant ?? "") === (product.selectedVariant ?? "")
                   )
               ),
             };
@@ -62,7 +66,8 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
             (p) =>
               p.id === product.id &&
               p.selectedSize === product.selectedSize &&
-              p.selectedColor === product.selectedColor
+              p.selectedColor === product.selectedColor &&
+              (p.selectedVariant ?? "") === (product.selectedVariant ?? "")
           );
           if (idx === -1) return state;
           const next = [...state.cart];

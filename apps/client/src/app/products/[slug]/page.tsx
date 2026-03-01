@@ -1,10 +1,11 @@
 import ProductInteraction from "@/components/ProductInteractions";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import RichTextContent from "@/components/RichTextContent";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import Image from "next/image";
-import { fetchProduct } from "@/lib/api";
+import { fetchCategories, fetchProduct } from "@/lib/api";
 import { notFound, redirect } from "next/navigation";
-import { productUrl } from "@/lib/utils";
+import { categorySlug, productUrl } from "@/lib/utils";
 
 export const generateMetadata = async ({
   params,
@@ -30,7 +31,10 @@ const ProductPage = async ({
   const { slug } = await params;
   const { size, color } = await searchParams;
 
-  const product = await fetchProduct(slug);
+  const [product, categories] = await Promise.all([
+    fetchProduct(slug),
+    fetchCategories(),
+  ]);
   if (!product) notFound();
 
   // Redirect legacy /products/123 URLs to slugged URL
@@ -41,8 +45,29 @@ const ProductPage = async ({
   const selectedSize = size || product.sizes[0];
   const selectedColor = color || product.colors[0];
 
+  const firstCategoryId = product.categoryIds?.[0];
+  const firstCategory = firstCategoryId
+    ? categories.find((c) => c.id === firstCategoryId)
+    : null;
+  const breadcrumbItems = [
+    { label: "Hem", href: "/" },
+    { label: "Produkter", href: "/" },
+    ...(firstCategory
+      ? [
+          {
+            label: firstCategory.parentName
+              ? `${firstCategory.parentName} › ${firstCategory.name}`
+              : firstCategory.name,
+            href: `/?category=${categorySlug(firstCategory)}`,
+          },
+        ]
+      : []),
+    { label: product.name },
+  ];
+
   return (
-    <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-12">
+    <div className="flex flex-col gap-4 mt-6">
+      <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-4">
       {/* IMAGE GALLERY */}
       <div className="w-full lg:w-5/12">
         <ProductImageGallery
@@ -53,6 +78,7 @@ const ProductPage = async ({
       {/* DETAILS */}
       <div className="w-full lg:w-7/12 flex flex-col gap-4">
         <h1 className="text-2xl font-medium">{product.name}</h1>
+        <Breadcrumb items={breadcrumbItems} className="text-sm" />
         <RichTextContent html={product.description} />
         <h2 className="text-2xl font-semibold">
           {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}{" "}
@@ -103,6 +129,7 @@ const ProductPage = async ({
           <span className="underline hover:text-black">Återbetalningspolicy</span>.
         </p>
       </div>
+    </div>
     </div>
   );
 };

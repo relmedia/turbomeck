@@ -1,9 +1,14 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export function PageTitle() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromPage = searchParams.get("fromPage");
 
   const getTitle = () => {
     if (pathname === "/studio") return "Dashboard";
@@ -16,7 +21,32 @@ export function PageTitle() {
     return "Dashboard";
   };
 
+  const showBackButton =
+    pathname === "/studio/products/add" ||
+    /^\/studio\/products\/[^/]+$/.test(pathname) ||
+    /^\/studio\/products\/[^/]+\/view$/.test(pathname);
+
   return (
-    <h1 className="text-2xl font-semibold tracking-tight">{getTitle()}</h1>
+    <div className="flex items-center gap-3">
+      {showBackButton && (
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={() => {
+            const page = fromPage ? parseInt(fromPage, 10) : 0;
+            if (page > 1) {
+              window.location.href = `/studio/products?page=${page}`;
+            } else {
+              router.back();
+            }
+          }}
+          aria-label="Gå tillbaka"
+          className="cursor-pointer shrink-0 bg-muted hover:bg-accent"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+      )}
+      <h1 className="text-2xl font-semibold tracking-tight">{getTitle()}</h1>
+    </div>
   );
 }

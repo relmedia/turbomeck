@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +64,9 @@ export default function ProductViewPage() {
   const params = useParams();
   const productId = params.id as string;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromPage = searchParams.get("fromPage");
+  const fromQuery = fromPage ? `?fromPage=${fromPage}` : "";
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +136,7 @@ export default function ProductViewPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/studio/products">Produkter</Link>
+                <Link href={fromPage ? `/studio/products?page=${fromPage}` : "/studio/products"}>Produkter</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -187,7 +191,7 @@ export default function ProductViewPage() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" asChild>
-            <Link href={`/studio/products/${product.id}`}>
+            <Link href={`/studio/products/${product.id}${fromQuery}`}>
               <Pencil className="w-4 h-4 mr-2" />
               Redigera
             </Link>

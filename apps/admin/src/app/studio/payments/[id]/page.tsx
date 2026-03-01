@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 type OrderItem = {
   productName: string;
   productImage: string;
+  variant?: string;
   quantity: number;
   price: number;
   total: number;
@@ -282,7 +283,12 @@ export default function OrderDetailPage() {
                         <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted">
                           <img src={item.productImage} alt={item.productName} className="h-full w-full object-cover" />
                         </div>
-                        <span className="font-medium">{item.productName}</span>
+                        <div>
+                          <span className="font-medium">{item.productName}</span>
+                          {item.variant && (
+                            <span className="block text-sm text-muted-foreground">{item.variant}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-2">{item.quantity}</td>

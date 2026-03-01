@@ -105,6 +105,7 @@ export default function ProductDetailPage() {
     stock: string;
     weight: string;
     categoryIds: number[];
+    attributes: { name: string; options: string[] }[];
     image: string | null;
     thumbnails: string[];
   }>({
@@ -142,6 +143,9 @@ export default function ProductDetailPage() {
         stock: data.stock?.toString() || "0",
         weight: data.weight != null ? data.weight.toString() : "",
         categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
+        attributes: Array.isArray(data.attributes)
+          ? data.attributes.filter((a: { name?: string; options?: string[] }) => a?.name && Array.isArray(a?.options))
+          : [],
         image: data.image || null,
         thumbnails: data.thumbnails ?? [],
       });
@@ -231,6 +235,7 @@ export default function ProductDetailPage() {
           stock: parseInt(formData.stock) || 0,
           weight: formData.weight ? parseFloat(formData.weight) : null,
           categoryIds: formData.categoryIds,
+          attributes: formData.attributes,
           image: formData.image,
           thumbnails: formData.thumbnails,
         }),
@@ -414,6 +419,64 @@ export default function ProductDetailPage() {
                   disabled={saving}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Produktalternativ</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Kunden måste välja ett alternativ vid köp. Lägg till alternativ (kommaseparerade, t.ex. 13C, 13T, 14t, 15t).
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {formData.attributes.map((attr, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <Input
+                    placeholder="13C, 13T, 14t, 15t..."
+                    value={attr.options.join(", ")}
+                    onChange={(e) =>
+                      setFormData((prev) => {
+                        const next = [...prev.attributes];
+                        next[idx] = {
+                          ...next[idx],
+                          options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                        };
+                        return { ...prev, attributes: next };
+                      })
+                    }
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        attributes: prev.attributes.filter((_, i) => i !== idx),
+                      }))
+                    }
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    attributes: [...prev.attributes, { name: "Alternativ", options: [] }],
+                  }))
+                }
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Lägg till alternativ
+              </Button>
             </CardContent>
           </Card>
 
@@ -618,7 +681,7 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                   {formData.categoryIds.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {formData.categoryIds.map((id) => {
                         const c = categories.find((x) => x.id === id);
                         return c ? (
@@ -640,6 +703,17 @@ export default function ProductDetailPage() {
                           </Badge>
                         ) : null;
                       })}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, categoryIds: [] }))
+                        }
+                      >
+                        Rensa alla
+                      </Button>
                     </div>
                   )}
                 </div>

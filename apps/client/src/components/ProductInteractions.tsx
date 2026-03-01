@@ -11,19 +11,37 @@ const ProductInteraction = ({
   product,
   selectedSize,
   selectedColor,
+  selectedVariant,
+  onVariantChange,
 }: {
   product: ProductType;
   selectedSize: string;
   selectedColor: string;
+  selectedVariant?: string;
+  onVariantChange?: (value: string) => void;
 }) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [quantity, setQuantity] = useState(1);
+  const [variant, setVariant] = useState(selectedVariant ?? "");
 
   const { addToCart } = useCartStore();
   const hasSizes = product.sizes.length > 1 && product.sizes[0] !== "-";
   const hasColors = product.colors.length > 1 && product.colors[0] !== "default";
+  const attributes = product.attributes ?? [];
+  const attrsWithOptions = attributes.filter((a) => a.options.length > 0);
+  const hasAttributes = attrsWithOptions.length > 0;
+  const allOptions = Array.from(
+    new Map(
+      attrsWithOptions.flatMap((a) =>
+        a.options.map((opt) => {
+          const value = `${a.name}: ${opt}`;
+          return [value, { value, label: opt }] as const;
+        })
+      )
+    ).values()
+  );
 
   const handleTypeChange = (type: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -41,14 +59,27 @@ const ProductInteraction = ({
     }
   };
 
-  const handleAddToCart = () => {
+  const addProductToCart = () => {
+    if (hasAttributes && !variant) {
+      toast.error("Välj storlek innan du lägger i varukorgen.");
+      return false;
+    }
     addToCart({
       ...product,
       quantity,
       selectedColor,
       selectedSize,
+      selectedVariant: hasAttributes ? variant : undefined,
     });
-    toast.success("Produkten har lagts till i varukorgen!");
+    return true;
+  };
+
+  const handleAddToCart = () => {
+    if (addProductToCart()) toast.success("Produkten har lagts till i varukorgen!");
+  };
+
+  const handleBuyNow = () => {
+    if (addProductToCart()) router.push("/cart");
   };
   return (
     <div className="flex flex-col gap-4 mt-4">
@@ -77,6 +108,28 @@ const ProductInteraction = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {/* ATTRIBUTES (e.g. Typ: 13C, 13T) - single select with all options */}
+      {hasAttributes && (
+        <div className="flex flex-col gap-2 text-sm">
+          <span className="text-gray-500 block">Storlek</span>
+          <select
+            value={variant}
+            onChange={(e) => {
+              const v = e.target.value;
+              setVariant(v);
+              onVariantChange?.(v);
+            }}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-800"
+          >
+            <option value="">Välj storlek</option>
+            {allOptions.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       {/* COLOR */}
@@ -125,7 +178,10 @@ const ProductInteraction = ({
         <Plus className="w-4 h-4" />
         Lägg i varukorg
       </button>
-      <button className="ring-1 ring-gray-400 shadow-lg text-gray-800 px-4 py-2 rounded-md flex items-center justify-center cursor-pointer gap-2 text-sm font-medium">
+      <button
+        onClick={handleBuyNow}
+        className="ring-1 ring-gray-400 shadow-lg text-gray-800 px-4 py-2 rounded-md flex items-center justify-center cursor-pointer gap-2 text-sm font-medium"
+      >
         <ShoppingCart className="w-4 h-4" />
         Köp denna produkt
       </button>

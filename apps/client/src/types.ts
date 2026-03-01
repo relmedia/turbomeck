@@ -12,6 +12,8 @@ export type ProductType = {
   categoryIds?: number[];
   sizes: [string, ...string[]];
   colors: [string, ...string[]];
+  /** Product variants e.g. [{ name: "Typ", options: ["13C","13T"] }] - customer must choose when adding to cart */
+  attributes?: { name: string; options: string[] }[];
   images: Record<string, string>;
   /** All images for gallery (main + thumbnails) */
   galleryImages?: string[];
@@ -23,6 +25,8 @@ export type CartItemType = ProductType & {
   quantity: number;
   selectedSize: string;
   selectedColor: string;
+  /** Selected variant e.g. "Typ: 13C" when product has attributes */
+  selectedVariant?: string;
 };
 
 export type CartItemsType = CartItemType[];

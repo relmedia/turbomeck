@@ -521,7 +521,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                   </Tooltip>
                 </div>
                 {field.value.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {field.value.map((id) => {
                       const c = categories.find((x) => x.id === id);
                       return c ? (
@@ -540,6 +540,15 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                         </Badge>
                       ) : null;
                     })}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => field.onChange([])}
+                    >
+                      Rensa alla
+                    </Button>
                   </div>
                 )}
               </div>

@@ -55,6 +55,7 @@ export async function GET(
       items: items.map((i) => ({
         productName: i.productName,
         productImage: i.productImage ?? "/products/1g.png",
+        variant: (i as { variant?: string }).variant ?? undefined,
         quantity: i.quantity,
         price: Number(i.price),
         total: Number(i.price) * i.quantity,

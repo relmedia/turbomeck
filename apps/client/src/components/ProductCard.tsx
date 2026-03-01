@@ -81,7 +81,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
       {/* PRODUCT DETAIL */}
       <div className="flex flex-col gap-4 p-4 flex-1 min-h-0">
         <h1 className="font-medium">{product.name}</h1>
-        <p className="text-sm text-gray-500">{product.shortDescription}</p>
+        <p className="text-sm text-gray-500 line-clamp-2">{product.shortDescription}</p>
         {/* PRODUCT TYPES */}
         {hasVariants && (
           <div className="flex items-center gap-4 text-xs">

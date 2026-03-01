@@ -39,7 +39,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DataTablePagination } from "@/components/TablePagination";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import { PanelLeftClose, Plus, Trash2 } from "lucide-react";
 
 const productGlobalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
@@ -70,6 +71,12 @@ export function DataTable<TData extends { id: number | string }, TValue>({
   categories = [],
   onDelete,
 }: DataTableProps<TData, TValue>) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  const pageFromUrl = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const pageSizeFromUrl = Math.min(50, Math.max(10, parseInt(searchParams.get("pageSize") ?? "10", 10)));
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState({});
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
@@ -79,6 +86,16 @@ export function DataTable<TData extends { id: number | string }, TValue>({
   const [statusFilters, setStatusFilters] = useState({ aktiv: true, slutsald: true, stangd: true });
   const [categoryFilters, setCategoryFilters] = useState<Record<number, boolean>>({});
   const [priceFilters, setPriceFilters] = useState({ range0_500: true, range500_1000: true, range1000: true });
+  const [pagination, setPagination] = useState({
+    pageIndex: pageFromUrl - 1,
+    pageSize: pageSizeFromUrl,
+  });
+
+  useEffect(() => {
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+    const size = Math.min(50, Math.max(10, parseInt(searchParams.get("pageSize") ?? "10", 10)));
+    setPagination((p) => ({ ...p, pageIndex: page - 1, pageSize: size }));
+  }, [searchParams.toString()]);
 
   const filteredData = useMemo(() => {
     // Only apply status filter when user has unchecked at least one
@@ -142,11 +159,21 @@ export function DataTable<TData extends { id: number | string }, TValue>({
     onRowSelectionChange: setRowSelection,
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: (updater) => {
+      const next = updater(pagination);
+      setPagination(next);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("page", String(next.pageIndex + 1));
+      params.set("pageSize", String(next.pageSize));
+      const url = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", url);
+    },
     state: {
       sorting,
       rowSelection,
       columnVisibility,
       globalFilter,
+      pagination,
     },
     globalFilterFn: productGlobalFilterFn as FilterFn<TData>,
   });

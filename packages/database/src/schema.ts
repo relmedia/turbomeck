@@ -68,6 +68,8 @@ export const products = pgTable("products", {
   weight: decimal("weight", { precision: 8, scale: 2 }), // kg, for PostNord shipping
   image: text("image"), // Main product image
   thumbnails: jsonb("thumbnails").$type<string[]>().default([]), // Additional gallery images
+  /** Product variants e.g. [{ name: "Typ", options: ["13C","13T","14t"] }] - customer must choose when adding to cart */
+  attributes: jsonb("attributes").$type<{ name: string; options: string[] }[]>().default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -171,6 +173,8 @@ export const orderItems = pgTable("order_items", {
   productId: integer("product_id").references(() => products.id),
   productName: text("product_name").notNull(),
   productImage: text("product_image"),
+  /** Selected variant/attribute e.g. "Typ: 13C" */
+  variant: text("variant"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull(),
 });

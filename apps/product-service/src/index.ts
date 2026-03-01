@@ -244,6 +244,7 @@ app.get("/api/products", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryMap.get(p.id) ?? [],
+      attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }));
@@ -290,6 +291,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
+      attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -330,6 +332,7 @@ app.get("/api/products/:id", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
+      attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       orderCount,
       totalRevenue,
       createdAt: p.createdAt,
@@ -383,6 +386,7 @@ app.post("/api/products", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryIdsRes,
+      attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -396,7 +400,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes } = req.body;
 
     const updateData: Partial<NewProduct> = {
       updatedAt: new Date(),
@@ -410,6 +414,11 @@ app.put("/api/products/:id", async (req, res) => {
     if (thumbnails !== undefined) updateData.thumbnails = Array.isArray(thumbnails) ? thumbnails : [];
     if (stock !== undefined) updateData.stock = stock;
     if (weight !== undefined) updateData.weight = weight != null ? weight.toString() : null;
+    if (attributes !== undefined) {
+      updateData.attributes = Array.isArray(attributes)
+        ? attributes.filter((a: unknown) => a && typeof a === "object" && "name" in a && "options" in a && Array.isArray((a as { options: unknown }).options))
+        : [];
+    }
 
     const updated = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
 
@@ -492,6 +501,7 @@ app.post("/api/orders", async (req, res) => {
         productId?: number;
         productName: string;
         productImage?: string;
+        variant?: string;
         price: number;
         quantity: number;
       }>;
@@ -537,6 +547,7 @@ app.post("/api/orders", async (req, res) => {
         productId: item.productId ?? null,
         productName: item.productName,
         productImage: item.productImage ?? null,
+        variant: item.variant ?? null,
         price: String(item.price),
         quantity: item.quantity,
       }))
@@ -603,6 +614,7 @@ app.get("/api/orders", async (req, res) => {
             productId: i.productId,
             productName: i.productName,
             productImage: i.productImage,
+            variant: (i as { variant?: string }).variant ?? null,
             price: parseFloat(i.price),
             quantity: i.quantity,
           })),
@@ -657,6 +669,7 @@ app.get("/api/orders/:id", async (req, res) => {
         productId: i.productId,
         productName: i.productName,
         productImage: i.productImage,
+        variant: (i as { variant?: string }).variant ?? null,
         price: parseFloat(i.price),
         quantity: i.quantity,
       })),
