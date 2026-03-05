@@ -1,0 +1,433 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { Order } from "@/lib/api";
+import type { MyReview } from "@/lib/api";
+import { fetchMyReviews, createReview, updateReview } from "@/lib/api";
+import { Star, X, Pencil, Lock } from "lucide-react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { toast } from "react-toastify";
+
+const UPLOADS_BASE =
+  process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
+
+function resolveImageUrl(path: string | null): string {
+  if (!path) return "/products/1g.png";
+  if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
+  if (path.startsWith("http")) return path;
+  return path;
+}
+
+function OrderItemReviewForm({
+  productId,
+  productName,
+  productImage,
+  onSuccess,
+}: {
+  productId: number;
+  productName: string;
+  productImage: string | null;
+  onSuccess: () => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [title, setTitle] = useState("");
+  const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating < 1 || rating > 5) {
+      toast.error("Välj ett betyg mellan 1 och 5.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await createReview({
+        productId,
+        rating,
+        title: title.trim() || undefined,
+        comment: comment.trim() || undefined,
+      });
+      onSuccess();
+      setTitle("");
+      setComment("");
+      setRating(0);
+      toast.success("Tack! Din recension har sparats.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara recensionen.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 p-4 rounded-lg border bg-muted/30">
+      <div className="flex gap-3">
+        <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
+          <Image
+            src={resolveImageUrl(productImage)}
+            alt={productName}
+            fill
+            className="object-cover"
+            sizes="56px"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{productName}</p>
+        </div>
+      </div>
+      <div>
+        <Label className="mb-1 block text-sm">Betyg *</Label>
+        <div className="flex gap-0.5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setRating(i)}
+              className="rounded p-0.5 transition-colors hover:bg-muted"
+              aria-label={`${i} stjärnor`}
+            >
+              <Star
+                className={cn(
+                  "h-5 w-5",
+                  i <= rating ? "fill-black text-black" : "text-gray-200"
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <Label htmlFor={`title-${productId}`} className="text-sm">Rubrik (valfritt)</Label>
+        <Input
+          id={`title-${productId}`}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="T.ex. Bra kvalitet"
+          maxLength={100}
+          className="mt-1"
+        />
+      </div>
+      <div>
+        <Label htmlFor={`comment-${productId}`} className="text-sm">Kommentar</Label>
+        <textarea
+          id={`comment-${productId}`}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Berätta vad du tyckte om produkten..."
+          rows={3}
+          className="mt-1 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <Button type="submit" disabled={loading}>
+        {loading ? "Skickar..." : "Publicera recension"}
+      </Button>
+    </form>
+  );
+}
+
+function OrderItemReviewCard({
+  item,
+  review,
+  onUpdated,
+}: {
+  item: { id: number; productId: number; productName: string; productImage: string | null };
+  review: MyReview;
+  onUpdated: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [rating, setRating] = useState(review.rating);
+  const [title, setTitle] = useState(review.title ?? "");
+  const [comment, setComment] = useState(review.comment ?? "");
+  const [loading, setLoading] = useState(false);
+
+  const canEdit = review.editedAt == null;
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating < 1 || rating > 5) {
+      toast.error("Välj ett betyg mellan 1 och 5.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateReview(review.id, {
+        rating,
+        title: title.trim() || undefined,
+        comment: comment.trim() || undefined,
+      });
+      onUpdated();
+      setEditing(false);
+      toast.success("Recensionen har uppdaterats.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunde inte uppdatera recensionen.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setRating(review.rating);
+    setTitle(review.title ?? "");
+    setComment(review.comment ?? "");
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <form onSubmit={handleSave} className="p-4 rounded-lg border bg-muted/30 space-y-3">
+        <div className="flex gap-3">
+          <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
+            <Image
+              src={resolveImageUrl(item.productImage)}
+              alt={item.productName}
+              fill
+              className="object-cover"
+              sizes="56px"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{item.productName}</p>
+          </div>
+        </div>
+        <div>
+          <Label className="mb-1 block text-sm">Betyg *</Label>
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setRating(i)}
+                className="rounded p-0.5 transition-colors hover:bg-muted"
+                aria-label={`${i} stjärnor`}
+              >
+                <Star
+                  className={cn(
+                    "h-5 w-5",
+                    i <= rating ? "fill-black text-black" : "text-gray-200"
+                  )}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <Label className="text-sm">Rubrik (valfritt)</Label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="T.ex. Bra kvalitet"
+            maxLength={100}
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label className="text-sm">Kommentar</Label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Berätta vad du tyckte om produkten..."
+            rows={3}
+            className="mt-1 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={loading}>
+            {loading ? "Sparar..." : "Spara ändringar"}
+          </Button>
+          <Button type="button" variant="outline" onClick={handleCancel} disabled={loading}>
+            Avbryt
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+      <div className="flex gap-3">
+        <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
+          <Image
+            src={resolveImageUrl(item.productImage)}
+            alt={item.productName}
+            fill
+            className="object-cover"
+            sizes="56px"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium truncate">{item.productName}</p>
+            {canEdit ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(true)}
+                className="shrink-0"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                Redigera
+              </Button>
+            ) : (
+              <span className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                Låst
+              </span>
+            )}
+          </div>
+          <div className="flex gap-0.5 mt-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Star
+                key={i}
+                className={cn(
+                  "h-4 w-4",
+                  i <= review.rating ? "fill-black text-black" : "text-gray-200"
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      {review.title && (
+        <p className="text-sm font-medium">{review.title}</p>
+      )}
+      {review.comment && (
+        <p className="text-sm text-muted-foreground">{review.comment}</p>
+      )}
+    </div>
+  );
+}
+
+type OrderReviewsModalProps = {
+  order: Order | null;
+  onClose: () => void;
+};
+
+export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalProps) {
+  const [myReviews, setMyReviews] = useState<MyReview[]>([]);
+
+  useEffect(() => {
+    fetchMyReviews().then(setMyReviews);
+  }, [order?.id]);
+
+  if (!order) return null;
+
+  const reviewedIds = myReviews.map((r) => r.productId);
+  const itemsWithProductId = (order.items ?? []).filter(
+    (item): item is typeof item & { productId: number } => item.productId != null
+  );
+  const unreviewedItems = itemsWithProductId.filter(
+    (item) => !reviewedIds.includes(item.productId)
+  );
+  const reviewByProductId = new Map(myReviews.map((r) => [r.productId, r]));
+
+  // No unreviewed products: all done or no products to review
+  if (unreviewedItems.length === 0) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        onClick={onClose}
+      >
+        <div
+          className="bg-background rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between z-10">
+            <h2 className="text-lg font-semibold">Dina recensioner</h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="Stäng"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            {itemsWithProductId.length === 0 ? (
+              <p className="text-muted-foreground">
+                Denna beställning har inga produkter som kan recenseras.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    Du har redan skrivit recensioner för alla produkter i denna beställning.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Du kan redigera varje recension max en gång. Efter det är den låst och kan inte ändras.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  {itemsWithProductId.map((item) => {
+                    const review = reviewByProductId.get(item.productId);
+                    if (!review) return null;
+                    return (
+                      <OrderItemReviewCard
+                        key={item.id}
+                        item={{
+                          id: item.id,
+                          productId: item.productId,
+                          productName: item.productName,
+                          productImage: item.productImage,
+                        }}
+                        review={review}
+                        onUpdated={() => fetchMyReviews().then(setMyReviews)}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <Button onClick={onClose} className="mt-2">
+              Stäng
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background rounded-xl shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between z-10">
+          <h2 className="text-lg font-semibold">Skriv recension</h2>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-md hover:bg-muted transition-colors"
+            aria-label="Stäng"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Beställning #{order.orderNumber} – Du har köpt dessa produkter men har inte skrivit en recension ännu.
+          </p>
+          <div className="space-y-4">
+            {unreviewedItems.map((item) => (
+              <OrderItemReviewForm
+                key={item.id}
+                productId={item.productId}
+                productName={item.productName}
+                productImage={item.productImage}
+                onSuccess={() => fetchMyReviews().then(setMyReviews)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

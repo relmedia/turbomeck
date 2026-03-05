@@ -86,7 +86,7 @@ export default function IntegritetspolicyPage() {
             <li>Rättelse av felaktiga uppgifter</li>
             <li>Rätten att bli glömd (radering, inom vissa undantag)</li>
             <li>Dataportabilitet — ladda ner en kopia av dina uppgifter i{" "}
-              <Link href="/account/export" className="underline hover:text-foreground">JSON-format</Link>
+              <Link href="/account/export" className="underline hover:text-foreground">PDF-format</Link>
             </li>
             <li>Invända mot viss behandling</li>
           </ul>

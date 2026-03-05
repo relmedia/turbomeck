@@ -1,7 +1,7 @@
 "use client";
 
 import type { FC } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   shippingFormSchema,
   type SavedAddress,
@@ -53,6 +53,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors },
   } = useForm<AddressFormInputs>({
     resolver: zodResolver(addressSchema as any),
@@ -62,6 +63,16 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
       ...initialAddress,
     },
   });
+
+  useEffect(() => {
+    if (initialAddress) {
+      reset({
+        country: "SE",
+        phone: "",
+        ...initialAddress,
+      });
+    }
+  }, [initialAddress, reset]);
 
   const onSubmit: SubmitHandler<AddressFormInputs> = async (data) => {
     setError(null);

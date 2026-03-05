@@ -62,7 +62,7 @@ export const columns: ColumnDef<User>[] = [
   },
   {
     accessorKey: "fullName",
-    header: "Användarnamn",
+    header: "Namn",
   },
   {
     accessorKey: "email",

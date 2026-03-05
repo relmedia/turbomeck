@@ -25,7 +25,7 @@ export default function ExportDataPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `turbomeck-mina-uppgifter-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `turbomeck-mina-uppgifter-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -83,7 +83,7 @@ export default function ExportDataPage() {
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             Enligt GDPR har du rätt till dataportabilitet. Hämta en kopia av dina
-            personuppgifter i JSON-format. Filen innehåller din profil, sparad adress,
+            personuppgifter som PDF. Filen innehåller din profil, sparad adress,
             önskelista och orderhistorik.
           </p>
         </CardHeader>
@@ -98,10 +98,10 @@ export default function ExportDataPage() {
                 Exporterar...
               </>
             ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" />
-                Ladda ner mina uppgifter
-              </>
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Ladda ner som PDF
+                </>
             )}
           </Button>
         </CardContent>

@@ -2,8 +2,13 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: path.resolve(__dirname, "../.."),
+  webpack: (config) => {
+    // Ensure monorepo root node_modules is in resolution path (fixes CSS @import in turbo)
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      path.resolve(__dirname, "../../node_modules"),
+    ];
+    return config;
   },
   images: {
     dangerouslyAllowLocalIP: true,

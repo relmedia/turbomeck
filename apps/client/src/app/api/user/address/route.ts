@@ -64,9 +64,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const fullName = `${savedAddress.firstName} ${savedAddress.lastName}`.trim();
     await db
       .update(users)
       .set({
+        name: fullName || user.name,
         metadata: { ...user.metadata, savedAddress },
       })
       .where(eq(users.id, session.user.id));

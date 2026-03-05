@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PRODUCT_API } from "@/lib/product-api";
 
 type Category = {
   id: number;
@@ -58,8 +59,6 @@ type Product = {
   updatedAt?: string;
 };
 
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
-
 export default function ProductViewPage() {
   const params = useParams();
   const productId = params.id as string;
@@ -78,8 +77,8 @@ export default function ProductViewPage() {
     setError(null);
     try {
       const [productRes, categoriesRes] = await Promise.all([
-        fetch(`${PRODUCT_SERVICE_URL}/api/products/${productId}`),
-        fetch(`${PRODUCT_SERVICE_URL}/api/categories`),
+        fetch(`${PRODUCT_API}/products/${productId}`),
+        fetch(`${PRODUCT_API}/categories`),
       ]);
       if (!productRes.ok) throw new Error("Produkt hittades inte");
       const data = await productRes.json();
@@ -101,7 +100,7 @@ export default function ProductViewPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/products/${productId}`, {
+      const res = await fetch(`${PRODUCT_API}/products/${productId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Kunde inte ta bort produkt");

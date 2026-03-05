@@ -5,7 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import {
   Home,
   Inbox,
-  Calendar,
+  Star,
   Search,
   Settings,
   Plus,
@@ -58,9 +58,9 @@ const items = [
     icon: Inbox,
   },
   {
-    title: "Kalender",
-    url: "#",
-    icon: Calendar,
+    title: "Recensioner",
+    url: "/studio/reviews",
+    icon: Star,
   },
   {
     title: "Sök...",

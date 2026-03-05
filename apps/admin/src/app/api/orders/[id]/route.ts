@@ -3,6 +3,32 @@ import { orders, orderItems } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+/** DELETE /api/orders/[id] - Admin delete an order */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const orderId = parseInt(id, 10);
+    if (isNaN(orderId)) {
+      return NextResponse.json({ error: "Ogiltigt order-ID" }, { status: 400 });
+    }
+
+    const [deleted] = await db
+      .delete(orders)
+      .where(eq(orders.id, orderId))
+      .returning({ id: orders.id });
+    if (!deleted) {
+      return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete order:", err);
+    return NextResponse.json({ error: "Kunde inte ta bort order" }, { status: 500 });
+  }
+}
+
 /** GET /api/orders/[id] - Single order with items for detail page */
 export async function GET(
   _req: Request,

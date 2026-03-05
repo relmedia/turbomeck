@@ -193,6 +193,33 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   }),
 }));
 
+// ============ REVIEWS ============
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id")
+      .references(() => products.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+    rating: integer("rating").notNull(),
+    title: text("title"),
+    comment: text("comment"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    editedAt: timestamp("edited_at"),
+  },
+  (t) => [{ unique: [t.productId, t.userId] }]
+);
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  product: one(products, { fields: [reviews.productId], references: [products.id] }),
+  user: one(users, { fields: [reviews.userId], references: [users.id] }),
+  order: one(orders, { fields: [reviews.orderId], references: [orders.id] }),
+}));
+
 // ============ DISCOUNT CODES (RABATTKODER) ============
 export const discountCodes = pgTable("discount_codes", {
   id: serial("id").primaryKey(),
@@ -222,6 +249,9 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+
+export type Review = typeof reviews.$inferSelect;
+export type NewReview = typeof reviews.$inferInsert;
 
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export type NewDiscountCode = typeof discountCodes.$inferInsert;

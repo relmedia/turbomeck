@@ -49,6 +49,7 @@ import {
 import { ImageUpload } from "@/components/ImageUpload";
 import { ThumbnailsUpload } from "@/components/ThumbnailsUpload";
 import { toast } from "react-toastify";
+import { PRODUCT_API } from "@/lib/product-api";
 
 type Category = {
   id: number;
@@ -60,8 +61,6 @@ type Category = {
 function categoryDisplayName(c: Category): string {
   return c.parentName ? `${c.parentName} › ${c.name}` : c.name;
 }
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
 
 type Product = {
   id: number;
@@ -125,8 +124,8 @@ export default function ProductDetailPage() {
     setError(null);
     try {
       const [productRes, categoriesRes] = await Promise.all([
-        fetch(`${PRODUCT_SERVICE_URL}/api/products/${productId}`),
-        fetch(`${PRODUCT_SERVICE_URL}/api/categories`),
+        fetch(`${PRODUCT_API}/products/${productId}`),
+        fetch(`${PRODUCT_API}/categories`),
       ]);
       if (!productRes.ok) {
         throw new Error("Product not found");
@@ -158,7 +157,7 @@ export default function ProductDetailPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`);
+      const res = await fetch(`${PRODUCT_API}/categories`);
       if (res.ok) {
         const cats: Category[] = await res.json();
         setCategories(cats);
@@ -179,7 +178,7 @@ export default function ProductDetailPage() {
     if (parentId !== null && (typeof parentId !== "number" || isNaN(parentId))) return;
     setCreatingCategory(true);
     try {
-      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`, {
+      const res = await fetch(`${PRODUCT_API}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newCategoryName.trim(), parentId }),
@@ -222,34 +221,38 @@ export default function ProductDetailPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${PRODUCT_SERVICE_URL}/api/products/${productId}`, {
+      const response = await fetch(`${PRODUCT_API}/products/${productId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: formData.name,
-          shortDescription: formData.shortDescription,
-          description: formData.description,
-          price: parseFloat(formData.price) || 0,
-          stock: parseInt(formData.stock) || 0,
-          weight: formData.weight ? parseFloat(formData.weight) : null,
-          categoryIds: formData.categoryIds,
-          attributes: formData.attributes,
-          image: formData.image,
-          thumbnails: formData.thumbnails,
+          name: String(formData.name ?? ""),
+          shortDescription: String(formData.shortDescription ?? ""),
+          description: String(formData.description ?? ""),
+          price: Number(formData.price) || 0,
+          stock: Number(formData.stock) || 0,
+          weight: formData.weight ? Number(formData.weight) : null,
+          categoryIds: Array.isArray(formData.categoryIds) ? formData.categoryIds : [],
+          attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
+          image: formData.image ?? null,
+          thumbnails: Array.isArray(formData.thumbnails) ? formData.thumbnails : [],
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update product");
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData?.error || errData?.message || `Failed to update product (${response.status})`;
+        throw new Error(msg);
       }
 
       const updatedProduct = await response.json();
       setProduct(updatedProduct);
       toast.success("Produkten har sparats!");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      const msg = err instanceof Error ? err.message : "Failed to save";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -258,7 +261,7 @@ export default function ProductDetailPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const response = await fetch(`${PRODUCT_SERVICE_URL}/api/products/${productId}`, {
+      const response = await fetch(`${PRODUCT_API}/products/${productId}`, {
         method: "DELETE",
       });
 

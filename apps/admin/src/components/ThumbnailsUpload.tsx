@@ -3,10 +3,14 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, X, Loader2 } from "lucide-react";
+import { Plus, X, Loader2, FolderOpen, Eraser } from "lucide-react";
 import Image from "next/image";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface ThumbnailsUploadProps {
   value?: string[];
@@ -16,8 +20,60 @@ interface ThumbnailsUploadProps {
 
 export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [removingBgIndex, setRemovingBgIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [existingFiles, setExistingFiles] = useState<string[]>([]);
+  const [loadingExisting, setLoadingExisting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleRemoveBackground = async (index: number) => {
+    const url = value[index];
+    if (!url) return;
+    setRemovingBgIndex(index);
+    setError(null);
+    try {
+      const res = await fetch(`${PRODUCT_API}/upload/remove-background`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Kunde inte ta bort bakgrund.");
+      }
+      const data = await res.json();
+      const next = [...value];
+      next[index] = data.url;
+      onChange(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort bakgrund.");
+    } finally {
+      setRemovingBgIndex(null);
+    }
+  };
+
+  const loadExistingUploads = async () => {
+    setLoadingExisting(true);
+    try {
+      const res = await fetch(`${PRODUCT_API}/upload`);
+      if (res.ok) {
+        const data = await res.json();
+        setExistingFiles(data.files ?? []);
+      }
+    } catch {
+      setExistingFiles([]);
+    } finally {
+      setLoadingExisting(false);
+    }
+  };
+
+  const handleAddExisting = (url: string) => {
+    if (!value.includes(url)) {
+      onChange([...value, url]);
+    }
+    setBrowseOpen(false);
+  };
 
   const handleUpload = async (file: File) => {
     if (!file) return;
@@ -39,7 +95,7 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
       const formData = new FormData();
       formData.append("image", file);
 
-      const response = await fetch(`${PRODUCT_SERVICE_URL}/api/upload`, {
+      const response = await fetch(`${PRODUCT_API}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -83,53 +139,136 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
                   unoptimized
                 />
               </div>
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon"
-                className="absolute top-1 right-1 h-6 w-6 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => handleRemove(index)}
-                disabled={disabled || isUploading}
-              >
-                <X className="w-3 h-3" />
-              </Button>
+              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="h-6 w-6 cursor-pointer"
+                  onClick={() => handleRemoveBackground(index)}
+                  disabled={disabled || isUploading || removingBgIndex === index}
+                  title="Ta bort bakgrund"
+                >
+                  {removingBgIndex === index ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Eraser className="w-3 h-3" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="h-6 w-6 cursor-pointer"
+                  onClick={() => handleRemove(index)}
+                  disabled={disabled || isUploading || removingBgIndex === index}
+                  title="Ta bort"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      <div
-        className={`
-          flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6
-          transition-colors cursor-pointer min-h-[100px]
-          ${disabled || isUploading ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50"}
-          border-muted-foreground/25
-        `}
-        onClick={() => !disabled && !isUploading && inputRef.current?.click()}
-      >
-        {isUploading ? (
-          <>
-            <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-            <p className="text-sm text-muted-foreground">Laddar upp...</p>
-          </>
-        ) : (
-          <>
-            <div className="p-2 rounded-full bg-muted">
-              <Plus className="w-5 h-5 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div
+          className={`
+            flex flex-1 flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6
+            transition-colors cursor-pointer min-h-[100px]
+            ${disabled || isUploading ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50"}
+            border-muted-foreground/25
+          `}
+          onClick={() => !disabled && !isUploading && inputRef.current?.click()}
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+              <p className="text-sm text-muted-foreground">Laddar upp...</p>
+            </>
+          ) : (
+            <>
+              <div className="p-2 rounded-full bg-muted">
+                <Plus className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Lägg till thumbnail
+              </p>
+            </>
+          )}
+          <Input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={disabled || isUploading}
+          />
+        </div>
+
+        <Popover open={browseOpen} onOpenChange={(open) => {
+          setBrowseOpen(open);
+          if (open) loadExistingUploads();
+        }}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              disabled={disabled || isUploading}
+            >
+              <FolderOpen className="w-4 h-4 mr-2" />
+              Välj från uppladdningar
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[320px] p-0" align="start">
+            <div className="p-2 border-b">
+              <p className="text-sm font-medium">Filer i upload-mappen</p>
+              <p className="text-xs text-muted-foreground">Klicka för att lägga till</p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Lägg till thumbnail
-            </p>
-          </>
-        )}
-        <Input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          className="hidden"
-          onChange={handleFileChange}
-          disabled={disabled || isUploading}
-        />
+            <div className="max-h-[280px] overflow-y-auto p-2">
+              {loadingExisting ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : existingFiles.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Inga bilder hittades</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {existingFiles.map((url) => {
+                    const alreadyAdded = value.includes(url);
+                    return (
+                      <button
+                        key={url}
+                        type="button"
+                        onClick={() => !alreadyAdded && handleAddExisting(url)}
+                        disabled={alreadyAdded}
+                        className={`relative aspect-square rounded-md overflow-hidden border transition-opacity ${
+                          alreadyAdded ? "opacity-50 cursor-not-allowed" : "hover:opacity-90 cursor-pointer"
+                        }`}
+                      >
+                        <Image
+                          src={url}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                          unoptimized
+                        />
+                        {alreadyAdded && (
+                          <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs">
+                            Tillagd
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -1,0 +1,78 @@
+{
+  "common": {
+    "addToCart": "Add to cart",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "search": "Search",
+    "size": "Size",
+    "color": "Color",
+    "reviews": "reviews",
+    "review": "review"
+  },
+  "nav": {
+    "myAccount": "My account",
+    "deliveryAddress": "Delivery address",
+    "changePassword": "Change password",
+    "logout": "Log out",
+    "login": "Log in",
+    "home": "Home"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Create account",
+    "email": "Email address",
+    "password": "Password",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "First and last name",
+    "loginToTurbomeck": "Log in to Turbomeck",
+    "createAccount": "Create account on Turbomeck",
+    "loggingIn": "Logging in...",
+    "creating": "Creating account...",
+    "forgotPassword": "Forgot password?",
+    "sendResetLink": "Send reset link",
+    "sending": "Sending...",
+    "rememberMe": "Remember me",
+    "passwordMinLength": "At least 6 characters",
+    "acceptTerms": "I accept the",
+    "privacyPolicy": "privacy policy",
+    "and": "and",
+    "terms": "terms of service",
+    "noAccount": "New user?",
+    "haveAccount": "Already have an account?",
+    "createAccountLink": "Create account",
+    "backToLogin": "Back to login",
+    "or": "or"
+  },
+  "search": {
+    "placeholder": "Search products...",
+    "noResults": "No products found",
+    "viewAllResults": "View all results"
+  },
+  "product": {
+    "addedToCart": "Product has been added to your cart!",
+    "loginToSave": "Log in to save products",
+    "addedToWishlist": "Added to wishlist",
+    "removedFromWishlist": "Removed from wishlist"
+  },
+  "footer": {
+    "quickLinks": "Quick links",
+    "products": "Products",
+    "company": "Company",
+    "contact": "Contact",
+    "home": "Home",
+    "privacy": "Privacy policy",
+    "terms": "Terms of service",
+    "cookieSettings": "Cookie settings",
+    "faq": "FAQ",
+    "allProducts": "All products",
+    "news": "News",
+    "bestsellers": "Bestsellers",
+    "sale": "Sale",
+    "about": "About us",
+    "blog": "Blog",
+    "rightsReserved": "All rights reserved"
+  }
+}

@@ -27,8 +27,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { toast } from "react-toastify";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Namn är obligatoriskt!" }),
@@ -85,7 +84,7 @@ const EditCategory = ({
           ? parseInt(values.parentId, 10)
           : null;
       const response = await fetch(
-        `${PRODUCT_SERVICE_URL}/api/categories/${category.id}`,
+        `${PRODUCT_API}/categories/${category.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

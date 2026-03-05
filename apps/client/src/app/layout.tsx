@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
+import { WishlistProvider } from "@/components/providers/WishlistProvider";
+import { LanguageProvider } from "@/i18n/context";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -36,6 +38,8 @@ export default function RootLayout({
     <html lang="sv">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
+          <LanguageProvider>
+          <WishlistProvider>
           <CookieConsentProvider
             config={{
               consentVersion: "1.0.0",
@@ -78,6 +82,8 @@ export default function RootLayout({
             <CookieSettings />
             <ToastContainer position="top-right" />
           </CookieConsentProvider>
+          </WishlistProvider>
+          </LanguageProvider>
         </SessionProvider>
       </body>
     </html>

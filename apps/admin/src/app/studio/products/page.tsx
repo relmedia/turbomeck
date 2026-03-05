@@ -6,8 +6,7 @@ import { DataTable } from "./data-table";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw } from "lucide-react";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
 
 const ProductsPage = () => {
   const [data, setData] = useState<Product[]>([]);
@@ -23,8 +22,8 @@ const ProductsPage = () => {
     setError(null);
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        fetch(`${PRODUCT_SERVICE_URL}/api/products`),
-        fetch(`${PRODUCT_SERVICE_URL}/api/categories`),
+        fetch(`${PRODUCT_API}/products`),
+        fetch(`${PRODUCT_API}/categories`),
       ]);
       if (!productsRes.ok) throw new Error("Failed to fetch products");
       const products = await productsRes.json();
@@ -49,7 +48,7 @@ const ProductsPage = () => {
     try {
       await Promise.all(
         ids.map((id) =>
-          fetch(`${PRODUCT_SERVICE_URL}/api/products/${id}`, {
+          fetch(`${PRODUCT_API}/products/${id}`, {
             method: "DELETE",
           })
         )

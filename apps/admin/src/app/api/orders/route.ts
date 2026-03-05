@@ -1,7 +1,22 @@
 import { db } from "@repo/database";
-import { orders, orderItems } from "@repo/database/schema";
+import { orders, orderItems, users } from "@repo/database/schema";
 import { desc, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+function getFullNameFromUser(u: { name: string | null; metadata?: unknown } | null): string | null {
+  if (!u) return null;
+  const meta = u.metadata as { savedAddress?: Record<string, unknown> } | null | undefined;
+  const saved = meta?.savedAddress;
+  if (saved && typeof saved === "object") {
+    const first = (saved.firstName ?? saved.first_name) as string | undefined;
+    const last = (saved.lastName ?? saved.last_name) as string | undefined;
+    if (first != null || last != null) {
+      const full = [first ?? "", last ?? ""].filter(Boolean).join(" ").trim();
+      if (full) return full;
+    }
+  }
+  return u.name ?? null;
+}
 
 /** GET /api/orders - List orders for payments table */
 export async function GET() {
@@ -15,6 +30,12 @@ export async function GET() {
     if (orderRows.length === 0) {
       return NextResponse.json([]);
     }
+
+    const userIds = [...new Set(orderRows.map((o) => o.userId).filter(Boolean))] as string[];
+    const userRows = userIds.length > 0
+      ? await db.select().from(users).where(inArray(users.id, userIds))
+      : [];
+    const userByid = new Map(userRows.map((u) => [u.id, u]));
 
     const orderIds = orderRows.map((o) => o.id);
     const items = await db
@@ -31,7 +52,11 @@ export async function GET() {
 
     const list = orderRows.map((o) => {
       const firstItem = firstItemByOrderId.get(o.id);
-      const fullName = `${o.firstName} ${o.lastName}`.trim();
+      let fullName = `${o.firstName} ${o.lastName}`.trim();
+      if (o.userId) {
+        const userFull = getFullNameFromUser(userByid.get(o.userId) ?? null);
+        if (userFull?.trim()) fullName = userFull.trim();
+      }
       return {
         id: String(o.id),
         orderId: o.id,

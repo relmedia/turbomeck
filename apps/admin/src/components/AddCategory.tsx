@@ -29,8 +29,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { toast } from "react-toastify";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Namn är obligatoriskt!" }),
@@ -53,7 +52,7 @@ const AddCategory = ({ onSuccess }: AddCategoryProps) => {
   });
 
   useEffect(() => {
-    fetch(`${PRODUCT_SERVICE_URL}/api/categories`)
+    fetch(`${PRODUCT_API}/categories`)
       .then((r) => r.json())
       .then(setCategories)
       .catch(() => setCategories([]));
@@ -68,7 +67,7 @@ const AddCategory = ({ onSuccess }: AddCategoryProps) => {
         values.parentId && values.parentId !== "" && values.parentId !== "__none__"
           ? parseInt(values.parentId, 10)
           : null;
-      const response = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`, {
+      const response = await fetch(`${PRODUCT_API}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

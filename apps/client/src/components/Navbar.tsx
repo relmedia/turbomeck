@@ -4,13 +4,16 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SearchBar from "./SearchBar";
-import { Bell, Home, User, LogOut } from "lucide-react";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { User, LogOut, MapPin, Key } from "lucide-react";
+import { useTranslation } from "@/i18n/context";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
+import WishlistIcon from "./WishlistIcon";
 import { useSession, signOut } from "next-auth/react";
 import {
   DropdownMenu,
@@ -22,6 +25,7 @@ import { Button } from "./ui/button";
 import { AuthModal } from "./AuthModal";
 
 const Navbar = () => {
+  const t = useTranslation();
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -41,34 +45,23 @@ const Navbar = () => {
       {/*RIGHT*/}
       <div className="flex items-center gap-6">
         <SearchBar />
-        <Link href="/">
-          <Home className="w-4 h-4 text-gray-600" />
-        </Link>
-        <Bell className="w-4 h-4 text-gray-600" />
+        <WishlistIcon />
         <ShoppingCartIcon />
+        <LanguageSwitcher />
         {status !== "loading" && (
           <>
             {!session ? (
               <>
                 <button
                   type="button"
-                  className="text-sm cursor-pointer"
+                  className="cursor-pointer"
                   onClick={() => {
                     setAuthMode("login");
                     setAuthOpen(true);
                   }}
+                  aria-label={t("nav.login")}
                 >
-                  Logga in
-                </button>
-                <button
-                  type="button"
-                  className="text-sm cursor-pointer"
-                  onClick={() => {
-                    setAuthMode("register");
-                    setAuthOpen(true);
-                  }}
-                >
-                  Skapa konto
+                  <User className="w-4 h-4 text-gray-600" />
                 </button>
                 <AuthModal
                   open={authOpen}
@@ -101,12 +94,24 @@ const Navbar = () => {
                   <DropdownMenuItem asChild>
                     <Link href="/account">
                       <User className="w-4 h-4 mr-2" />
-                      Mitt konto
+                      {t("nav.myAccount")}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/account?section=address">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      {t("nav.deliveryAddress")}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/account?section=password">
+                      <Key className="w-4 h-4 mr-2" />
+                      {t("nav.changePassword")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
                     <LogOut className="w-4 h-4 mr-2" />
-                    Logga ut
+                    {t("nav.logout")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

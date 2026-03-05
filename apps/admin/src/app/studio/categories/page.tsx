@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import EditCategory from "@/components/EditCategory";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
 
 const CategoriesPage = () => {
   const [data, setData] = useState<Category[]>([]);
@@ -23,7 +22,7 @@ const CategoriesPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`);
+      const res = await fetch(`${PRODUCT_API}/categories`);
       if (!res.ok) throw new Error("Failed to fetch categories");
       const categories = await res.json();
       setData(categories);
@@ -42,7 +41,7 @@ const CategoriesPage = () => {
   const handleDelete = useCallback(
     async (id: number) => {
       try {
-        const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories/${id}`, {
+        const res = await fetch(`${PRODUCT_API}/categories/${id}`, {
           method: "DELETE",
         });
         if (!res.ok) throw new Error("Failed to delete");
@@ -53,6 +52,15 @@ const CategoriesPage = () => {
       }
     },
     [fetchCategories]
+  );
+
+  const handleDeleteSelected = useCallback(
+    async (selected: Category[]) => {
+      for (const cat of selected) {
+        await handleDelete(cat.id);
+      }
+    },
+    [handleDelete]
   );
 
   const handleEdit = useCallback((category: Category) => {
@@ -120,7 +128,11 @@ const CategoriesPage = () => {
         </div>
       ) : (
         <>
-          <DataTable columns={columns} data={data} />
+          <DataTable
+            columns={columns}
+            data={data}
+            onDeleteSelected={handleDeleteSelected}
+          />
 
           {editingCategory && (
             <Sheet

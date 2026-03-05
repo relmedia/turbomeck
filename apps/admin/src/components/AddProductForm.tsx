@@ -37,8 +37,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "./ui/tooltip";
-
-const PRODUCT_SERVICE_URL = "http://localhost:8000";
+import { PRODUCT_API } from "@/lib/product-api";
 
 export type Category = {
   id: number;
@@ -101,7 +100,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
   });
 
   const fetchCategories = useCallback(async () => {
-    const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`);
+    const res = await fetch(`${PRODUCT_API}/categories`);
     const data = res.ok ? await res.json() : [];
     setCategories(data);
   }, []);
@@ -119,7 +118,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       return;
     setCreatingCategory(true);
     try {
-      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/categories`, {
+      const res = await fetch(`${PRODUCT_API}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newCategoryName.trim(), parentId }),
@@ -147,7 +146,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     setError(null);
 
     try {
-      const response = await fetch(`${PRODUCT_SERVICE_URL}/api/products`, {
+      const response = await fetch(`${PRODUCT_API}/products`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

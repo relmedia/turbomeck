@@ -1,0 +1,78 @@
+{
+  "common": {
+    "addToCart": "Lägg i varukorg",
+    "loading": "Laddar...",
+    "error": "Ett fel uppstod",
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "close": "Stäng",
+    "search": "Sök",
+    "size": "Storlek",
+    "color": "Färg",
+    "reviews": "recensioner",
+    "review": "recension"
+  },
+  "nav": {
+    "myAccount": "Mitt konto",
+    "deliveryAddress": "Leveransadress",
+    "changePassword": "Byt lösenord",
+    "logout": "Logga ut",
+    "login": "Logga in",
+    "home": "Start"
+  },
+  "auth": {
+    "login": "Logga in",
+    "register": "Skapa konto",
+    "email": "E-postadress",
+    "password": "Lösenord",
+    "fullName": "Fullständigt namn",
+    "fullNamePlaceholder": "Förnamn och efternamn",
+    "loginToTurbomeck": "Logga in till Turbomeck",
+    "createAccount": "Skapa konto på Turbomeck",
+    "loggingIn": "Loggar in...",
+    "creating": "Skapar konto...",
+    "forgotPassword": "Glömt lösenord?",
+    "sendResetLink": "Skicka återställningslänk",
+    "sending": "Skickar...",
+    "rememberMe": "Kom ihåg mig",
+    "passwordMinLength": "Minst 6 tecken",
+    "acceptTerms": "Jag godkänner",
+    "privacyPolicy": "integritetspolicyn",
+    "and": "och",
+    "terms": "köpvillkoren",
+    "noAccount": "Ny användare?",
+    "haveAccount": "Har du redan ett konto?",
+    "createAccountLink": "Skapa konto",
+    "backToLogin": "Tillbaka till inloggning",
+    "or": "eller"
+  },
+  "search": {
+    "placeholder": "Sök produkter...",
+    "noResults": "Inga produkter hittades",
+    "viewAllResults": "Visa alla resultat"
+  },
+  "product": {
+    "addedToCart": "Produkten har lagts till i varukorgen!",
+    "loginToSave": "Logga in för att spara produkter",
+    "addedToWishlist": "Tillagd i önskelista",
+    "removedFromWishlist": "Borttagen från önskelista"
+  },
+  "footer": {
+    "quickLinks": "Snabb länkar",
+    "products": "Produkter",
+    "company": "Företaget",
+    "contact": "Kontakt",
+    "home": "Start",
+    "privacy": "Integritetspolicy",
+    "terms": "Användarvillkor",
+    "cookieSettings": "Cookie-inställningar",
+    "faq": "Frågor och svar",
+    "allProducts": "Alla produkter",
+    "news": "Nyheter",
+    "bestsellers": "Bästsäljare",
+    "sale": "Rea",
+    "about": "Om oss",
+    "blog": "Blog",
+    "rightsReserved": "Alla rättigheter reserverade"
+  }
+}

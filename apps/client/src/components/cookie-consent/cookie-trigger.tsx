@@ -47,7 +47,7 @@ export function CookieTrigger({ className, variant = "text", children }: CookieT
     <button
       onClick={openSettings}
       className={cn(
-        "text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors",
+        "text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
         className,
       )}
     >

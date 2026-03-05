@@ -1,16 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import useCartStore from "@/stores/cartStore";
 import { ProductType } from "@repo/types";
 import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
-import { ShoppingCart, Heart } from "lucide-react";
+import { fetchReviews } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ShoppingCart, Heart, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import { toast } from "react-toastify";
+import { useTranslation } from "@/i18n/context";
 
 const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
+  const t = useTranslation();
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
   const hasVariants =
     (product.sizes.length > 1 || product.sizes[0] !== "-") &&
@@ -21,6 +26,21 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   });
 
   const { addToCart } = useCartStore();
+  const [reviewStats, setReviewStats] = useState<{
+    averageRating: number;
+    totalCount: number;
+  } | "loading" | "error">("loading");
+
+  useEffect(() => {
+    const pid = Number(product.id);
+    if (!pid) {
+      setReviewStats({ averageRating: 0, totalCount: 0 });
+      return;
+    }
+    fetchReviews(pid)
+      .then(({ averageRating, totalCount }) => setReviewStats({ averageRating, totalCount }))
+      .catch(() => setReviewStats("error"));
+  }, [product.id]);
 
   const handleProductType = ({
     type,
@@ -42,7 +62,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
       selectedSize: productTypes.size,
       selectedColor: productTypes.color,
     });
-    toast.success("Produkten har lagts till i varukorgen!");
+    toast.success(t("product.addedToCart"));
   };
 
   return (
@@ -61,7 +81,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               }
               const wasInList = isInWishlist(Number(product.id));
               toggleWishlist(Number(product.id));
-              toast.success(wasInList ? "Borttagen från önskelista" : "Tillagd i önskelista");
+              toast.success(wasInList ? t("product.removedFromWishlist") : t("product.addedToWishlist"));
             }}
             className="absolute top-2 right-2 z-10 p-2 rounded-full bg-background/80 hover:bg-background transition-colors"
             aria-label={isInWishlist(Number(product.id)) ? "Ta bort från önskelista" : "Lägg till i önskelista"}
@@ -81,13 +101,43 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
       {/* PRODUCT DETAIL */}
       <div className="flex flex-col gap-4 p-4 flex-1 min-h-0">
         <h1 className="font-medium">{product.name}</h1>
+        <div className="flex items-center gap-1.5">
+          {reviewStats === "loading" ? (
+            <Skeleton className="h-4 w-24" />
+          ) : (
+            <>
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((i) => {
+                  const filled =
+                    reviewStats !== "error" &&
+                    reviewStats.totalCount > 0 &&
+                    i <= Math.round(reviewStats.averageRating);
+                  return (
+                    <Star
+                      key={i}
+                      className={cn(
+                        "h-4 w-4",
+                        filled ? "fill-black text-black" : "text-gray-200"
+                      )}
+                    />
+                  );
+                })}
+              </div>
+              {reviewStats !== "error" && (
+            <span className="text-xs text-gray-500">
+              ({reviewStats.totalCount} {reviewStats.totalCount === 1 ? t("common.review") : t("common.reviews")})
+                </span>
+              )}
+            </>
+          )}
+        </div>
         <p className="text-sm text-gray-500 line-clamp-2">{product.shortDescription}</p>
         {/* PRODUCT TYPES */}
         {hasVariants && (
           <div className="flex items-center gap-4 text-xs">
             {product.sizes.length > 1 && (
               <div className="flex flex-col gap-1">
-                <span className="text-gray-500">Storlek</span>
+                <span className="text-gray-500">{t("common.size")}</span>
                 <select
                   name="size"
                   id="size"
@@ -106,7 +156,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
             )}
             {product.colors.length > 1 && (
               <div className="flex flex-col gap-1">
-                <span className="text-gray-500">Färg</span>
+                <span className="text-gray-500">{t("common.color")}</span>
                 <div className="flex items-center gap-2">
                   {product.colors.map((color) => (
                     <div
@@ -144,7 +194,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
             className="ring-1 ring-gray-200 shadow-lg rounded-md  px-2 py-1 text-sm cursor-pointer hover:text-white cart-button transition-all duration-300 flex items-center gap-2"
           >
             <ShoppingCart className="w-4 h-4" />
-            Lägg i varukorg
+            {t("common.addToCart")}
           </button>
         </div>
       </div>

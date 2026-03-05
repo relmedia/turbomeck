@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -10,9 +11,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export type Payment = {
@@ -38,7 +50,64 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   failed: { label: "Avbruten", className: "bg-red-50 text-red-700 border border-red-200" },
 };
 
-export const columns: ColumnDef<Payment>[] = [
+function DeleteOrderDialog({
+  payment,
+  onDelete,
+}: {
+  payment: Payment;
+  onDelete?: (id: string) => Promise<void>;
+}) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(payment.id);
+      setOpen(false);
+    } catch (err) {
+      console.error("Delete failed:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <DropdownMenuItem
+          onSelect={(e) => e.preventDefault()}
+          className="text-destructive focus:text-destructive cursor-pointer"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Ta bort
+        </DropdownMenuItem>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Ta bort order?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Du håller på att ta bort order #{payment.orderId ?? payment.id} för {payment.fullName}.
+            Orderrader och data tas bort permanent. Denna åtgärd kan inte ångras.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Avbryt</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {isDeleting ? "Tar bort..." : "Ta bort"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+export const createColumns = (onDelete?: (id: string) => Promise<void>): ColumnDef<Payment>[] => [
   {
     id: "select",
     enableHiding: false,
@@ -179,8 +248,12 @@ export const columns: ColumnDef<Payment>[] = [
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/studio/payments/${payment.id}`}>Visa kunddata</Link>
+              <Link href={`/studio/payments/${payment.id}`} className="flex items-center">
+                Visa kunddata
+              </Link>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DeleteOrderDialog payment={payment} onDelete={onDelete} />
           </DropdownMenuContent>
         </DropdownMenu>
       );

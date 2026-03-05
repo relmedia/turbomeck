@@ -1,8 +1,14 @@
 import ProductInteraction from "@/components/ProductInteractions";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
+import {
+  ProductReviewsProvider,
+  ProductReviewsSummary,
+  ProductReviewsSection,
+} from "@/components/ProductReviews";
 import RichTextContent from "@/components/RichTextContent";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import Image from "next/image";
+import Link from "next/link";
 import { fetchCategories, fetchProduct } from "@/lib/api";
 import { notFound, redirect } from "next/navigation";
 import { categorySlug, productUrl } from "@/lib/utils";
@@ -76,59 +82,63 @@ const ProductPage = async ({
         />
       </div>
       {/* DETAILS */}
-      <div className="w-full lg:w-7/12 flex flex-col gap-4">
-        <h1 className="text-2xl font-medium">{product.name}</h1>
-        <Breadcrumb items={breadcrumbItems} className="text-sm" />
-        <RichTextContent html={product.description} />
-        <h2 className="text-2xl font-semibold">
-          {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}{" "}
-          Kr
-        </h2>
-        <ProductInteraction
-          product={product}
-          selectedSize={selectedSize}
-          selectedColor={selectedColor}
-        />
-        {/* CARD INFO */}
-        <div className="flex items-center gap-2 mt-4">
-          <Image
-            src="/klarna.png"
-            alt="klarna"
-            width={50}
-            height={25}
-            className="rounded-md"
+      <ProductReviewsProvider productId={product.id}>
+        <div className="w-full lg:w-7/12 flex flex-col gap-4">
+          <Breadcrumb items={breadcrumbItems} className="text-sm" />
+          <h1 className="text-2xl font-medium">{product.name}</h1>
+          <ProductReviewsSummary />
+          <RichTextContent html={product.description} />
+          <h2 className="text-2xl font-semibold">
+            {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}{" "}
+            Kr
+          </h2>
+          <ProductInteraction
+            product={product}
+            selectedSize={selectedSize}
+            selectedColor={selectedColor}
           />
-          <Image
-            src="/cards.png"
-            alt="cards"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
-          <Image
-            src="/stripe.png"
-            alt="stripe"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
-          <Image
-            src="/vipps.png"
-            alt="vipps"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
+          {/* CARD INFO */}
+          <div className="flex items-center gap-2 mt-4">
+            <Image
+              src="/klarna.png"
+              alt="klarna"
+              width={50}
+              height={25}
+              className="rounded-md"
+            />
+            <Image
+              src="/cards.png"
+              alt="cards"
+              width={50}
+              height={25}
+              className="rounded-md"
+            />
+            <Image
+              src="/stripe.png"
+              alt="stripe"
+              width={50}
+              height={25}
+              className="rounded-md"
+            />
+            <Image
+              src="/vipps.png"
+              alt="vipps"
+              width={50}
+              height={25}
+              className="rounded-md"
+            />
+          </div>
+          <p className="text-gray-500 text-xs">
+            Genom att klicka på Betala nu godkänner du våra{" "}
+            <Link href="/terms" className="underline hover:text-black">Villkor</Link> och{" "}
+            <Link href="/privacy" className="underline hover:text-black">Integritetspolicy</Link>.
+            Du godkänner att vi debiterar din valda betalningsmetod för det totala
+            beloppet. Alla köp omfattas av vår retur- och{" "}
+            <Link href="/terms" className="underline hover:text-black">Återbetalningspolicy</Link>.
+          </p>
+          <ProductReviewsSection />
         </div>
-        <p className="text-gray-500 text-xs">
-          Genom att klicka på Betala nu godkänner du våra{" "}
-          <span className="underline hover:text-black">Villkor</span> och{" "}
-          <span className="underline hover:text-black">Integritetspolicy</span>.
-          Du godkänner att vi debiterar din valda betalningsmetod för det totala
-          beloppet. Alla köp omfattas av vår retur- och{" "}
-          <span className="underline hover:text-black">Återbetalningspolicy</span>.
-        </p>
-      </div>
+      </ProductReviewsProvider>
     </div>
     </div>
   );

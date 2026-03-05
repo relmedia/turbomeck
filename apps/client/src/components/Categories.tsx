@@ -23,7 +23,7 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
   const selectedCategory = searchParams.get("category");
 
   const makeHref = (slug: string) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams();
     params.set("category", slug);
     return `${pathname}?${params.toString()}`;
   };
@@ -31,33 +31,31 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
   const isSelected = (slug: string) =>
     (selectedCategory ?? "alla-produkter") === slug;
 
-  const parentCategories = categories
-    .filter((c) => !c.parentId)
-    .sort((a, b) => {
-      const aSlug = categorySlug(a);
-      const bSlug = categorySlug(b);
-      if (aSlug === "alla-produkter") return -1;
-      if (bSlug === "alla-produkter") return 1;
-      return 0;
-    })
-    .filter((c, i, arr) => {
-      const slug = categorySlug(c);
-      if (slug !== "alla-produkter") return true;
-      const firstIndex = arr.findIndex((x) => categorySlug(x) === "alla-produkter");
-      return i !== firstIndex;
-    });
+  const apiParentCategories = categories
+    .filter((c) => !c.parentId && categorySlug(c) !== "alla-produkter")
+    .sort((a, b) => a.name.localeCompare(b.name));
   const getChildren = (parentId: number) =>
     categories.filter((c) => c.parentId === parentId);
-
   const triggerClass = cn(
     "flex items-center gap-2 h-9 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-    "hover:bg-white/50 hover:text-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+    "hover:bg-white/50 hover:text-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
   );
 
   return (
     <div className="bg-gray-100 p-2 rounded-lg mb-4 text-sm flex flex-wrap items-center gap-1">
+      {/* Alla produkter - always first, link to startpage */}
+      <Link
+        href={pathname}
+        className={cn(
+          triggerClass,
+          isSelected("alla-produkter") ? "bg-white" : "text-gray-500",
+        )}
+      >
+        <Tag className="w-4 h-4 shrink-0" />
+        Alla produkter
+      </Link>
       {/* Main categories - with dropdown if they have subcategories */}
-      {parentCategories.map((parent) => {
+      {apiParentCategories.map((parent) => {
         const children = getChildren(parent.id);
         const parentSlug = categorySlug(parent);
         const hasChildren = children.length > 0;
@@ -72,7 +70,9 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
               <Tag className="w-4 h-4 shrink-0" />
             )}
             {parent.name}
-            {hasChildren && <ChevronDown className="w-4 h-4 ml-0.5 opacity-70" />}
+            {hasChildren && (
+              <ChevronDown className="w-4 h-4 ml-0.5 opacity-70" />
+            )}
           </>
         );
 
@@ -81,7 +81,7 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
             href={makeHref(parentSlug)}
             className={cn(
               triggerClass,
-              isSelected(parentSlug) ? "bg-white" : "text-gray-500"
+              isSelected(parentSlug) ? "bg-white" : "text-gray-500",
             )}
           >
             {linkContent}

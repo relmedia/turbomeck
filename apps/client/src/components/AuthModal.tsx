@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "@/i18n/context";
 
 type AuthMode = "login" | "register" | "forgot";
 
@@ -78,6 +79,7 @@ export function AuthModal({
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const t = useTranslation();
 
   const resetForm = () => {
     setEmail("");
@@ -221,7 +223,7 @@ export function AuthModal({
                       href={devResetUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline break-all block"
+                      className="text-sm text-primary break-all block cursor-pointer hover:text-primary/90"
                     >
                       {devResetUrl}
                     </a>
@@ -229,17 +231,17 @@ export function AuthModal({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full"
+                    className="w-full cursor-pointer"
                     onClick={() => switchMode("login")}
                   >
-                    Tillbaka till inloggning
+                    {t("auth.backToLogin")}
                   </Button>
                 </div>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="modal-forgot-email" className="text-sm font-medium">
-                      E-postadress <span className="text-destructive">*</span>
+                      {t("auth.email")} <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="modal-forgot-email"
@@ -253,8 +255,8 @@ export function AuthModal({
                     />
                   </div>
                   {error && <p className="text-sm text-destructive">{error}</p>}
-                  <Button type="submit" className="w-full h-10" disabled={loading}>
-                    {loading ? "Skickar..." : "Skicka återställningslänk"}
+                  <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
+                    {loading ? t("auth.sending") : t("auth.sendResetLink")}
                   </Button>
                 </form>
               )}
@@ -266,7 +268,7 @@ export function AuthModal({
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 border rounded-md"
+              className="flex-1 h-10 border rounded-md cursor-pointer"
               onClick={() => handleSocialSignIn("google")}
             >
               <GoogleIcon />
@@ -274,7 +276,7 @@ export function AuthModal({
             <Button
               type="button"
               variant="outline"
-              className="flex-1 h-10 border rounded-md"
+              className="flex-1 h-10 border rounded-md cursor-pointer"
               onClick={() => handleSocialSignIn("facebook")}
             >
               <FacebookIcon className="text-[#1877F2]" />
@@ -287,7 +289,7 @@ export function AuthModal({
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">eller</span>
+              <span className="bg-background px-2 text-muted-foreground">{t("auth.or")}</span>
             </div>
           </div>
 
@@ -310,7 +312,7 @@ export function AuthModal({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="modal-password" className="text-sm font-medium">
-                  Lösenord <span className="text-destructive">*</span>
+                  {t("auth.password")} <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -347,27 +349,27 @@ export function AuthModal({
                 </label>
                 <button
                   type="button"
-                  className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                  className="text-sm text-muted-foreground hover:text-foreground cursor-pointer"
                   onClick={() => switchMode("forgot")}
                 >
-                  Glömt lösenord?
+                  {t("auth.forgotPassword")}
                 </button>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full h-10" disabled={loading}>
-                {loading ? "Loggar in..." : "Logga in till Turbomeck"}
+              <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
+                {loading ? t("auth.loggingIn") : t("auth.loginToTurbomeck")}
               </Button>
             </form>
           ) : (
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="modal-name" className="text-sm font-medium">
-                  Namn <span className="text-destructive">*</span>
+                  {t("auth.fullName")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="modal-name"
                   type="text"
-                  placeholder="Ange ditt namn"
+                  placeholder={t("auth.fullNamePlaceholder")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -377,7 +379,7 @@ export function AuthModal({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="modal-reg-email" className="text-sm font-medium">
-                  E-postadress <span className="text-destructive">*</span>
+                  {t("auth.email")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="modal-reg-email"
@@ -392,13 +394,13 @@ export function AuthModal({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="modal-reg-password" className="text-sm font-medium">
-                  Lösenord <span className="text-destructive">*</span>
+                  {t("auth.password")} <span className="text-destructive">*</span>
                 </Label>
                 <div className="relative">
                   <Input
                     id="modal-reg-password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Minst 6 tecken"
+                    placeholder={t("auth.passwordMinLength")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -428,11 +430,11 @@ export function AuthModal({
                 />
                 <span className="text-sm text-muted-foreground">
                   Jag godkänner{" "}
-                  <Link href="/privacy" target="_blank" className="underline hover:text-foreground">
+                  <Link href="/privacy" target="_blank" className="hover:text-foreground cursor-pointer">
                     integritetspolicyn
                   </Link>
                   {" "}och{" "}
-                  <Link href="/terms" target="_blank" className="underline hover:text-foreground">
+                  <Link href="/terms" target="_blank" className="hover:text-foreground cursor-pointer">
                     köpvillkoren
                   </Link>
                   {" "}
@@ -440,8 +442,8 @@ export function AuthModal({
                 </span>
               </label>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full h-10" disabled={loading}>
-                {loading ? "Skapar konto..." : "Skapa konto på Turbomeck"}
+              <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
+                {loading ? t("auth.creating") : t("auth.createAccount")}
               </Button>
             </form>
           )}
@@ -453,24 +455,24 @@ export function AuthModal({
           <p className="text-center text-sm text-muted-foreground mt-6">
             {mode === "login" ? (
               <>
-                Ny användare?{" "}
+                {t("auth.noAccount")}{" "}
                 <button
                   type="button"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  className="font-medium text-foreground cursor-pointer hover:text-foreground/90"
                   onClick={() => switchMode("register")}
                 >
-                  Skapa konto
+                  {t("auth.createAccountLink")}
                 </button>
               </>
             ) : (
               <>
-                Har du redan ett konto?{" "}
+                {t("auth.haveAccount")}{" "}
                 <button
                   type="button"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  className="font-medium text-foreground cursor-pointer hover:text-foreground/90"
                   onClick={() => switchMode("login")}
                 >
-                  Logga in
+                  {t("auth.login")}
                 </button>
               </>
             )}
@@ -480,10 +482,10 @@ export function AuthModal({
             <p className="text-center text-sm text-muted-foreground mt-6">
               <button
                 type="button"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
+                className="font-medium text-foreground cursor-pointer hover:text-foreground/90"
                 onClick={() => switchMode("login")}
               >
-                Tillbaka till inloggning
+                {t("auth.backToLogin")}
               </button>
             </p>
           )}

@@ -12,10 +12,14 @@
     "db:push": "pnpm --filter @repo/database db:push",
     "db:generate": "pnpm --filter @repo/database db:generate",
     "db:migrate": "pnpm --filter @repo/database db:migrate",
-    "db:studio": "pnpm --filter @repo/database db:studio"
+    "db:studio": "pnpm --filter @repo/database db:studio",
+    "remove-bg": "pnpm --filter product-service remove-bg",
+    "regenerate-images": "pnpm --filter product-service remove-bg"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.2.5",
     "turbo": "^2.5.8",
     "typescript": "5.9.2"
   },

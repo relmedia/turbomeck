@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/index.ts",
     "check-types": "tsc --noEmit",
-    "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts"
+    "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts",
+    "remove-bg": "tsx --env-file=.env scripts/remove-background.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "drizzle-orm": "^0.39.0",
     "express": "^5.0.3",
     "multer": "^2.0.2",
+    "jimp": "^0.22.12",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -20,6 +21,7 @@ import {
   ChevronRight,
   FileText,
   Download,
+  MessageSquare,
 } from "lucide-react";
 import {
   Avatar,
@@ -40,6 +42,7 @@ import {
 import AddressEditForm from "@/components/AddressEditForm";
 import { fetchOrders, fetchProductsByIds, type Order } from "@/lib/api";
 import OrderDetailModal from "@/components/OrderDetailModal";
+import OrderReviewsModal from "@/components/OrderReviewsModal";
 import { type SavedAddress } from "@/types";
 import { useWishlist } from "@/hooks/useWishlist";
 import { productUrl } from "@/lib/utils";
@@ -78,11 +81,13 @@ type UserProfile = {
 };
 
 export default function AccountPage() {
+  const searchParams = useSearchParams();
   const { data: session, status, update: updateSession } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
   const [wishlistProducts, setWishlistProducts] = useState<Awaited<ReturnType<typeof fetchProductsByIds>>>([]);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -90,6 +95,9 @@ export default function AccountPage() {
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -104,6 +112,32 @@ export default function AccountPage() {
   const { wishlist, toggle: toggleWishlist } = useWishlist();
 
   const savedAddress = profile?.savedAddress;
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    setExportError(null);
+    try {
+      const res = await fetch("/api/account/export-data");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Kunde inte exportera data");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `turbomeck-mina-uppgifter-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setExportModalOpen(false);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Något gick fel");
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +218,13 @@ export default function AccountPage() {
       .then(([profileData, ordersData]) => {
         setProfile(profileData);
         setOrders(ordersData ?? []);
+        const addr = profileData?.savedAddress;
+        const full = addr?.firstName && addr?.lastName
+          ? `${addr.firstName} ${addr.lastName}`.trim()
+          : null;
+        if (full && profileData?.name !== full) {
+          fetch("/api/account/sync-name", { method: "POST" }).catch(() => {});
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -196,6 +237,21 @@ export default function AccountPage() {
     }
     fetchProductsByIds(wishlist).then(setWishlistProducts);
   }, [wishlist.join(",")]);
+
+  useEffect(() => {
+    if (loading) return;
+    const section = searchParams.get("section");
+    if (section === "address") {
+      setAddressModalOpen(true);
+      window.history.replaceState({}, "", "/account");
+    }
+    if (section === "password") {
+      setPasswordModalOpen(true);
+      setPasswordError(null);
+      setPasswordSuccess(false);
+      window.history.replaceState({}, "", "/account");
+    }
+  }, [searchParams, loading]);
 
   useEffect(() => {
     const paidOrders = orders.filter((o) => o.stripePaymentId);
@@ -334,14 +390,18 @@ export default function AccountPage() {
             Byt lösenord
             <ChevronRight className="w-4 h-4" />
           </button>
-          <Link
-            href="/account/export"
+          <button
+            type="button"
+            onClick={() => {
+              setExportModalOpen(true);
+              setExportError(null);
+            }}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
           >
             <Download className="w-4 h-4" />
             Exportera data
             <ChevronRight className="w-4 h-4" />
-          </Link>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -610,20 +670,33 @@ export default function AccountPage() {
                             </p>
                           </div>
                         </div>
-                        {trackingUrl && (
-                          <Link
-                            href={trackingUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="sm:shrink-0"
-                            onClick={(e) => e.stopPropagation()}
+                        <div className="flex gap-2 sm:shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-black hover:text-white hover:border-black"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReviewOrder(order);
+                            }}
                           >
-                            <Button variant="outline" size="sm">
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              Spåra leverans
-                            </Button>
-                          </Link>
-                        )}
+                            <MessageSquare className="w-3 h-3 mr-1" />
+                            Skriv recension
+                          </Button>
+                          {trackingUrl && (
+                            <Link
+                              href={trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button variant="outline" size="sm">
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Spåra leverans
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -753,6 +826,11 @@ export default function AccountPage() {
       <OrderDetailModal
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
+      />
+
+      <OrderReviewsModal
+        order={reviewOrder}
+        onClose={() => setReviewOrder(null)}
       />
 
       <Dialog open={addressModalOpen} onOpenChange={setAddressModalOpen}>
@@ -939,6 +1017,40 @@ export default function AccountPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Exportera mina uppgifter
+            </DialogTitle>
+            <DialogDescription>
+              Enligt GDPR har du rätt till dataportabilitet. Hämta en kopia av dina
+              personuppgifter som PDF. Filen innehåller din profil, sparad adress,
+              önskelista och orderhistorik.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {exportError && (
+              <p className="text-sm text-destructive">{exportError}</p>
+            )}
+            <Button onClick={handleExportData} disabled={exportLoading}>
+              {exportLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Exporterar...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Ladda ner som PDF
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

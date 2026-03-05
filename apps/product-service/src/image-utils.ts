@@ -1,11 +1,28 @@
 import fs from "fs";
 import path from "path";
 import { removeBackground } from "@imgly/background-removal-node";
-import sharp from "sharp";
+
+const TARGET_SIZE = 1200;
+
+/** Resize and save as PNG using Sharp (fast, native). */
+async function resizeWithSharp(buffer: Buffer, outputPath: string): Promise<void> {
+  const sharp = (await import("sharp")).default;
+  await sharp(buffer)
+    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "cover", position: "center" })
+    .png({ compressionLevel: 6 })
+    .toFile(outputPath);
+}
+
+/** Fallback: resize with Jimp (pure JS, works when Sharp fails on Windows). */
+async function resizeWithJimp(buffer: Buffer, outputPath: string): Promise<void> {
+  const { default: Jimp } = await import("jimp");
+  const image = await Jimp.read(buffer);
+  await image.cover(TARGET_SIZE, TARGET_SIZE).writeAsync(outputPath);
+}
 
 /**
  * Process product image: remove background + resize to square.
- * Used by upload endpoint and reprocess script.
+ * Uses Sharp when available; falls back to Jimp on Windows if Sharp fails (ERR_DLOPEN).
  */
 export async function processProductImage(inputPath: string): Promise<{ outputPath: string; filename: string }> {
   const ext = path.extname(inputPath);
@@ -38,11 +55,16 @@ export async function processProductImage(inputPath: string): Promise<{ outputPa
     imageBuffer = inputBuffer;
   }
 
-  const TARGET_SIZE = 1200;
-  await sharp(imageBuffer)
-    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "cover", position: "center" })
-    .png({ compressionLevel: 6 })
-    .toFile(outputPath);
+  try {
+    await resizeWithSharp(imageBuffer, outputPath);
+  } catch (sharpErr) {
+    const msg = String(sharpErr);
+    if (msg.includes("ERR_DLOPEN_FAILED") || msg.includes("Could not load the \"sharp\"")) {
+      await resizeWithJimp(imageBuffer, outputPath);
+    } else {
+      throw sharpErr;
+    }
+  }
 
   if (path.resolve(inputPath) !== path.resolve(outputPath)) {
     fs.unlinkSync(inputPath);

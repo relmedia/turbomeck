@@ -1,10 +1,11 @@
 "use client";
 
-import { Payment, columns } from "./columns";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Payment, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 
 type StatusTab = "all" | "completed" | "processed" | "returned" | "canceled";
 
@@ -13,13 +14,39 @@ const PaymentsPage = () => {
   const [data, setData] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/orders")
-      .then((res) => res.ok ? res.json() : [])
-      .then(setData)
-      .catch(() => setData([]))
-      .finally(() => setLoading(false));
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/orders");
+      const list = res.ok ? await res.json() : [];
+      setData(list);
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Kunde inte ta bort");
+      }
+      toast.success("Order borttagen");
+      await fetchOrders();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunde inte ta bort");
+      throw err;
+    }
+  }, [fetchOrders]);
+
+  const columns = useMemo(() => createColumns(handleDelete), [handleDelete]);
 
   const filteredData = data.filter((row) => {
     if (statusTab === "all") return true;

@@ -1,7 +1,5 @@
 import { ProductType } from "@/types";
-
-const PRODUCT_API =
-  process.env.NEXT_PUBLIC_PRODUCT_API_URL || "http://localhost:8000";
+import { PRODUCT_API } from "./product-api";
 const UPLOADS_BASE =
   process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
 
@@ -57,14 +55,36 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
   };
 }
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3
+): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (err) {
+      const isConnectionError =
+        err instanceof TypeError && (err.cause as { code?: string } | undefined)?.code === "ECONNREFUSED";
+      if (isConnectionError && i < retries - 1) {
+        await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Failed after retries");
+}
+
 export async function fetchCategories(): Promise<ApiCategory[]> {
-  const res = await fetch(`${PRODUCT_API}/api/categories`, { cache: "no-store" });
+  const res = await fetchWithRetry(`${PRODUCT_API}/categories`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch categories");
   return res.json();
 }
 
 export async function fetchProducts(): Promise<ProductType[]> {
-  const res = await fetch(`${PRODUCT_API}/api/products`, { cache: "no-store" });
+  const res = await fetchWithRetry(`${PRODUCT_API}/products`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch products");
   const data: ApiProduct[] = await res.json();
   return data.map(apiProductToProductType);
@@ -130,7 +150,7 @@ export async function createOrder(orderData: {
     quantity: number;
   }>;
 }): Promise<{ id: number; orderNumber: string; postNordTrackingId?: string | null }> {
-  const res = await fetch(`${PRODUCT_API}/api/orders`, {
+  const res = await fetch(`${PRODUCT_API}/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(orderData),
@@ -143,7 +163,7 @@ export async function createOrder(orderData: {
 }
 
 export async function fetchOrders(userId: string): Promise<Order[]> {
-  const res = await fetch(`${PRODUCT_API}/api/orders?userId=${encodeURIComponent(userId)}`, {
+  const res = await fetch(`${PRODUCT_API}/orders?userId=${encodeURIComponent(userId)}`, {
     cache: "no-store",
   });
   if (!res.ok) throw new Error("Failed to fetch orders");
@@ -152,7 +172,7 @@ export async function fetchOrders(userId: string): Promise<Order[]> {
 
 export async function fetchOrder(orderId: number, userId: string): Promise<Order | null> {
   const res = await fetch(
-    `${PRODUCT_API}/api/orders/${orderId}?userId=${encodeURIComponent(userId)}`,
+    `${PRODUCT_API}/orders/${orderId}?userId=${encodeURIComponent(userId)}`,
     { cache: "no-store" }
   );
   if (!res.ok) return null;
@@ -162,7 +182,7 @@ export async function fetchOrder(orderId: number, userId: string): Promise<Order
 export async function fetchProductsByIds(ids: number[]): Promise<ProductType[]> {
   if (ids.length === 0) return [];
   const res = await fetch(
-    `${PRODUCT_API}/api/products?ids=${ids.join(",")}`,
+    `${PRODUCT_API}/products?ids=${ids.join(",")}`,
     { cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -173,10 +193,94 @@ export async function fetchProductsByIds(ids: number[]): Promise<ProductType[]> 
 export async function fetchProduct(idOrSlug: string): Promise<ProductType | null> {
   const isNumeric = /^\d+$/.test(idOrSlug);
   const url = isNumeric
-    ? `${PRODUCT_API}/api/products/${idOrSlug}`
-    : `${PRODUCT_API}/api/products/slug/${idOrSlug}`;
+    ? `${PRODUCT_API}/products/${idOrSlug}`
+    : `${PRODUCT_API}/products/slug/${idOrSlug}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) return null;
   const data: ApiProduct = await res.json();
   return apiProductToProductType(data);
+}
+
+// ============ REVIEWS ============
+export type ApiReview = {
+  id: number;
+  productId: number;
+  userId: string;
+  orderId: number | null;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  createdAt: string;
+  userName: string;
+  verifiedPurchase: boolean;
+};
+
+export type ReviewsResponse = {
+  reviews: ApiReview[];
+  averageRating: number;
+  totalCount: number;
+};
+
+export async function fetchReviews(productId: number): Promise<ReviewsResponse> {
+  const res = await fetch(`${PRODUCT_API}/reviews?productId=${productId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch reviews");
+  return res.json();
+}
+
+export type MyReview = {
+  id: number;
+  productId: number;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  createdAt: string;
+  editedAt: string | null;
+};
+
+export async function fetchMyReviewedProductIds(): Promise<number[]> {
+  const res = await fetch("/api/reviews/me", { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.productIds ?? [];
+}
+
+export async function fetchMyReviews(): Promise<MyReview[]> {
+  const res = await fetch("/api/reviews/me", { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.reviews ?? [];
+}
+
+export async function createReview(data: {
+  productId: number;
+  rating: number;
+  title?: string;
+  comment?: string;
+}): Promise<{ success: boolean; review: ApiReview; verifiedPurchase: boolean }> {
+  const res = await fetch("/api/reviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to create review");
+  }
+  return res.json();
+}
+
+export async function updateReview(
+  reviewId: number,
+  data: { rating: number; title?: string; comment?: string }
+): Promise<{ success: boolean; review: MyReview }> {
+  const res = await fetch(`/api/reviews/${reviewId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Kunde inte uppdatera recensionen.");
+  }
+  return res.json();
 }

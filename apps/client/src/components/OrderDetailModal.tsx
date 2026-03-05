@@ -1,12 +1,12 @@
 "use client";
 
 import type { Order } from "@/lib/api";
-
-const POSTNORD_TRACKING_BASE =
-  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 import Image from "next/image";
 import { X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const POSTNORD_TRACKING_BASE =
+  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
 const UPLOADS_BASE =
   process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
@@ -96,29 +96,35 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
           </div>
           <div className="border-t pt-4">
             <p className="text-sm font-medium mb-3">Produkter</p>
-            <ul className="space-y-3">
-              {order.items.map((item) => (
-                <li key={item.id} className="flex gap-3">
-                  <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-                    <Image
-                      src={resolveImageUrl(item.productImage)}
-                      alt={item.productName}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.productName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity} × {item.price.toLocaleString("sv-SE")} kr
+            {(order.items?.length ?? 0) > 0 ? (
+              <ul className="space-y-3">
+                {order.items!.map((item) => (
+                  <li key={item.id} className="flex gap-3">
+                    <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
+                      <Image
+                        src={resolveImageUrl(item.productImage)}
+                        alt={item.productName || "Produkt"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {item.productName || `Produkt #${item.productId ?? item.id}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.quantity} × {Number(item.price).toLocaleString("sv-SE")} kr
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium shrink-0">
+                      {(Number(item.price) * item.quantity).toLocaleString("sv-SE")} kr
                     </p>
-                  </div>
-                  <p className="text-sm font-medium shrink-0">
-                    {(item.price * item.quantity).toLocaleString("sv-SE")} kr
-                  </p>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">Inga produktuppgifter tillgängliga.</p>
+            )}
           </div>
           <div className="border-t pt-4 space-y-1 text-sm">
             <div className="flex justify-between">
@@ -135,6 +141,12 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 <span>-{order.discount.toLocaleString("sv-SE")} kr</span>
               </div>
             )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Moms (25%)</span>
+              <span>
+                {Math.round(order.total * 0.2).toLocaleString("sv-SE")} kr
+              </span>
+            </div>
             <div className="flex justify-between font-semibold pt-2">
               <span>Totalt</span>
               <span>{order.total.toLocaleString("sv-SE")} kr</span>
