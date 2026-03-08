@@ -1,6 +1,7 @@
 "use client";
 
 import { Tag, ChevronDown, CarFront } from "lucide-react";
+import { useTranslation } from "@/i18n/context";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -18,6 +19,7 @@ type CategoryItem = {
 };
 
 const Categories = ({ categories }: { categories: CategoryItem[] }) => {
+  const t = useTranslation();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const selectedCategory = searchParams.get("category");
@@ -52,7 +54,7 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
         )}
       >
         <Tag className="w-4 h-4 shrink-0" />
-        Alla produkter
+        {t("products.allProducts")}
       </Link>
       {/* Main categories - with dropdown if they have subcategories */}
       {apiParentCategories.map((parent) => {

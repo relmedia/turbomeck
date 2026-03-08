@@ -27,6 +27,7 @@ import { useState } from "react";
 export type Category = {
   id: number;
   name: string;
+  nameEn?: string | null;
   description?: string | null;
   parentId?: number | null;
   parentName?: string | null;

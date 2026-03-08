@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, RefreshCw, Trash2, Plus } from "lucide-react";
+import { Save, RefreshCw, Trash2, Plus, Languages, Loader2 } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -93,6 +93,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -100,6 +101,9 @@ export default function ProductDetailPage() {
     name: string;
     shortDescription: string;
     description: string;
+    nameEn: string;
+    shortDescriptionEn: string;
+    descriptionEn: string;
     price: string;
     stock: string;
     weight: string;
@@ -111,6 +115,9 @@ export default function ProductDetailPage() {
     name: "",
     shortDescription: "",
     description: "",
+    nameEn: "",
+    shortDescriptionEn: "",
+    descriptionEn: "",
     price: "",
     stock: "",
     weight: "",
@@ -138,6 +145,9 @@ export default function ProductDetailPage() {
         name: data.name || "",
         shortDescription: data.shortDescription || "",
         description: data.description || "",
+        nameEn: data.nameEn || "",
+        shortDescriptionEn: data.shortDescriptionEn || "",
+        descriptionEn: data.descriptionEn || "",
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
         weight: data.weight != null ? data.weight.toString() : "",
@@ -205,6 +215,47 @@ export default function ProductDetailPage() {
     }
   };
 
+  const handleTranslate = async () => {
+    const name = formData.name?.trim();
+    const shortDescription = formData.shortDescription?.trim();
+    const description = formData.description?.trim();
+    if (!name && !shortDescription && !description) {
+      toast.error("Fyll i namn, kort beskrivning eller beskrivning först.");
+      return;
+    }
+    setIsTranslating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name || "",
+          shortDescription: shortDescription || "",
+          description: description || "",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Översättning misslyckades");
+      }
+      const data = await res.json();
+      setFormData((prev) => ({
+        ...prev,
+        nameEn: data.nameEn || "",
+        shortDescriptionEn: data.shortDescriptionEn || "",
+        descriptionEn: data.descriptionEn || "",
+      }));
+      toast.success("Översättning klar!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ett fel uppstod";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -230,6 +281,9 @@ export default function ProductDetailPage() {
           name: String(formData.name ?? ""),
           shortDescription: String(formData.shortDescription ?? ""),
           description: String(formData.description ?? ""),
+          nameEn: formData.nameEn?.trim() || null,
+          shortDescriptionEn: formData.shortDescriptionEn?.trim() || null,
+          descriptionEn: formData.descriptionEn?.trim() || null,
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
           weight: formData.weight ? Number(formData.weight) : null,
@@ -421,6 +475,60 @@ export default function ProductDetailPage() {
                   placeholder="Detaljerad produktbeskrivning"
                   disabled={saving}
                 />
+              </div>
+
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium">Engelska översättningar (valfritt)</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                  >
+                    {isTranslating ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Languages className="h-4 w-4 mr-2" />
+                    )}
+                    {isTranslating ? "Översätter..." : "Översätt med AI"}
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nameEn">Namn (engelska)</Label>
+                    <Input
+                      id="nameEn"
+                      name="nameEn"
+                      value={formData.nameEn}
+                      onChange={handleInputChange}
+                      placeholder="Product name (English)"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="shortDescriptionEn">Kort beskrivning (engelska)</Label>
+                    <Input
+                      id="shortDescriptionEn"
+                      name="shortDescriptionEn"
+                      value={formData.shortDescriptionEn}
+                      onChange={handleInputChange}
+                      placeholder="Short description (English)"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="descriptionEn">Fullständig beskrivning (engelska)</Label>
+                    <RichTextEditor
+                      id="descriptionEn"
+                      value={formData.descriptionEn}
+                      onChange={(html) => {
+                        setFormData((prev) => ({ ...prev, descriptionEn: html }));
+                      }}
+                      placeholder="Full description (English)"
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslation } from "@/i18n/context";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -87,6 +88,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     { className, value = "", onChange, defaultCountry = "SE", ...props },
     ref
   ) => {
+    const t = useTranslation();
     const parsed = React.useMemo(() => parsePhoneValue(value), [value]);
     const initialCountry = value ? parsed.country : defaultCountry;
     const [country, setCountry] = React.useState(initialCountry);
@@ -146,7 +148,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
               <SelectItem key={c.code} value={c.code}>
                 <span className="flex items-center gap-2">
                   <CountryFlag code={c.code} />
-                  <span>{c.name}</span>
+                  <span>{t(`shipping.country.${c.code}`)}</span>
                   <span className="text-muted-foreground text-xs">
                     {c.dial}
                   </span>
@@ -158,7 +160,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         <Input
           ref={ref}
           type="tel"
-          placeholder="070 123 45 67"
+          placeholder={t("shipping.phonePlaceholder")}
           value={number}
           onChange={handleNumberChange}
           className="flex-1"

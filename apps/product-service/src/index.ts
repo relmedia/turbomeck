@@ -137,19 +137,31 @@ app.delete("/api/upload/:filename", (req, res) => {
   }
 });
 
-// GET all categories (with parentName for display)
+// GET all categories (with parentName for display; ?locale=en returns English names)
 app.get("/api/categories", async (req, res) => {
   try {
+    const locale = (req.query.locale as string) || "sv";
+    const useEn = locale === "en";
     const all = await db.select().from(categories);
     const byId = Object.fromEntries(all.map((c) => [c.id, c]));
-    const out = all.map((c) => ({
-      id: c.id,
-      name: c.name,
-      description: c.description,
-      parentId: c.parentId,
-      parentName: c.parentId != null ? byId[c.parentId]?.name ?? null : null,
-      createdAt: c.createdAt,
-    }));
+    const out = all.map((c) => {
+      const cat = c as { name: string; nameEn?: string | null };
+      const parent = c.parentId != null ? byId[c.parentId] : null;
+      const parentCat = parent as { name: string; nameEn?: string | null } | undefined;
+      const name = useEn && cat.nameEn ? cat.nameEn : cat.name;
+      const parentName = parent
+        ? (useEn && parentCat?.nameEn ? parentCat.nameEn : parent.name)
+        : null;
+      return {
+        id: c.id,
+        name,
+        nameEn: cat.nameEn ?? null,
+        description: c.description,
+        parentId: c.parentId,
+        parentName,
+        createdAt: c.createdAt,
+      };
+    });
     res.json(out);
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -160,7 +172,7 @@ app.get("/api/categories", async (req, res) => {
 // POST create category
 app.post("/api/categories", async (req, res) => {
   try {
-    const { name, description, parentId } = req.body;
+    const { name, description, parentId, nameEn } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "Namn krävs" });
     }
@@ -168,14 +180,17 @@ app.post("/api/categories", async (req, res) => {
       .insert(categories)
       .values({
         name: name.trim(),
+        nameEn: typeof nameEn === "string" ? nameEn.trim() || null : null,
         description: description?.trim() || null,
         parentId: parentId != null ? parseInt(parentId, 10) : null,
       })
       .returning();
     const c = inserted[0];
+    const cat = c as { nameEn?: string | null };
     res.status(201).json({
       id: c.id,
       name: c.name,
+      nameEn: cat.nameEn ?? null,
       description: c.description,
       parentId: c.parentId,
       createdAt: c.createdAt,
@@ -193,29 +208,44 @@ app.post("/api/categories", async (req, res) => {
 app.put("/api/categories/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, description, parentId } = req.body;
+    const { name, description, parentId, nameEn } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "Namn krävs" });
     }
-    const updateData: { name: string; description?: string | null; parentId?: number | null } = {
+    const updateData: {
+      name: string;
+      nameEn?: string | null;
+      description?: string | null;
+      parentId?: number | null;
+    } = {
       name: name.trim(),
       parentId: parentId != null ? parseInt(parentId, 10) : null,
     };
-    if (description !== undefined) {
-      updateData.description = description?.trim() || null;
+    if (description !== undefined) updateData.description = description?.trim() || null;
+    if (nameEn !== undefined) {
+      updateData.nameEn = typeof nameEn === "string" && nameEn.trim() ? nameEn.trim() : null;
     }
     const updated = await db
       .update(categories)
       .set(updateData)
       .where(eq(categories.id, id))
       .returning();
+    // Explicitly update name_en if Drizzle set() didn't persist it (e.g. schema sync issues)
+    if (nameEn !== undefined) {
+      const nameEnVal = typeof nameEn === "string" && nameEn.trim() ? nameEn.trim() : null;
+      await db.execute(
+        sql`UPDATE categories SET name_en = ${nameEnVal} WHERE id = ${id}`
+      );
+    }
     if (updated.length === 0) {
       return res.status(404).json({ error: "Kategorin hittades inte" });
     }
     const c = updated[0];
+    const cat = c as { nameEn?: string | null };
     res.json({
       id: c.id,
       name: c.name,
+      nameEn: cat.nameEn ?? null,
       description: c.description,
       parentId: c.parentId,
       createdAt: c.createdAt,
@@ -296,6 +326,21 @@ app.get("/api/reviews", async (req, res) => {
   }
 });
 
+// Helper: pick localized name/description based on locale (sv = default, en = use *_en if available)
+function localizeProduct(
+  p: { name: string; shortDescription: string | null; description: string | null; nameEn?: string | null; shortDescriptionEn?: string | null; descriptionEn?: string | null },
+  locale: string
+) {
+  const useEn = locale === "en";
+  const orDefault = (en: string | null | undefined, def: string | null) =>
+    (useEn && en != null && String(en).trim() !== "" ? en : def) ?? def;
+  return {
+    name: orDefault(p.nameEn, p.name),
+    shortDescription: orDefault(p.shortDescriptionEn, p.shortDescription),
+    description: orDefault(p.descriptionEn, p.description),
+  };
+}
+
 // Helper: get categoryIds for products
 async function getProductCategoryIds(productIds: number[]): Promise<Map<number, number[]>> {
   if (productIds.length === 0) return new Map();
@@ -312,23 +357,44 @@ async function getProductCategoryIds(productIds: number[]): Promise<Map<number, 
   return map;
 }
 
-// GET all products (optional ?ids=1,2,3 for filtering)
+// GET all products (optional ?ids=1,2,3 for filtering, ?locale=sv|en for translated content)
 app.get("/api/products", async (req, res) => {
   try {
     const idsParam = req.query.ids as string | undefined;
+    const locale = (req.query.locale as string) || "sv";
     const filterIds = idsParam
       ? idsParam.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
       : null;
+    const productCols = {
+      id: products.id,
+      name: products.name,
+      shortDescription: products.shortDescription,
+      description: products.description,
+      nameEn: products.nameEn,
+      shortDescriptionEn: products.shortDescriptionEn,
+      descriptionEn: products.descriptionEn,
+      price: products.price,
+      image: products.image,
+      thumbnails: products.thumbnails,
+      stock: products.stock,
+      weight: products.weight,
+      attributes: products.attributes,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+    };
     const allProducts = filterIds?.length
-      ? await db.select().from(products).where(inArray(products.id, filterIds))
-      : await db.select().from(products);
+      ? await db.select(productCols).from(products).where(inArray(products.id, filterIds))
+      : await db.select(productCols).from(products);
     const productIds = allProducts.map((p) => p.id);
     const categoryMap = await getProductCategoryIds(productIds);
-    const formatted = allProducts.map((p) => ({
+    const formatted = allProducts.map((p) => {
+      const loc = localizeProduct(p, locale);
+      return {
       id: p.id,
-      name: p.name,
-      shortDescription: p.shortDescription,
-      description: p.description,
+      slug: productNameToSlug(p.name),
+      name: loc.name,
+      shortDescription: loc.shortDescription,
+      description: loc.description,
       price: parseFloat(p.price),
       image: p.image,
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
@@ -338,7 +404,8 @@ app.get("/api/products", async (req, res) => {
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
-    }));
+    };
+    });
     res.json(formatted);
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -360,22 +427,47 @@ function productNameToSlug(name: string): string {
     || "product";
 }
 
-// GET product by slug
+// GET product by slug (?locale=sv|en for translated content)
 app.get("/api/products/slug/:slug", async (req, res) => {
   try {
     const slug = req.params.slug;
-    const allProducts = await db.select().from(products);
-    const product = allProducts.find((p) => productNameToSlug(p.name) === slug);
+    const locale = (req.query.locale as string) || "sv";
+    const allProducts = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        shortDescription: products.shortDescription,
+        description: products.description,
+        nameEn: products.nameEn,
+        shortDescriptionEn: products.shortDescriptionEn,
+        descriptionEn: products.descriptionEn,
+        price: products.price,
+        image: products.image,
+        thumbnails: products.thumbnails,
+        stock: products.stock,
+        weight: products.weight,
+        attributes: products.attributes,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+      })
+      .from(products);
+    const product = allProducts.find((p) => {
+      if (productNameToSlug(p.name) === slug) return true;
+      const nameEn = (p as { nameEn?: string | null }).nameEn;
+      return nameEn ? productNameToSlug(nameEn) === slug : false;
+    });
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
     const p = product;
+    const loc = localizeProduct(p, locale);
     const categoryIds = (await getProductCategoryIds([p.id])).get(p.id) ?? [];
     res.json({
       id: p.id,
-      name: p.name,
-      shortDescription: p.shortDescription,
-      description: p.description,
+      slug: productNameToSlug(p.name),
+      name: loc.name,
+      shortDescription: loc.shortDescription,
+      description: loc.description,
       price: parseFloat(p.price),
       image: p.image,
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
@@ -392,15 +484,36 @@ app.get("/api/products/slug/:slug", async (req, res) => {
   }
 });
 
-// GET single product by id
+// GET single product by id (?locale=sv|en for translated content)
 app.get("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const product = await db.select().from(products).where(eq(products.id, id));
+    const locale = (req.query.locale as string) || "sv";
+    const product = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        shortDescription: products.shortDescription,
+        description: products.description,
+        nameEn: products.nameEn,
+        shortDescriptionEn: products.shortDescriptionEn,
+        descriptionEn: products.descriptionEn,
+        price: products.price,
+        image: products.image,
+        thumbnails: products.thumbnails,
+        stock: products.stock,
+        weight: products.weight,
+        attributes: products.attributes,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+      })
+      .from(products)
+      .where(eq(products.id, id));
     if (product.length === 0) {
       return res.status(404).json({ error: "Product not found" });
     }
     const p = product[0];
+    const loc = localizeProduct(p, locale);
     const categoryIds = (await getProductCategoryIds([p.id])).get(p.id) ?? [];
     const orderCountResult = await db
       .select({ count: sql<number>`count(distinct ${orderItems.orderId})::int` })
@@ -414,9 +527,13 @@ app.get("/api/products/:id", async (req, res) => {
     const totalRevenue = parseFloat(totalRevenueResult[0]?.total ?? "0");
     res.json({
       id: p.id,
-      name: p.name,
-      shortDescription: p.shortDescription,
-      description: p.description,
+      slug: productNameToSlug(p.name),
+      name: loc.name,
+      shortDescription: loc.shortDescription,
+      description: loc.description,
+      nameEn: (p as { nameEn?: string | null }).nameEn ?? null,
+      shortDescriptionEn: (p as { shortDescriptionEn?: string | null }).shortDescriptionEn ?? null,
+      descriptionEn: (p as { descriptionEn?: string | null }).descriptionEn ?? null,
       price: parseFloat(p.price),
       image: p.image,
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
@@ -438,13 +555,13 @@ app.get("/api/products/:id", async (req, res) => {
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
       : [];
 
-    const newProduct: NewProduct = {
+    const newProduct = {
       name,
       shortDescription,
       description,
@@ -453,6 +570,9 @@ app.post("/api/products", async (req, res) => {
       thumbnails: thumbnails && Array.isArray(thumbnails) ? thumbnails : [],
       stock: stock || 0,
       weight: weight != null ? weight.toString() : null,
+      nameEn: nameEn != null && String(nameEn).trim() !== "" ? String(nameEn) : null,
+      shortDescriptionEn: shortDescriptionEn != null && String(shortDescriptionEn).trim() !== "" ? String(shortDescriptionEn) : null,
+      descriptionEn: descriptionEn != null && String(descriptionEn).trim() !== "" ? String(descriptionEn) : null,
     };
 
     const inserted = await db.insert(products).values(newProduct).returning();
@@ -491,15 +611,18 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn } = req.body;
 
-    const updateData: Partial<NewProduct> = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
     if (name !== undefined) updateData.name = String(name ?? "");
     if (shortDescription !== undefined) updateData.shortDescription = shortDescription != null ? String(shortDescription) : null;
     if (description !== undefined) updateData.description = description != null ? String(description) : null;
+    if (nameEn !== undefined) updateData.nameEn = nameEn != null && String(nameEn).trim() !== "" ? String(nameEn) : null;
+    if (shortDescriptionEn !== undefined) updateData.shortDescriptionEn = shortDescriptionEn != null && String(shortDescriptionEn).trim() !== "" ? String(shortDescriptionEn) : null;
+    if (descriptionEn !== undefined) updateData.descriptionEn = descriptionEn != null && String(descriptionEn).trim() !== "" ? String(descriptionEn) : null;
     if (price !== undefined) updateData.price = String(Number(price) || 0);
     if (image !== undefined) updateData.image = image != null && image !== "" ? String(image) : null;
     if (thumbnails !== undefined) {

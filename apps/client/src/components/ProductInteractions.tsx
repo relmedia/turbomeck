@@ -3,6 +3,7 @@
 import useCartStore from "@/stores/cartStore";
 import { ProductType } from "@/types";
 import { Minus, Plus, ShoppingCart } from "lucide-react";
+import { useTranslation } from "@/i18n/context";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -27,6 +28,7 @@ const ProductInteraction = ({
   const [variant, setVariant] = useState(selectedVariant ?? "");
 
   const { addToCart } = useCartStore();
+  const t = useTranslation();
   const hasSizes = product.sizes.length > 1 && product.sizes[0] !== "-";
   const hasColors = product.colors.length > 1 && product.colors[0] !== "default";
   const attributes = product.attributes ?? [];
@@ -61,7 +63,7 @@ const ProductInteraction = ({
 
   const addProductToCart = () => {
     if (hasAttributes && !variant) {
-      toast.error("Välj storlek innan du lägger i varukorgen.");
+      toast.error(t("product.selectSizeBeforeCart"));
       return false;
     }
     addToCart({
@@ -75,7 +77,7 @@ const ProductInteraction = ({
   };
 
   const handleAddToCart = () => {
-    if (addProductToCart()) toast.success("Produkten har lagts till i varukorgen!");
+    if (addProductToCart()) toast.success(t("product.addedToCart"));
   };
 
   const handleBuyNow = () => {
@@ -86,7 +88,7 @@ const ProductInteraction = ({
       {/* SIZE */}
       {hasSizes && (
         <div className="flex flex-col gap-2 text-xs">
-          <span className="text-gray-500">Storlek</span>
+          <span className="text-gray-500">{t("common.size")}</span>
           <div className="flex items-center gap-2">
             {product.sizes.map((size) => (
               <div
@@ -113,7 +115,7 @@ const ProductInteraction = ({
       {/* ATTRIBUTES (e.g. Typ: 13C, 13T) - single select with all options */}
       {hasAttributes && (
         <div className="flex flex-col gap-2 text-sm">
-          <span className="text-gray-500 block">Storlek</span>
+          <span className="text-gray-500 block">{t("common.size")}</span>
           <select
             value={variant}
             onChange={(e) => {
@@ -123,7 +125,7 @@ const ProductInteraction = ({
             }}
             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-800"
           >
-            <option value="">Välj storlek</option>
+            <option value="">{t("product.selectSize")}</option>
             {allOptions.map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
@@ -135,7 +137,7 @@ const ProductInteraction = ({
       {/* COLOR */}
       {hasColors && (
         <div className="flex flex-col gap-2 text-sm">
-          <span className="text-gray-500">Färg</span>
+          <span className="text-gray-500">{t("common.color")}</span>
           <div className="flex items-center gap-2">
             {product.colors.map((color) => (
               <div
@@ -176,14 +178,14 @@ const ProductInteraction = ({
         className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg flex items-center justify-center gap-2 cursor-pointer text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
-        Lägg i varukorg
+        {t("common.addToCart")}
       </button>
       <button
         onClick={handleBuyNow}
         className="ring-1 ring-gray-400 shadow-lg text-gray-800 px-4 py-2 rounded-md flex items-center justify-center cursor-pointer gap-2 text-sm font-medium"
       >
         <ShoppingCart className="w-4 h-4" />
-        Köp denna produkt
+        {t("product.buyNow")}
       </button>
     </div>
   );

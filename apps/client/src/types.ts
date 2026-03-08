@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export type ProductType = {
   id: string | number;
+  /** Canonical slug from Swedish name - use for product URLs to avoid 404 when translated */
+  slug?: string;
   name: string;
   shortDescription: string;
   description: string;

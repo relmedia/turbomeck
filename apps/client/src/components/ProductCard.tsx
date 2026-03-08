@@ -68,7 +68,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   return (
     <div className="flex flex-col h-full shadow-lg rounded-lg overflow-hidden">
       {/* IMAGE */}
-      <Link href={productUrl(product.id, product.name)}>
+      <Link href={productUrl(product)}>
         <div className="relative aspect-square overflow-hidden bg-muted shrink-0 group">
           <button
             type="button"
@@ -76,7 +76,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               e.preventDefault();
               e.stopPropagation();
               if (!isSignedIn) {
-                toast.info("Logga in för att spara produkter");
+                toast.info(t("product.loginToSave"));
                 return;
               }
               const wasInList = isInWishlist(Number(product.id));
@@ -186,8 +186,8 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
           <p className="font-medium">
             {product.price.toLocaleString("sv-SE", {
               maximumFractionDigits: 0,
-            })}
-            Kr
+            })}{" "}
+            {t("common.kr")}
           </p>
           <button
             onClick={handleAddToCart}

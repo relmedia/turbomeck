@@ -1,6 +1,7 @@
 "use client";
 
 import type { FC } from "react";
+import { useLanguage, useTranslation } from "@/i18n/context";
 import {
   ShippingFormInputs,
   shippingFormSchema,
@@ -61,6 +62,8 @@ const ShippingForm: FC<ShippingFormProps> = ({
   defaultAddress,
   showSaveAddressOption = false,
 }) => {
+  const { locale } = useLanguage();
+  const t = useTranslation();
   const [saveToAccount, setSaveToAccount] = useState(false);
   const [deliveryOption, setDeliveryOption] = useState<
     "home" | "servicepoint"
@@ -219,10 +222,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
     >
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName">Förnamn</Label>
+          <Label htmlFor="firstName">{t("shipping.firstName")}</Label>
           <Input
             id="firstName"
-            placeholder="Förnamn"
+            placeholder={t("shipping.firstName")}
             {...register("firstName")}
             className={errors.firstName ? "border-destructive" : ""}
           />
@@ -231,10 +234,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lastName">Efternamn</Label>
+          <Label htmlFor="lastName">{t("shipping.lastName")}</Label>
           <Input
             id="lastName"
-            placeholder="Efternamn"
+            placeholder={t("shipping.lastName")}
             {...register("lastName")}
             className={errors.lastName ? "border-destructive" : ""}
           />
@@ -245,11 +248,11 @@ const ShippingForm: FC<ShippingFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">E-post</Label>
+        <Label htmlFor="email">{t("shipping.email")}</Label>
         <Input
           id="email"
           type="email"
-          placeholder="E-postadress"
+          placeholder={t("shipping.emailPlaceholder")}
           {...register("email")}
           className={errors.email ? "border-destructive" : ""}
         />
@@ -259,7 +262,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label>Mobilnummer</Label>
+        <Label>{t("shipping.phone")}</Label>
         <Controller
           name="phone"
           control={control}
@@ -278,7 +281,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="country">Land</Label>
+        <Label htmlFor="country">{t("shipping.country")}</Label>
           <Controller
           name="country"
           control={control}
@@ -301,7 +304,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
                   <SelectItem key={c.code} value={c.code}>
                     <span className="flex items-center gap-2">
                       <CountryFlag code={c.code} />
-                      <span>{c.name}</span>
+                      <span>{t(`shipping.country.${c.code}`)}</span>
                     </span>
                   </SelectItem>
                 ))}
@@ -315,10 +318,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="address">Adress</Label>
+        <Label htmlFor="address">{t("shipping.address")}</Label>
         <Input
           id="address"
-          placeholder="Gatuadress"
+          placeholder={t("shipping.addressPlaceholder")}
           {...register("address")}
           className={errors.address ? "border-destructive" : ""}
         />
@@ -329,10 +332,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="city">Ort</Label>
+          <Label htmlFor="city">{t("shipping.city")}</Label>
           <Input
             id="city"
-            placeholder="Ortens namn"
+            placeholder={t("shipping.cityPlaceholder")}
             {...register("city")}
             className={errors.city ? "border-destructive" : ""}
           />
@@ -341,10 +344,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="postalCode">Postkod</Label>
+          <Label htmlFor="postalCode">{t("shipping.postalCode")}</Label>
           <Input
             id="postalCode"
-            placeholder="Postnummer"
+            placeholder={t("shipping.postalCodePlaceholder")}
             {...register("postalCode")}
             className={errors.postalCode ? "border-destructive" : ""}
           />
@@ -362,7 +365,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
           defaultAddress.postalCode ||
           defaultAddress.city) ? (
           <p className="text-sm text-muted-foreground">
-            Adress sparad på ditt konto
+            {t("shipping.addressSaved")}
           </p>
         ) : (
           <label className="flex items-center gap-2 cursor-pointer text-sm">
@@ -372,19 +375,19 @@ const ShippingForm: FC<ShippingFormProps> = ({
               onChange={(e) => setSaveToAccount(e.target.checked)}
               className="w-4 h-4 accent-primary rounded"
             />
-            Spara adress till mitt konto för framtida beställningar
+            {t("shipping.saveAddress")}
           </label>
         ))}
 
       {/* PostNord Shipping Module or fallback delivery options */}
       <div className="flex flex-col gap-3 pt-4 border-t border-border">
-        <p className="text-sm font-medium">Leveranssätt</p>
+        <p className="text-sm font-medium">{t("shipping.deliveryMethod")}</p>
 
         {POSTNORD_ENABLED && !postNordFailed ? (
           <PostNordShippingModule
             formData={formValues}
             cartItems={cartItems}
-            language="sv"
+            language={locale === "en" ? "en" : "sv"}
             onShippingChange={handlePostNordSelect}
             onError={() => setPostNordFailed(true)}
           />
@@ -403,7 +406,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
                   className="w-4 h-4 accent-primary"
                 />
                 <Package className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">Hemleverans</span>
+                <span className="text-sm">{t("shipping.homeDelivery")}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -416,8 +419,8 @@ const ShippingForm: FC<ShippingFormProps> = ({
                 <MapPin className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm">
                   {isPostNordCountry
-                    ? "PostNord Postpaket (ombud)"
-                    : "Postpaket utrikes"}
+                    ? t("shipping.postNordServicepoint")
+                    : t("shipping.postNordAbroad")}
                 </span>
               </label>
             </div>
@@ -433,7 +436,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
                 />
               ) : (
                 <p className="text-xs text-muted-foreground mt-2">
-                  Leverans till angiven adress
+                  {t("shipping.deliveryToAddress")}
                 </p>
               ))}
           </>
@@ -445,7 +448,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
         disabled={!isValid}
         className="w-full cursor-pointer"
       >
-        Fortsätt
+        {t("shipping.continue")}
         <ArrowRight className="w-3 h-3" />
       </Button>
     </form>

@@ -1,0 +1,132 @@
+"use client";
+
+import { ProductType } from "@/types";
+import ProductCard from "./ProductCard";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationEllipsis,
+} from "./ui/pagination";
+import { useTranslation } from "@/i18n/context";
+
+type Props = {
+  products: ProductType[];
+  hasSearch: boolean;
+  currentPage: number;
+  totalPages: number;
+  showViewAllLink: boolean;
+};
+
+function buildPath(
+  pathname: string,
+  searchParams: URLSearchParams,
+  page: number
+): string {
+  const sp = new URLSearchParams(searchParams);
+  sp.set("page", String(page));
+  return `${pathname}?${sp.toString()}`;
+}
+
+export function ProductListContent({
+  products,
+  hasSearch,
+  currentPage,
+  totalPages,
+  showViewAllLink,
+}: Props) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const t = useTranslation();
+
+  const path = (p: number) => buildPath(pathname, searchParams, p);
+
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
+        {products.length > 0 ? (
+          products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))
+        ) : (
+          <div className="col-span-full flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-border bg-muted/20">
+            <p className="text-base font-medium text-foreground">
+              {hasSearch
+                ? t("products.noProductsMatch")
+                : t("products.noProducts")}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {hasSearch
+                ? t("products.tryDifferentSearch")
+                : t("products.browseCategories")}
+            </p>
+          </div>
+        )}
+      </div>
+      {showViewAllLink && (
+        <Link
+          href="/products"
+          className="flex justify-end mt-4 underline text-sm text-gray-500"
+        >
+          {t("products.viewAllProducts")}
+        </Link>
+      )}
+      {totalPages > 1 && (
+        <Pagination className="mt-8">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href={currentPage > 1 ? path(currentPage - 1) : "#"}
+                aria-disabled={currentPage <= 1}
+                className={
+                  currentPage <= 1 ? "pointer-events-none opacity-50" : ""
+                }
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+              if (
+                p === 1 ||
+                p === totalPages ||
+                (p >= currentPage - 2 && p <= currentPage + 2)
+              ) {
+                return (
+                  <PaginationItem key={p}>
+                    <PaginationLink href={path(p)} isActive={p === currentPage}>
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+              if (p === currentPage - 3 || p === currentPage + 3) {
+                return (
+                  <PaginationItem key={p}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+              return null;
+            })}
+            <PaginationItem>
+              <PaginationNext
+                href={
+                  currentPage < totalPages ? path(currentPage + 1) : "#"
+                }
+                aria-disabled={currentPage >= totalPages}
+                className={
+                  currentPage >= totalPages
+                    ? "pointer-events-none opacity-50"
+                    : ""
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+    </>
+  );
+}

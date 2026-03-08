@@ -14,6 +14,7 @@ export type ApiCategory = {
 
 export type ApiProduct = {
   id: number;
+  slug?: string;
   name: string;
   shortDescription: string;
   description: string;
@@ -41,6 +42,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
   const galleryImages = [mainImg, ...thumbnails.filter((t) => t !== mainImg)];
   return {
     id: api.id,
+    slug: api.slug,
     name: api.name,
     shortDescription: api.shortDescription || "",
     description: api.description || "",
@@ -77,14 +79,16 @@ async function fetchWithRetry(
   throw new Error("Failed after retries");
 }
 
-export async function fetchCategories(): Promise<ApiCategory[]> {
-  const res = await fetchWithRetry(`${PRODUCT_API}/categories`, { cache: "no-store" });
+export async function fetchCategories(locale?: "sv" | "en"): Promise<ApiCategory[]> {
+  const url = locale ? `${PRODUCT_API}/categories?locale=${locale}` : `${PRODUCT_API}/categories`;
+  const res = await fetchWithRetry(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch categories");
   return res.json();
 }
 
-export async function fetchProducts(): Promise<ProductType[]> {
-  const res = await fetchWithRetry(`${PRODUCT_API}/products`, { cache: "no-store" });
+export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
+  const url = locale ? `${PRODUCT_API}/products?locale=${locale}` : `${PRODUCT_API}/products`;
+  const res = await fetchWithRetry(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch products");
   const data: ApiProduct[] = await res.json();
   return data.map(apiProductToProductType);
@@ -179,10 +183,12 @@ export async function fetchOrder(orderId: number, userId: string): Promise<Order
   return res.json();
 }
 
-export async function fetchProductsByIds(ids: number[]): Promise<ProductType[]> {
+export async function fetchProductsByIds(ids: number[], locale?: "sv" | "en"): Promise<ProductType[]> {
   if (ids.length === 0) return [];
+  const params = new URLSearchParams({ ids: ids.join(",") });
+  if (locale) params.set("locale", locale);
   const res = await fetch(
-    `${PRODUCT_API}/products?ids=${ids.join(",")}`,
+    `${PRODUCT_API}/products?${params.toString()}`,
     { cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -190,11 +196,12 @@ export async function fetchProductsByIds(ids: number[]): Promise<ProductType[]> 
   return data.map(apiProductToProductType);
 }
 
-export async function fetchProduct(idOrSlug: string): Promise<ProductType | null> {
+export async function fetchProduct(idOrSlug: string, locale?: "sv" | "en"): Promise<ProductType | null> {
   const isNumeric = /^\d+$/.test(idOrSlug);
-  const url = isNumeric
+  const base = isNumeric
     ? `${PRODUCT_API}/products/${idOrSlug}`
     : `${PRODUCT_API}/products/slug/${idOrSlug}`;
+  const url = locale ? `${base}?locale=${locale}` : base;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) return null;
   const data: ApiProduct = await res.json();

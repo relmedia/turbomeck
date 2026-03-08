@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LOCALE_COOKIE_NAME } from "@/i18n/context";
 
 const PRODUCT_SERVICE =
   process.env.PRODUCT_SERVICE_URL || process.env.NEXT_PUBLIC_PRODUCT_API_URL || "http://localhost:8000";
@@ -9,7 +10,12 @@ export async function GET(
 ) {
   const { path } = await params;
   const pathStr = path.join("/");
-  const search = req.nextUrl.searchParams.toString();
+  const searchParams = new URLSearchParams(req.nextUrl.searchParams);
+  const locale = req.cookies.get(LOCALE_COOKIE_NAME)?.value;
+  if (locale === "en" || locale === "sv") {
+    searchParams.set("locale", locale);
+  }
+  const search = searchParams.toString();
   const url = `${PRODUCT_SERVICE}/api/${pathStr}${search ? `?${search}` : ""}`;
   try {
     const res = await fetch(url, {

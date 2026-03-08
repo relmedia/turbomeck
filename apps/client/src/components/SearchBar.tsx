@@ -93,10 +93,11 @@ const SearchBar = () => {
           if (path.startsWith("http")) return path;
           return path;
         };
-        const products: ProductType[] = (Array.isArray(data) ? data : []).map((p: { id: number; name: string; shortDescription?: string; description?: string; price: number; image?: string | null; thumbnails?: string[] }) => {
+        const products: ProductType[] = (Array.isArray(data) ? data : []).map((p: { id: number; slug?: string; name: string; shortDescription?: string; description?: string; price: number; image?: string | null; thumbnails?: string[] }) => {
           const img = resolveImg(p.image || p.thumbnails?.[0]);
           return {
             id: p.id,
+            slug: p.slug,
             name: p.name,
             shortDescription: p.shortDescription || "",
             description: p.description || "",
@@ -183,7 +184,7 @@ const SearchBar = () => {
   const handleSelectProduct = useCallback((product: ProductType) => {
     setIsDropdownOpen(false);
     setQuery("");
-    router.push(productUrl(product.id, product.name));
+    router.push(productUrl(product));
   }, [router]);
 
   const showDropdown = isDropdownOpen && query.trim().length >= 3;
@@ -197,9 +198,9 @@ const SearchBar = () => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim().length >= 3 && setIsDropdownOpen(true)}
-          placeholder="Sök produkter..."
+          placeholder={t("search.placeholder")}
           className="text-sm outline-0 bg-transparent w-full"
-          aria-label="Sök produkter"
+          aria-label={t("search.placeholder")}
           aria-autocomplete="list"
           aria-expanded={showDropdown}
           aria-haspopup="listbox"
@@ -220,7 +221,7 @@ const SearchBar = () => {
                 {dropdownProducts.map((product) => (
                   <li key={product.id} role="option">
                     <Link
-                      href={productUrl(product.id, product.name)}
+                      href={productUrl(product)}
                       onClick={(e) => {
                         e.preventDefault();
                         handleSelectProduct(product);
@@ -239,7 +240,7 @@ const SearchBar = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{product.name}</p>
                         <p className="text-xs text-gray-500">
-                          {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} kr
+                          {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} {t("common.kr")}
                         </p>
                       </div>
                     </Link>

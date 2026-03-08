@@ -1,10 +1,12 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import svTranslations from "./translations/sv.json";
 import enTranslations from "./translations/en.json";
 
 const STORAGE_KEY = "turbomeck-lang";
+export const LOCALE_COOKIE_NAME = "turbomeck-locale";
 
 export type Locale = "sv" | "en";
 
@@ -29,6 +31,7 @@ function setStoredLocale(locale: Locale) {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, locale);
     document.documentElement.lang = locale === "en" ? "en" : "sv";
+    document.cookie = `${LOCALE_COOKIE_NAME}=${locale};path=/;max-age=31536000;SameSite=Lax`;
   }
 }
 
@@ -45,13 +48,14 @@ function getNested(obj: Record<string, unknown>, path: string): string | undefin
 type LanguageContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
   ready: boolean;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [locale, setLocaleState] = useState<Locale>("sv");
   const [translationData, setTranslationData] = useState<Translations>(() =>
     loadTranslations("sv")
@@ -62,6 +66,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const stored = getStoredLocale();
     setLocaleState(stored);
     document.documentElement.lang = stored === "en" ? "en" : "sv";
+    document.cookie = `${LOCALE_COOKIE_NAME}=${stored};path=/;max-age=31536000;SameSite=Lax`;
     setTranslationData(loadTranslations(stored));
     setReady(true);
   }, []);
@@ -70,12 +75,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(newLocale);
     setStoredLocale(newLocale);
     setTranslationData(loadTranslations(newLocale));
-  }, []);
+    router.refresh();
+  }, [router]);
 
   const t = useCallback(
-    (key: string): string => {
-      const value = getNested(translationData as Record<string, unknown>, key);
-      if (value !== undefined) return value;
+    (key: string, vars?: Record<string, string | number>): string => {
+      let value = getNested(translationData as Record<string, unknown>, key);
+      if (value !== undefined) {
+        if (vars) {
+          for (const [k, v] of Object.entries(vars)) {
+            value = String(value).replace(new RegExp(`{{${k}}}`, "g"), String(v));
+          }
+        }
+        return String(value);
+      }
       return key;
     },
     [translationData]

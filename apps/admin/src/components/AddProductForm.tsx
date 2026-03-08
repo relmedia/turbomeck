@@ -16,7 +16,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { RichTextEditor } from "./ui/rich-text-editor";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Languages } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { ThumbnailsUpload } from "./ThumbnailsUpload";
 import {
@@ -57,6 +57,9 @@ const formSchema = z.object({
     .min(1, { message: "Kort beskrivning är obligatoriskt!" })
     .max(100),
   description: z.string().min(1, { message: "Beskrivning är obligatoriskt!" }),
+  nameEn: z.string().optional(),
+  shortDescriptionEn: z.string().max(100).optional(),
+  descriptionEn: z.string().optional(),
   price: z.coerce.number().min(0.01, {
     message: "Pris måste vara större än 0!",
   }),
@@ -83,6 +86,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
   const [addSubcategoryOpen, setAddSubcategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -90,6 +94,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       name: "",
       shortDescription: "",
       description: "",
+      nameEn: "",
+      shortDescriptionEn: "",
+      descriptionEn: "",
       price: 0,
       stock: 0,
       weight: undefined,
@@ -141,6 +148,41 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     }
   };
 
+  const handleTranslate = async () => {
+    const name = form.getValues("name");
+    const shortDescription = form.getValues("shortDescription");
+    const description = form.getValues("description");
+    if (!name?.trim() && !shortDescription?.trim() && !description?.trim()) {
+      setError("Fyll i namn, kort beskrivning eller beskrivning först.");
+      return;
+    }
+    setIsTranslating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name || "",
+          shortDescription: shortDescription || "",
+          description: description || "",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Översättning misslyckades");
+      }
+      const data = await res.json();
+      form.setValue("nameEn", data.nameEn || "");
+      form.setValue("shortDescriptionEn", data.shortDescriptionEn || "");
+      form.setValue("descriptionEn", data.descriptionEn || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     setError(null);
@@ -155,6 +197,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           name: values.name,
           shortDescription: values.shortDescription,
           description: values.description,
+          nameEn: values.nameEn || undefined,
+          shortDescriptionEn: values.shortDescriptionEn || undefined,
+          descriptionEn: values.descriptionEn || undefined,
           price: values.price,
           stock: values.stock,
           weight: values.weight ?? null,
@@ -269,6 +314,73 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
             </FormItem>
           )}
         />
+
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium">Engelska översättningar (valfritt)</h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleTranslate}
+              disabled={isTranslating}
+            >
+              {isTranslating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Languages className="h-4 w-4 mr-2" />
+              )}
+              {isTranslating ? "Översätter..." : "Översätt med AI"}
+            </Button>
+          </div>
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="nameEn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Namn (engelska)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Product name (English)..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="shortDescriptionEn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kort beskrivning (engelska)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Short description (English)..." {...field} />
+                  </FormControl>
+                  <FormDescription>Max 100 tecken</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="descriptionEn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Beskrivning (engelska)</FormLabel>
+                  <FormControl>
+                    <RichTextEditor
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Full description (English)..."
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <FormField

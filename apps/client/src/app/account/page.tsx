@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
+import { useLanguage, useTranslation } from "@/i18n/context";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -50,24 +51,12 @@ import { productUrl } from "@/lib/utils";
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
-function getMemberSince(date: Date): string {
-  return date.toLocaleDateString("sv-SE", {
+function getMemberSince(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
-}
-
-function orderStatusLabel(s: string) {
-  return s === "confirmed"
-    ? "Bekräftad"
-    : s === "shipped"
-      ? "Skickad"
-      : s === "delivered"
-        ? "Levererad"
-        : s === "cancelled"
-          ? "Avbruten"
-          : s;
 }
 
 type UserProfile = {
@@ -81,7 +70,17 @@ type UserProfile = {
 };
 
 export default function AccountPage() {
+  const { locale } = useLanguage();
+  const t = useTranslation();
   const searchParams = useSearchParams();
+
+  function orderStatusLabel(s: string) {
+    if (s === "confirmed") return t("account.orderStatusConfirmed");
+    if (s === "shipped") return t("account.orderStatusShipped");
+    if (s === "delivered") return t("account.orderStatusDelivered");
+    if (s === "cancelled") return t("account.orderStatusCancelled");
+    return s;
+  }
   const { data: session, status, update: updateSession } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -120,13 +119,13 @@ export default function AccountPage() {
       const res = await fetch("/api/account/export-data");
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Kunde inte exportera data");
+        throw new Error(data.error ?? t("account.exportError"));
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `turbomeck-mina-uppgifter-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `${t("account.exportFilename")}-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -144,11 +143,11 @@ export default function AccountPage() {
     setPasswordError(null);
     setPasswordSuccess(false);
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError("Lösenorden matchar inte");
+      setPasswordError(t("account.passwordsDontMatch"));
       return;
     }
     if (passwordForm.newPassword.length < 6) {
-      setPasswordError("Nytt lösenord måste vara minst 6 tecken");
+      setPasswordError(t("account.passwordMinLength"));
       return;
     }
     setPasswordSubmitting(true);
@@ -163,13 +162,13 @@ export default function AccountPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setPasswordError(data.error ?? "Kunde inte ändra lösenord");
+        setPasswordError(data.error ?? t("account.changePasswordError"));
         return;
       }
       setPasswordSuccess(true);
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch {
-      setPasswordError("Nätverksfel. Försök igen.");
+      setPasswordError(t("account.networkError"));
     } finally {
       setPasswordSubmitting(false);
     }
@@ -178,8 +177,9 @@ export default function AccountPage() {
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setDeleteError(null);
-    if (deleteForm.confirmText !== "ta bort mitt konto") {
-      setDeleteError('Skriv "ta bort mitt konto" för att bekräfta');
+    const confirmPhrase = t("account.deleteConfirmPhrase");
+    if (deleteForm.confirmText !== confirmPhrase) {
+      setDeleteError(t("account.deleteConfirmError", { phrase: confirmPhrase }));
       return;
     }
     setDeleteSubmitting(true);
@@ -194,13 +194,13 @@ export default function AccountPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setDeleteError(data.error ?? "Kunde inte ta bort kontot");
+        setDeleteError(data.error ?? t("account.deleteAccountError"));
         return;
       }
       setDeleteModalOpen(false);
       await signOut({ callbackUrl: "/" });
     } catch {
-      setDeleteError("Nätverksfel. Försök igen.");
+      setDeleteError(t("account.networkError"));
     } finally {
       setDeleteSubmitting(false);
     }
@@ -299,12 +299,12 @@ export default function AccountPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error ?? "Kunde inte ladda upp");
+        throw new Error(data.error ?? t("account.uploadError"));
       }
       refreshProfile();
       await updateSession?.({ image: data.image });
     } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : "Något gick fel");
+      setAvatarError(err instanceof Error ? err.message : t("account.somethingWentWrong"));
     } finally {
       setAvatarUploading(false);
       e.target.value = "";
@@ -314,7 +314,7 @@ export default function AccountPage() {
   if (status === "loading") {
     return (
       <div className="w-full mt-12 flex justify-center">
-        <div className="animate-pulse text-muted-foreground">Laddar...</div>
+        <div className="animate-pulse text-muted-foreground">{t("common.loading")}</div>
       </div>
     );
   }
@@ -331,7 +331,7 @@ export default function AccountPage() {
           </CardHeader>
           <CardContent>
             <Link href="/">
-              <Button>Logga in</Button>
+              <Button>{t("auth.login")}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -349,10 +349,10 @@ export default function AccountPage() {
         const d = new Date(lastActivityOrder.createdAt);
         const now = new Date();
         const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays === 0) return "Idag";
-        if (diffDays === 1) return "Igår";
-        if (diffDays < 7) return `För ${diffDays} dagar sedan`;
-        return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+        if (diffDays === 0) return t("account.today");
+        if (diffDays === 1) return t("account.yesterday");
+        if (diffDays < 7) return t("account.daysAgo", { days: diffDays });
+        return d.toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE", { day: "numeric", month: "short" });
       })()
     : "—";
 
@@ -366,7 +366,7 @@ export default function AccountPage() {
   return (
     <div className="w-full mt-8 mb-16">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Profil</h1>
+        <h1 className="text-2xl font-semibold">{t("account.profile")}</h1>
         <nav className="inline-flex rounded-lg bg-muted p-1 gap-0.5 ml-auto [&_button]:cursor-pointer">
           <button
             type="button"
@@ -374,7 +374,7 @@ export default function AccountPage() {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
           >
             <MapPin className="w-4 h-4" />
-            Leveransadress
+            {t("nav.deliveryAddress")}
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
@@ -387,7 +387,7 @@ export default function AccountPage() {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
           >
             <Key className="w-4 h-4" />
-            Byt lösenord
+            {t("nav.changePassword")}
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
@@ -399,7 +399,7 @@ export default function AccountPage() {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
           >
             <Download className="w-4 h-4" />
-            Exportera data
+            {t("account.exportData")}
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
@@ -412,7 +412,7 @@ export default function AccountPage() {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-destructive/90 hover:text-destructive hover:bg-background transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
-            Ta bort konto
+            {t("account.deleteAccount")}
             <ChevronRight className="w-4 h-4" />
           </button>
         </nav>
@@ -431,7 +431,7 @@ export default function AccountPage() {
                   disabled={avatarUploading}
                 />
                 <Avatar className="size-24 overflow-hidden">
-                  <AvatarImage src={avatarImage ?? undefined} alt="Profilbild" />
+                  <AvatarImage src={avatarImage ?? undefined} alt={t("account.profileImageAlt")} />
                   <AvatarFallback className="text-lg">
                     {(() => {
                       const fn = displayFullName ?? "";
@@ -460,30 +460,30 @@ export default function AccountPage() {
                 <p className="text-sm text-destructive mb-2">{avatarError}</p>
               )}
               <p className="text-xs text-muted-foreground mb-4">
-                Klicka för att byta bild
+                {t("account.clickToChangeImage")}
               </p>
               <h2 className="font-semibold text-lg mb-4">{displayFullName}</h2>
               <div className="w-full space-y-3 text-sm border-t pt-4">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Medlem sedan</span>
+                  <span className="text-muted-foreground">{t("account.memberSince")}</span>
                   <span className="font-medium">
                     {profile?.createdAt
-                      ? getMemberSince(new Date(profile.createdAt))
+                      ? getMemberSince(new Date(profile.createdAt), locale)
                       : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Senast aktiv</span>
+                  <span className="text-muted-foreground">{t("account.lastActive")}</span>
                   <span className="font-medium">{lastActivityText}</span>
                 </div>
                 {savedAddress?.phone && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Telefon</span>
+                    <span className="text-muted-foreground">{t("account.phone")}</span>
                     <span className="font-medium">{savedAddress.phone}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">E-post</span>
+                  <span className="text-muted-foreground">{t("account.email")}</span>
                   <span className="font-medium truncate max-w-[140px]">
                     {displayEmail}
                   </span>
@@ -500,7 +500,7 @@ export default function AccountPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Heart className="w-4 h-4" />
-                  Önskelista
+                  {t("account.wishlist")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -511,7 +511,7 @@ export default function AccountPage() {
                       className="flex gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <Link
-                        href={productUrl(product.id, product.name)}
+                        href={productUrl(product)}
                         className="relative w-16 h-16 shrink-0 rounded-md overflow-hidden bg-muted"
                       >
                         <Image
@@ -523,7 +523,7 @@ export default function AccountPage() {
                         />
                       </Link>
                       <div className="flex-1 min-w-0">
-                        <Link href={productUrl(product.id, product.name)}>
+                        <Link href={productUrl(product)}>
                           <p className="font-medium text-sm truncate hover:underline">
                             {product.name}
                           </p>
@@ -536,7 +536,7 @@ export default function AccountPage() {
                         type="button"
                         onClick={() => toggleWishlist(Number(product.id))}
                         className="p-2 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                        aria-label="Ta bort från önskelista"
+                        aria-label={t("wishlist.removeFromWishlist")}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -557,7 +557,7 @@ export default function AccountPage() {
                   <p className="text-2xl font-semibold">
                     {loading ? "—" : orders.length}
                   </p>
-                  <p className="text-sm text-muted-foreground">Beställningar</p>
+                  <p className="text-sm text-muted-foreground">{t("account.orders")}</p>
                 </div>
               </CardContent>
             </Card>
@@ -574,7 +574,7 @@ export default function AccountPage() {
                           maximumFractionDigits: 0,
                         })} kr`}
                   </p>
-                  <p className="text-sm text-muted-foreground">Totalt köpt</p>
+                  <p className="text-sm text-muted-foreground">{t("account.totalSpent")}</p>
                 </div>
               </CardContent>
             </Card>
@@ -587,7 +587,7 @@ export default function AccountPage() {
                   <p className="text-2xl font-semibold">
                     {loading ? "—" : deliveredCount}
                   </p>
-                  <p className="text-sm text-muted-foreground">Levererade</p>
+                  <p className="text-sm text-muted-foreground">{t("account.delivered")}</p>
                 </div>
               </CardContent>
             </Card>
@@ -597,13 +597,13 @@ export default function AccountPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Star className="w-4 h-4" />
-                Senaste beställningar
+                {t("account.recentOrders")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  Laddar beställningar...
+                  {t("account.loadingOrders")}
                 </p>
               ) : orders.length === 0 ? (
                 <div className="py-12 text-center">
@@ -652,7 +652,7 @@ export default function AccountPage() {
                           </div>
                           <div>
                             <p className="font-medium text-sm">
-                              Beställning #{order.orderNumber}
+                              {t("account.order")} #{order.orderNumber}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {order.total.toLocaleString("sv-SE")} kr ·{" "}
@@ -660,7 +660,7 @@ export default function AccountPage() {
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {new Date(order.createdAt).toLocaleDateString(
-                                "sv-SE",
+                                locale === "en" ? "en-GB" : "sv-SE",
                                 {
                                   day: "numeric",
                                   month: "short",
@@ -681,7 +681,7 @@ export default function AccountPage() {
                             }}
                           >
                             <MessageSquare className="w-3 h-3 mr-1" />
-                            Skriv recension
+                            {t("account.writeReview")}
                           </Button>
                           {trackingUrl && (
                             <Link
@@ -692,7 +692,7 @@ export default function AccountPage() {
                             >
                               <Button variant="outline" size="sm">
                                 <ExternalLink className="w-3 h-3 mr-1" />
-                                Spåra leverans
+                                {t("account.trackDelivery")}
                               </Button>
                             </Link>
                           )}
@@ -704,7 +704,7 @@ export default function AccountPage() {
               )}
               {orders.length > 5 && (
                 <p className="text-center text-sm text-muted-foreground mt-4">
-                  Visar 5 senaste av {orders.length} beställningar
+                  {t("account.showingOrders", { count: orders.length })}
                 </p>
               )}
             </CardContent>
@@ -717,10 +717,10 @@ export default function AccountPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-4 h-4" />
-                  Stripe-kvitton
+                  {t("account.stripeReceipts")}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Klicka för att öppna Stripe:s hostade kvitto i webbläsaren.
+                  {t("account.stripeReceiptsDesc")}
                 </p>
               </CardHeader>
               <CardContent>
@@ -728,16 +728,16 @@ export default function AccountPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left font-medium">Beställning</th>
-                        <th className="px-4 py-3 text-left font-medium">Datum</th>
-                        <th className="px-4 py-3 text-left font-medium">Mottagare</th>
-                        <th className="px-4 py-3 text-left font-medium">Leverans</th>
-                        <th className="px-4 py-3 text-right font-medium">Delsumma</th>
-                        <th className="px-4 py-3 text-right font-medium">Frakt</th>
-                        <th className="px-4 py-3 text-right font-medium">Rabatt</th>
-                        <th className="px-4 py-3 text-right font-medium">Totalt</th>
-                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                        <th className="px-4 py-3 text-center font-medium">Kvitto</th>
+                        <th className="px-4 py-3 text-left font-medium">{t("account.order")}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t("account.date")}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t("account.recipient")}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t("account.delivery")}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t("account.subtotal")}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t("account.shipping")}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t("account.discount")}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t("account.total")}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t("account.status")}</th>
+                        <th className="px-4 py-3 text-center font-medium">{t("account.receipt")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -752,7 +752,7 @@ export default function AccountPage() {
                             >
                               <td className="px-4 py-3 font-medium">#{order.orderNumber}</td>
                               <td className="px-4 py-3 text-muted-foreground">
-                                {new Date(order.createdAt).toLocaleDateString("sv-SE", {
+                                {new Date(order.createdAt).toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE", {
                                   day: "numeric",
                                   month: "short",
                                   year: "numeric",
@@ -804,7 +804,7 @@ export default function AccountPage() {
                                     className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    Visa
+                                    {t("account.view")}
                                     <ExternalLink className="w-3 h-3" />
                                   </a>
                                 ) : (
@@ -838,10 +838,10 @@ export default function AccountPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="w-4 h-4" />
-              Leveransadress
+              {t("account.addressDialogTitle")}
             </DialogTitle>
             <DialogDescription>
-              Uppdatera din sparade leveransadress. Den används vid kassa.
+              {t("account.addressDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <AddressEditForm
@@ -852,7 +852,7 @@ export default function AccountPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(address),
               });
-              if (!res.ok) throw new Error("Failed to save");
+              if (!res.ok) throw new Error(t("account.saveError"));
               refreshProfile();
               setAddressModalOpen(false);
             }}
@@ -875,15 +875,15 @@ export default function AccountPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Key className="w-4 h-4" />
-              Byt lösenord
+              {t("account.changePasswordTitle")}
             </DialogTitle>
             <DialogDescription>
-              Ange nuvarande lösenord och välj ett nytt lösenord. Ett bekräftelsemail skickas till din e-postadress när lösenordet har ändrats.
+              {t("account.changePasswordDesc")}
             </DialogDescription>
           </DialogHeader>
           {profile?.hasPassword === false ? (
             <p className="text-sm text-muted-foreground">
-              Du är inloggad via ett externt konto. Lösenord kan inte ändras här.
+              {t("account.externalAccountNote")}
             </p>
           ) : (
             <form onSubmit={handleChangePassword} className="space-y-4">
@@ -901,7 +901,7 @@ export default function AccountPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="newPassword">Nytt lösenord</Label>
+                <Label htmlFor="newPassword">{t("account.newPassword")}</Label>
                 <Input
                   id="newPassword"
                   type="password"
@@ -914,7 +914,7 @@ export default function AccountPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="confirmPassword">Bekräfta nytt lösenord</Label>
+                <Label htmlFor="confirmPassword">{t("account.confirmNewPassword")}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -930,10 +930,10 @@ export default function AccountPage() {
                 <p className="text-sm text-destructive">{passwordError}</p>
               )}
               {passwordSuccess && (
-                <p className="text-sm text-emerald-600">Lösenordet har ändrats.</p>
+                <p className="text-sm text-emerald-600">{t("account.passwordChanged")}</p>
               )}
               <Button type="submit" disabled={passwordSubmitting}>
-                {passwordSubmitting ? "Sparar..." : "Byt lösenord"}
+                {passwordSubmitting ? t("account.saving") : t("nav.changePassword")}
               </Button>
             </form>
           )}
@@ -945,16 +945,16 @@ export default function AccountPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-4 h-4" />
-              Ta bort konto
+              {t("account.deleteAccountTitle")}
             </DialogTitle>
             <DialogDescription>
-              Detta tar permanent bort ditt konto och alla tillhörande data. Denna åtgärd kan inte ångras. Skriv &quot;ta bort mitt konto&quot; för att bekräfta.
+              {t("account.deleteAccountDesc", { phrase: t("account.deleteConfirmPhrase") })}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleDeleteAccount} className="space-y-4">
             {profile?.hasPassword && (
               <div>
-                <Label htmlFor="deletePassword">Ditt lösenord</Label>
+                <Label htmlFor="deletePassword">{t("account.yourPassword")}</Label>
                 <Input
                   id="deletePassword"
                   type="password"
@@ -990,7 +990,7 @@ export default function AccountPage() {
                   setDeleteForm((p) => ({ ...p, confirmText: e.target.value }))
                 }
                 className="mt-1"
-                placeholder="ta bort mitt konto"
+                placeholder={t("account.deleteConfirmPhrase")}
               />
             </div>
             {deleteError && (
@@ -1002,18 +1002,18 @@ export default function AccountPage() {
                 variant="outline"
                 onClick={() => setDeleteModalOpen(false)}
               >
-                Avbryt
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
                 variant="destructive"
                 disabled={
                   deleteSubmitting ||
-                  deleteForm.confirmText !== "ta bort mitt konto" ||
+                  deleteForm.confirmText !== t("account.deleteConfirmPhrase") ||
                   (profile?.hasPassword && !deleteForm.password)
                 }
               >
-                {deleteSubmitting ? "Tar bort..." : "Ta bort konto permanent"}
+                {deleteSubmitting ? t("account.deleting") : t("account.deletePermanently")}
               </Button>
             </div>
           </form>
@@ -1025,12 +1025,10 @@ export default function AccountPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="w-5 h-5" />
-              Exportera mina uppgifter
+              {t("account.exportTitle")}
             </DialogTitle>
             <DialogDescription>
-              Enligt GDPR har du rätt till dataportabilitet. Hämta en kopia av dina
-              personuppgifter som PDF. Filen innehåller din profil, sparad adress,
-              önskelista och orderhistorik.
+              {t("account.exportDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1041,12 +1039,12 @@ export default function AccountPage() {
               {exportLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Exporterar...
+                  {t("account.exporting")}
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4 mr-2" />
-                  Ladda ner som PDF
+                  {t("account.downloadPdf")}
                 </>
               )}
             </Button>

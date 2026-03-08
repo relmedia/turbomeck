@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/i18n/context";
 import type { Order } from "@/lib/api";
 import type { MyReview } from "@/lib/api";
 import { fetchMyReviews, createReview, updateReview } from "@/lib/api";
-import { Star, X, Pencil, Lock } from "lucide-react";
+import { Star, X, Pencil, Lock, Info } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ function OrderItemReviewForm({
   productImage: string | null;
   onSuccess: () => void;
 }) {
+  const t = useTranslation();
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
@@ -41,7 +43,7 @@ function OrderItemReviewForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1 || rating > 5) {
-      toast.error("Välj ett betyg mellan 1 och 5.");
+      toast.error(t("orderReviews.chooseRating"));
       return;
     }
     setLoading(true);
@@ -56,9 +58,9 @@ function OrderItemReviewForm({
       setTitle("");
       setComment("");
       setRating(0);
-      toast.success("Tack! Din recension har sparats.");
+      toast.success(t("orderReviews.reviewSaved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunde inte spara recensionen.");
+      toast.error(err instanceof Error ? err.message : t("orderReviews.saveReviewError"));
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ function OrderItemReviewForm({
         </div>
       </div>
       <div>
-        <Label className="mb-1 block text-sm">Betyg *</Label>
+        <Label className="mb-1 block text-sm">{t("orderReviews.rating")}</Label>
         <div className="flex gap-0.5">
           {[1, 2, 3, 4, 5].map((i) => (
             <button
@@ -89,7 +91,7 @@ function OrderItemReviewForm({
               type="button"
               onClick={() => setRating(i)}
               className="rounded p-0.5 transition-colors hover:bg-muted"
-              aria-label={`${i} stjärnor`}
+              aria-label={t("orderReviews.starsAria", { count: i })}
             >
               <Star
                 className={cn(
@@ -113,18 +115,18 @@ function OrderItemReviewForm({
         />
       </div>
       <div>
-        <Label htmlFor={`comment-${productId}`} className="text-sm">Kommentar</Label>
+        <Label htmlFor={`comment-${productId}`} className="text-sm">{t("orderReviews.comment")}</Label>
         <textarea
           id={`comment-${productId}`}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Berätta vad du tyckte om produkten..."
+          placeholder={t("orderReviews.commentPlaceholder")}
           rows={3}
           className="mt-1 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
       <Button type="submit" disabled={loading}>
-        {loading ? "Skickar..." : "Publicera recension"}
+        {loading ? t("orderReviews.sending") : t("orderReviews.publishReview")}
       </Button>
     </form>
   );
@@ -139,6 +141,7 @@ function OrderItemReviewCard({
   review: MyReview;
   onUpdated: () => void;
 }) {
+  const t = useTranslation();
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(review.rating);
   const [title, setTitle] = useState(review.title ?? "");
@@ -150,7 +153,7 @@ function OrderItemReviewCard({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1 || rating > 5) {
-      toast.error("Välj ett betyg mellan 1 och 5.");
+      toast.error(t("orderReviews.chooseRating"));
       return;
     }
     setLoading(true);
@@ -162,9 +165,9 @@ function OrderItemReviewCard({
       });
       onUpdated();
       setEditing(false);
-      toast.success("Recensionen har uppdaterats.");
+      toast.success(t("orderReviews.reviewUpdated"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kunde inte uppdatera recensionen.");
+      toast.error(err instanceof Error ? err.message : t("orderReviews.updateReviewError"));
     } finally {
       setLoading(false);
     }
@@ -195,7 +198,7 @@ function OrderItemReviewCard({
           </div>
         </div>
         <div>
-          <Label className="mb-1 block text-sm">Betyg *</Label>
+          <Label className="mb-1 block text-sm">{t("orderReviews.rating")}</Label>
           <div className="flex gap-0.5">
             {[1, 2, 3, 4, 5].map((i) => (
               <button
@@ -203,7 +206,7 @@ function OrderItemReviewCard({
                 type="button"
                 onClick={() => setRating(i)}
                 className="rounded p-0.5 transition-colors hover:bg-muted"
-                aria-label={`${i} stjärnor`}
+                aria-label={t("orderReviews.starsAria", { count: i })}
               >
                 <Star
                   className={cn(
@@ -216,21 +219,21 @@ function OrderItemReviewCard({
           </div>
         </div>
         <div>
-          <Label className="text-sm">Rubrik (valfritt)</Label>
+          <Label className="text-sm">{t("orderReviews.titleOptional")}</Label>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="T.ex. Bra kvalitet"
+            placeholder={t("orderReviews.titlePlaceholder")}
             maxLength={100}
             className="mt-1"
           />
         </div>
         <div>
-          <Label className="text-sm">Kommentar</Label>
+          <Label className="text-sm">{t("orderReviews.comment")}</Label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Berätta vad du tyckte om produkten..."
+            placeholder={t("orderReviews.commentPlaceholder")}
             rows={3}
             className="mt-1 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
@@ -271,12 +274,12 @@ function OrderItemReviewCard({
                 className="shrink-0"
               >
                 <Pencil className="h-3.5 w-3.5 mr-1" />
-                Redigera
+                {t("orderReviews.edit")}
               </Button>
             ) : (
               <span className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground">
                 <Lock className="h-3 w-3" />
-                Låst
+                {t("orderReviews.locked")}
               </span>
             )}
           </div>
@@ -309,6 +312,7 @@ type OrderReviewsModalProps = {
 };
 
 export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalProps) {
+  const t = useTranslation();
   const [myReviews, setMyReviews] = useState<MyReview[]>([]);
 
   useEffect(() => {
@@ -338,11 +342,11 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
           onClick={(e) => e.stopPropagation()}
         >
           <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between z-10">
-            <h2 className="text-lg font-semibold">Dina recensioner</h2>
+            <h2 className="text-lg font-semibold">{t("orderReviews.yourReviews")}</h2>
             <button
               onClick={onClose}
               className="p-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="Stäng"
+              aria-label={t("common.close")}
             >
               <X className="w-4 h-4" />
             </button>
@@ -350,17 +354,23 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
           <div className="p-6 space-y-4">
             {itemsWithProductId.length === 0 ? (
               <p className="text-muted-foreground">
-                Denna beställning har inga produkter som kan recenseras.
+                {t("orderReviews.noProductsToReview")}
               </p>
             ) : (
               <>
-                <div className="space-y-1">
+                <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Du har redan skrivit recensioner för alla produkter i denna beställning.
+                    {t("orderReviews.allReviewsDone")}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Du kan redigera varje recension max en gång. Efter det är den låst och kan inte ändras.
-                  </p>
+                  <div
+                    className="flex gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
+                    role="status"
+                  >
+                    <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      {t("orderReviews.editLimitNote")}
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-4">
                   {itemsWithProductId.map((item) => {
@@ -384,7 +394,7 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
               </>
             )}
             <Button onClick={onClose} className="mt-2">
-              Stäng
+              {t("common.close")}
             </Button>
           </div>
         </div>
@@ -413,7 +423,7 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
         </div>
         <div className="p-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Beställning #{order.orderNumber} – Du har köpt dessa produkter men har inte skrivit en recension ännu.
+            {t("orderReviews.orderIntro", { orderNumber: order.orderNumber })}
           </p>
           <div className="space-y-4">
             {unreviewedItems.map((item) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Languages, Loader2 } from "lucide-react";
 import {
   SheetContent,
   SheetHeader,
@@ -31,12 +32,14 @@ import { PRODUCT_API } from "@/lib/product-api";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Namn är obligatoriskt!" }),
+  nameEn: z.string().optional(),
   parentId: z.string().optional(),
 });
 
 export type CategoryForEdit = {
   id: number;
   name: string;
+  nameEn?: string | null;
   description?: string | null;
   parentId?: number | null;
   parentName?: string | null;
@@ -56,11 +59,13 @@ const EditCategory = ({
   onClose,
 }: EditCategoryProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: category.name,
+      nameEn: category.nameEn ?? "",
       parentId: category.parentId != null ? String(category.parentId) : "__none__",
     },
   });
@@ -68,13 +73,40 @@ const EditCategory = ({
   useEffect(() => {
     form.reset({
       name: category.name,
+      nameEn: category.nameEn ?? "",
       parentId: category.parentId != null ? String(category.parentId) : "__none__",
     });
-  }, [category.id, category.name, category.parentId, form]);
+  }, [category.id, category.name, category.nameEn, category.parentId, form]);
 
   const parentCategories = categories.filter(
     (c) => !c.parentId && c.id !== category.id
   );
+
+  const handleTranslate = async () => {
+    const name = form.getValues("name");
+    if (!name?.trim()) {
+      toast.error("Fyll i det svenska namnet först.");
+      return;
+    }
+    setIsTranslating(true);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), shortDescription: "", description: "" }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Översättning misslyckades");
+      }
+      const data = await res.json();
+      form.setValue("nameEn", data.nameEn || "");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
@@ -90,6 +122,7 @@ const EditCategory = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: values.name.trim(),
+            nameEn: values.nameEn?.trim() || null,
             parentId,
           }),
         }
@@ -128,6 +161,38 @@ const EditCategory = ({
                   <FormControl>
                     <Input
                       placeholder="Ange kategoriens namn"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nameEn"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between gap-2">
+                    <FormLabel>Namn (engelska)</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTranslate}
+                      disabled={isTranslating}
+                    >
+                      {isTranslating ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Languages className="h-4 w-4 mr-2" />
+                      )}
+                      {isTranslating ? "Översätter..." : "Översätt med AI"}
+                    </Button>
+                  </div>
+                  <FormControl>
+                    <Input
+                      placeholder="Category name (English)"
                       {...field}
                     />
                   </FormControl>

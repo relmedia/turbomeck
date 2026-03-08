@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Star, CheckCircle2 } from "lucide-react";
 import { fetchReviews, type ApiReview, type ReviewsResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/i18n/context";
 
 type ReviewsContextValue = {
   data: ReviewsResponse | null;
@@ -20,6 +21,7 @@ function useReviews() {
 }
 
 function ReviewCard({ review }: { review: ApiReview }) {
+  const t = useTranslation();
   const date = new Date(review.createdAt).toLocaleDateString("sv-SE", {
     year: "numeric",
     month: "long",
@@ -44,7 +46,7 @@ function ReviewCard({ review }: { review: ApiReview }) {
         {review.verifiedPurchase && (
           <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
             <CheckCircle2 className="h-3 w-3" />
-            Verifierat köp
+            {t("reviews.verifiedPurchase")}
           </span>
         )}
         <span className="text-sm text-muted-foreground">{date}</span>
@@ -66,6 +68,7 @@ export function ProductReviewsProvider({
   productId: number;
   children: React.ReactNode;
 }) {
+  const t = useTranslation();
   const [data, setData] = useState<ReviewsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +80,7 @@ export function ProductReviewsProvider({
         if (!cancelled) setData(res);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Kunde inte ladda recensioner");
+        if (!cancelled) setError(err instanceof Error ? err.message : t("reviews.loadError"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -85,7 +88,7 @@ export function ProductReviewsProvider({
     return () => {
       cancelled = true;
     };
-  }, [productId]);
+  }, [productId, t]);
 
   const value: ReviewsContextValue = {
     data,
@@ -102,12 +105,13 @@ export function ProductReviewsProvider({
 
 export function ProductReviewsSummary() {
   const { data, loading, error } = useReviews();
+  const t = useTranslation();
 
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="h-4 w-4 animate-pulse rounded bg-muted" />
-        Laddar recensioner...
+        {t("reviews.loading")}
       </div>
     );
   }
@@ -124,7 +128,7 @@ export function ProductReviewsSummary() {
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <div
         className="flex items-center gap-0.5"
-        aria-label={`${avgRating.toFixed(1)} av 5 stjärnor`}
+        aria-label={`${avgRating.toFixed(1)} ${t("reviews.starsLabel")}`}
       >
         {[1, 2, 3, 4, 5].map((i) => (
           <Star
@@ -138,7 +142,7 @@ export function ProductReviewsSummary() {
       </div>
       <span className="font-medium text-foreground">{avgRating.toFixed(1)}</span>
       <span className="text-muted-foreground">
-        ({totalCount} {totalCount === 1 ? "recension" : "recensioner"})
+        ({totalCount} {totalCount === 1 ? t("common.review") : t("common.reviews")})
       </span>
     </div>
   );
@@ -146,12 +150,13 @@ export function ProductReviewsSummary() {
 
 export function ProductReviewsSection() {
   const { data, loading, error } = useReviews();
+  const t = useTranslation();
 
   return (
     <div className="space-y-6">
       {!loading && !error && data && data.reviews.length > 0 && (
         <div className="space-y-2">
-          <h3 className="font-medium">Recensioner</h3>
+          <h3 className="font-medium">{t("reviews.title")}</h3>
           <div className="divide-y rounded-lg border p-4">
             {data.reviews.map((r) => (
               <ReviewCard key={r.id} review={r} />

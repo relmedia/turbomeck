@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "@/i18n/context";
 import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
@@ -25,6 +26,7 @@ import type { SavedAddress } from "@/types";
 
 const CartPage: React.FC = () => {
   const router = useRouter();
+  const t = useTranslation();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
   const [shippingPreview, setShippingPreview] = useState<{
     deliveryOption?: "home" | "servicepoint";
@@ -140,7 +142,7 @@ const CartPage: React.FC = () => {
       .catch(() => {
         setAppliedCoupon(false);
         setCouponDiscount(0);
-        setCouponError("Kunde inte validera rabattkoden");
+        setCouponError(t("cart.couponError"));
       });
   };
 
@@ -158,7 +160,7 @@ const CartPage: React.FC = () => {
   const sections = [
     {
       id: 1 as const,
-      title: "Dina uppgifter",
+      title: t("cart.yourDetails"),
       content: (
         <ShippingForm
           setShippingForm={setShippingForm}
@@ -183,7 +185,7 @@ const CartPage: React.FC = () => {
     },
     {
       id: 3 as const,
-      title: "Betalningssätt",
+      title: t("cart.paymentMethod"),
       content: shippingForm ? (
         <PaymentForm
           total={total}
@@ -287,7 +289,7 @@ const CartPage: React.FC = () => {
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          Slutför föregående steg först.
+          {t("cart.completePrevious")}
         </p>
       ),
     },
@@ -298,13 +300,13 @@ const CartPage: React.FC = () => {
       <div className="w-full mt-8 lg:mt-12">
         <div className="bg-card border rounded-lg p-12 text-center">
           <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground text-lg">Varukorgen är tom</p>
+          <p className="text-muted-foreground text-lg">{t("cart.empty")}</p>
           <Button
             variant="outline"
             className="mt-4"
             onClick={() => router.push("/products")}
           >
-            Fortsätt handla
+            {t("cart.continueShopping")}
           </Button>
         </div>
       </div>
@@ -318,13 +320,13 @@ const CartPage: React.FC = () => {
         <div className="lg:w-2/5 space-y-6">
           {/* Shopping Cart – items + order summary + place order */}
           <div className="bg-card border rounded-lg p-6">
-            <h2 className="text-lg font-bold mb-1">Varukorg</h2>
+            <h2 className="text-lg font-bold mb-1">{t("cart.title")}</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Du har {cart.reduce((a, i) => a + i.quantity, 0)}{" "}
+              {t("cart.itemsCount")} {cart.reduce((a, i) => a + i.quantity, 0)}{" "}
               {cart.reduce((a, i) => a + i.quantity, 0) === 1
-                ? "produkt"
-                : "produkter"}{" "}
-              i varukorgen
+                ? t("cart.product")
+                : t("cart.products")}{" "}
+              {t("cart.inCart")}
             </p>
             <div className="space-y-4">
               {cart.map((item) => (
@@ -338,7 +340,7 @@ const CartPage: React.FC = () => {
             </div>
             <div className="mt-6 pt-6 border-t border-border space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Delsumma</span>
+                <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                 <span className="font-medium">
                   {subtotal.toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,
@@ -348,12 +350,12 @@ const CartPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Fraktkostnad</span>
+                <span className="text-muted-foreground">{t("cart.shipping")}</span>
                 <span className="font-medium">{shipping} kr</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Rabatt</span>
+                  <span>{t("cart.discount")}</span>
                   <span className="font-medium">
                     -
                     {discount.toLocaleString("sv-SE", {
@@ -365,7 +367,7 @@ const CartPage: React.FC = () => {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Moms (25%)</span>
+                <span className="text-muted-foreground">{t("cart.vat")}</span>
                 <span className="font-medium">
                   {Math.round((subtotal - discount + shipping) * 0.2).toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,
@@ -375,7 +377,7 @@ const CartPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-1">
-                <span>Totalt</span>
+                <span>{t("cart.total")}</span>
                 <span>
                   {total.toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,
@@ -389,14 +391,14 @@ const CartPage: React.FC = () => {
 
           {/* Coupon Code – bottom card */}
           <div className="bg-card border rounded-lg p-6">
-            <h2 className="text-lg font-bold mb-1">Rabattkod</h2>
+            <h2 className="text-lg font-bold mb-1">{t("cart.couponCode")}</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Ange kod för att få rabatt direkt
+              {t("cart.couponHint")}
             </p>
             {appliedCoupon ? (
               <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-3">
                 <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                  Rabatt på {discount.toLocaleString("sv-SE")} kr tillämpad
+                  {t("cart.couponApplied", { amount: discount.toLocaleString("sv-SE") })}
                 </span>
                 <Button
                   type="button"
@@ -411,7 +413,7 @@ const CartPage: React.FC = () => {
                     setCouponError("");
                   }}
                 >
-                  Ta bort
+                  {t("cart.remove")}
                 </Button>
               </div>
             ) : (
@@ -419,7 +421,7 @@ const CartPage: React.FC = () => {
                 <div className="flex items-center rounded-lg border border-input bg-white overflow-hidden focus-within:ring-2 focus-within:ring-ring/50 focus-within:ring-offset-0 focus-within:border-ring">
                   <Input
                     type="text"
-                    placeholder="Kampanjkod"
+                    placeholder={t("cart.couponPlaceholder")}
                     value={couponCode}
                     onChange={(e) => {
                       setCouponCode(e.target.value);
@@ -433,7 +435,7 @@ const CartPage: React.FC = () => {
                     size="sm"
                     className="h-6 py-0 px-1.5 text-xs bg-gray-900 hover:bg-gray-800 text-white shrink-0 cursor-pointer rounded-none my-1 ml-1 mr-2"
                   >
-                    Tillämpa
+                    {t("cart.apply")}
                   </Button>
                 </div>
                 {couponError && (
@@ -489,14 +491,15 @@ function CartItemRow({
   onRemove: () => void;
   onQuantityChange: (q: number) => void;
 }) {
+  const t = useTranslation();
   const imageSrc =
     item.images?.[item.selectedColor] || item.images?.default || "";
   const hasSizes = item.sizes?.length > 0 && item.sizes[0] !== "-";
   const hasColors = item.colors?.length > 1 && item.colors[0] !== "default";
   const details: string[] = [];
   if (item.selectedVariant) details.push(item.selectedVariant);
-  if (hasColors) details.push(`Färg: ${item.selectedColor}`);
-  if (hasSizes) details.push(`Storlek: ${item.selectedSize}`);
+  if (hasColors) details.push(`${t("cart.colorLabel")}: ${item.selectedColor}`);
+  if (hasSizes) details.push(`${t("cart.sizeLabel")}: ${item.selectedSize}`);
   useEffect(() => {
     if (item.quantity > 4) onQuantityChange(4);
   }, [item.quantity, onQuantityChange]);
@@ -540,7 +543,7 @@ function CartItemRow({
             type="button"
             onClick={onRemove}
             className="p-2 text-muted-foreground hover:text-destructive rounded-lg transition-colors"
-            aria-label="Ta bort"
+            aria-label={t("cart.removeItem")}
           >
             <Trash2 className="w-4 h-4" />
           </button>

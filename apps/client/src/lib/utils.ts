@@ -5,9 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** URL path for a product detail page, e.g. /products/22t-td04hl-saab-935 */
-export function productUrl(_id: string | number, name: string): string {
-  return `/products/${toSlug(name) || "product"}`
+/** URL path for a product detail page. Uses translated slug from product.name (localized), falls back to slug or id. */
+export function productUrl(product: { id: string | number; name?: string; slug?: string }): string {
+  const slug = (product.name ? toSlug(product.name) : null) ?? product.slug ?? null;
+  return `/products/${slug || product.id}`;
 }
 
 /** URL-safe slug from category name, e.g. "Saab 9-3" → "saab-9-3" */

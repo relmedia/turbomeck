@@ -63,6 +63,10 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   shortDescription: text("short_description"),
   description: text("description"),
+  /** English translations; when locale=en, used instead of name/shortDescription/description */
+  nameEn: text("name_en"),
+  shortDescriptionEn: text("short_description_en"),
+  descriptionEn: text("description_en"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   stock: integer("stock").default(0).notNull(),
   weight: decimal("weight", { precision: 8, scale: 2 }), // kg, for PostNord shipping
@@ -113,6 +117,8 @@ export const categories = pgTable(
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
+    /** English translation for category name */
+    nameEn: text("name_en"),
     description: text("description"),
     parentId: integer("parent_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

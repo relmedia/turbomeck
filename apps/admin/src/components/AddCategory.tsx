@@ -33,6 +33,7 @@ import { PRODUCT_API } from "@/lib/product-api";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Namn är obligatoriskt!" }),
+  nameEn: z.string().optional(),
   parentId: z.string().optional(),
 });
 
@@ -48,7 +49,7 @@ const AddCategory = ({ onSuccess }: AddCategoryProps) => {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", parentId: "__none__" },
+    defaultValues: { name: "", nameEn: "", parentId: "__none__" },
   });
 
   useEffect(() => {
@@ -114,6 +115,23 @@ const AddCategory = ({ onSuccess }: AddCategoryProps) => {
                       />
                     </FormControl>
                     <FormDescription>Ange kategoriens namn.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nameEn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Namn (engelska)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Category name (English)"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>Valfritt – visas när språk är engelska.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

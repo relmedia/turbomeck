@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+import { SE, GB } from "country-flag-icons/react/3x2";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,53 +12,53 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/i18n/context";
 import { cn } from "@/lib/utils";
 
-function LanguageIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path fill="none" d="m5 8l6 6m-7 0l6-6l2-3M2 5h12M7 2h1m14 20l-5-10l-5 10m2-4h6" />
-    </svg>
-  );
-}
+const LOCALES = [
+  { code: "sv" as const, Flag: SE, name: "SV" },
+  { code: "en" as const, Flag: GB, name: "EN" },
+] as const;
 
 export function LanguageSwitcher() {
   const { locale, setLocale } = useLanguage();
+  const current = LOCALES.find((l) => l.code === locale) ?? LOCALES[0];
+  const CurrentFlag = current.Flag;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 cursor-pointer"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 cursor-pointer font-medium"
           aria-label={locale === "sv" ? "Byt språk" : "Change language"}
         >
-          <LanguageIcon className="h-4 w-4 text-gray-600" />
+          <CurrentFlag
+            title={current.code === "sv" ? "Svenska" : "English"}
+            className="h-4 w-6 rounded-sm object-cover shrink-0"
+          />
+          <span>{current.name}</span>
+          <ChevronDown className="h-4 w-4 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => setLocale("sv")}
-          className={cn(locale === "sv" && "bg-accent")}
-        >
-          Svenska
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setLocale("en")}
-          className={cn(locale === "en" && "bg-accent")}
-        >
-          English
-        </DropdownMenuItem>
+        {LOCALES.map((loc) => {
+          const LocFlag = loc.Flag;
+          return (
+            <DropdownMenuItem
+              key={loc.code}
+              onClick={() => setLocale(loc.code)}
+              className={cn(
+                "gap-2 cursor-pointer",
+                locale === loc.code && "bg-accent"
+              )}
+            >
+              <LocFlag
+                title={loc.code === "sv" ? "Svenska" : "English"}
+                className="h-4 w-6 rounded-sm object-cover shrink-0"
+              />
+              {loc.name}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
