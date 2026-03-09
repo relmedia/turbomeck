@@ -3,7 +3,6 @@
 import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,34 +28,31 @@ import {
   FieldGroup,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
-const signInSchema = z.object({
+const emailLinkSchema = z.object({
   email: z.string().email({ message: "Ange en giltig e-postadress" }),
-  password: z.string().min(1, { message: "Lösenord krävs" }),
-  rememberMe: z.boolean().default(false),
 });
 
-type SignInValues = z.infer<typeof signInSchema>;
+type SignInValues = z.infer<typeof emailLinkSchema>;
 
 function SignInContent() {
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/studio";
   const errorParam = searchParams.get("error");
   const error =
-    errorParam === "CredentialsSignin"
-      ? "Ogiltig e-post eller lösenord"
-      : errorParam
-        ? "Inloggningen misslyckades"
-        : "";
+    errorParam === "EmailSignin"
+      ? "Kunde inte skicka inloggningslänk. Kontrollera att e-post är konfigurerad i Inställningar."
+      : errorParam === "Verification"
+        ? "Inloggningslänken är inte längre giltig. Den kan redan ha använts eller ha gått ut."
+        : errorParam
+          ? "Inloggningen misslyckades"
+          : "";
 
   const form = useForm<SignInValues>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: { email: "", password: "", rememberMe: false },
+    resolver: zodResolver(emailLinkSchema),
+    defaultValues: { email: "" },
   });
   const formatDateTime = () => {
       const now = new Date();
@@ -76,13 +72,15 @@ function SignInContent() {
 
   const handleSubmit = form.handleSubmit(async (values) => {
     setLoading(true);
+    form.setError("root", { message: "" });
     try {
-      await signIn("credentials", {
+      await signIn("email", {
         email: values.email,
-        password: values.password,
         callbackUrl,
         redirect: true,
       });
+    } catch (err) {
+      form.setError("root", { message: err instanceof Error ? err.message : "Något gick fel" });
     } finally {
       setLoading(false);
     }
@@ -108,7 +106,7 @@ function SignInContent() {
         <CardHeader>
           <CardTitle>Logga in till ditt konto</CardTitle>
           <CardDescription>
-            Ange din e-post nedan för att logga in till Admin-panelen
+            Ange din e-post så skickar vi en inloggningslänk till din mejl
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,62 +133,14 @@ function SignInContent() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel htmlFor="password">Lösenord</FormLabel>
-                      <div className="relative">
-                        <FormControl>
-                          <Input
-                            id="password"
-                            type={showPassword ? "text" : "password"}
-                            autoComplete="current-password"
-                            className="pr-10"
-                            {...field}
-                          />
-                        </FormControl>
-                        <button
-                          type="button"
-                          aria-label={showPassword ? "Dölj lösenord" : "Visa lösenord"}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        </button>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 mt-2">
-                        <FormField
-                          control={form.control}
-                          name="rememberMe"
-                          render={({ field }) => (
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <Checkbox
-                                id="remember"
-                                checked={field.value}
-                                onCheckedChange={(checked) => field.onChange(checked === true)}
-                              />
-                              <span className="text-sm">Kom ihåg mig</span>
-                            </label>
-                          )}
-                        />
-                        <Link
-                    href="http://localhost:3002/reset-password"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm underline-offset-4 hover:underline"
-                  >
-                    Glömt lösenord?
-                  </Link>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {(error || form.formState.errors.root?.message) && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.root?.message || error}
+                </p>
+              )}
               <Field>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Loggar in..." : "Logga in"}
+                  {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
                 </Button>
               </Field>
               <Field>

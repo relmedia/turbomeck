@@ -3,9 +3,6 @@ import { users, passwordResetTokens } from "@repo/database";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { Resend } from "resend";
-
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 function generateToken() {
   return randomBytes(32).toString("hex");
@@ -65,26 +62,11 @@ export async function POST(req: Request) {
     const baseUrl = getBaseUrl(req);
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-    if (resend) {
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || "Turbomeck <onboarding@resend.dev>",
-        to: normalizedEmail,
-        subject: "Återställ ditt lösenord - Turbomeck",
-        html: `
-          <p>Hej!</p>
-          <p>Du har begärt att återställa ditt lösenord. Klicka på länken nedan för att skapa ett nytt lösenord:</p>
-          <p><a href="${resetUrl}">${resetUrl}</a></p>
-          <p>Länken är giltig i 1 timme.</p>
-          <p>Om du inte bad om detta kan du ignorera detta mail.</p>
-        `,
-      });
-    }
-
     return NextResponse.json({
       success: true,
       message: "Om ett konto finns för denna e-post har vi skickat en återställningslänk.",
-      // Dev only: expose link when Resend is not configured
-      ...(process.env.NODE_ENV === "development" && !resend && { resetUrl }),
+      // Dev only: expose link when no email provider is configured
+      ...(process.env.NODE_ENV === "development" && { resetUrl }),
     });
   } catch (err) {
     console.error("Forgot password error:", err);

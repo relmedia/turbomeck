@@ -273,6 +273,7 @@
   "cart": {
     "title": "Varukorg",
     "empty": "Varukorgen är tom",
+    "emptyDescription": "Det verkar som att du inte har lagt till något i varukorgen ännu.",
     "continueShopping": "Fortsätt handla",
     "itemsCount": "Du har",
     "product": "produkt",

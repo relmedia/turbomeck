@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useEffect, useCallback, type ReactNode } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -28,7 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { FileSpreadsheet, FileText } from "lucide-react";
@@ -41,17 +41,6 @@ type ProductRow = {
   sold: number;
   sales: number;
 };
-
-const MOCK_PRODUCTS: ProductRow[] = [
-  { id: 1, name: "Sports Shoes", image: null, sold: 316, sales: 10 },
-  { id: 2, name: "Black T-Shirt", image: null, sold: 274, sales: 20 },
-  { id: 3, name: "Jeans", image: null, sold: 195, sales: 15 },
-  { id: 4, name: "Red Sneakers", image: null, sold: 402, sales: 40 },
-  { id: 5, name: "Red Scarf", image: null, sold: 280, sales: 37 },
-  { id: 6, name: "Kitchen Accessory", image: null, sold: 150, sales: 18 },
-  { id: 7, name: "Bicycle", image: null, sold: 316, sales: 25 },
-  { id: 8, name: "Sports Shoes", image: null, sold: 290, sales: 12 },
-];
 
 const globalFilterFn: FilterFn<ProductRow> = (row, _columnId, filterValue) => {
   const val = String(filterValue ?? "").toLowerCase();
@@ -75,8 +64,27 @@ function downloadBlob(blob: Blob, filename: string) {
 type BestSellingProductsProps = { hideTitle?: boolean; onToolbarRender?: (toolbar: ReactNode) => void };
 
 export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingProductsProps = {}) {
+  const [data, setData] = useState<ProductRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/best-selling-products");
+      const list = res.ok ? await res.json() : [];
+      setData(list);
+    } catch {
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const columns = useMemo<ColumnDef<ProductRow>[]>(
     () => [
@@ -103,14 +111,20 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
           return (
             <div className="flex items-center gap-3">
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                <Image
-                  src={p.image || "/products/1g.png"}
-                  alt={p.name}
-                  fill
-                  className="object-cover"
-                  sizes="40px"
-                  unoptimized
-                />
+                {p.image ? (
+                  <Image
+                    src={p.image}
+                    alt={p.name}
+                    fill
+                    className="object-cover"
+                    sizes="40px"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="h-full w-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                    —
+                  </div>
+                )}
               </div>
               <span className="font-normal">{p.name}</span>
             </div>
@@ -181,9 +195,11 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/studio/products/${product.id}`}>Visa produkt</Link>
-                </DropdownMenuItem>
+                {product.id > 0 && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/studio/products/${product.id}`}>Visa produkt</Link>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           );
@@ -194,7 +210,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
   );
 
   const table = useReactTable({
-    data: MOCK_PRODUCTS,
+    data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel({ pageSize: 8 }),
@@ -259,7 +275,16 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
   };
 
   const toolbar = (
-    <div className="flex gap-2">
+    <div className="flex gap-2 items-center">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={fetchProducts}
+        disabled={loading}
+        aria-label="Uppdatera"
+      >
+        <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+      </Button>
       <Input
         placeholder="Filtrera produkter..."
         value={globalFilter}
@@ -289,7 +314,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
 
   useEffect(() => {
     if (hideTitle && onToolbarRender) onToolbarRender(toolbar);
-  }, [hideTitle, onToolbarRender, globalFilter]);
+  }, [hideTitle, onToolbarRender, globalFilter, loading]);
 
   return (
     <div className="space-y-4">
@@ -333,6 +358,12 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
         />
       )}
       <div className="rounded-xl border bg-card overflow-hidden font-light [&_th]:font-normal">
+        {loading && data.length === 0 ? (
+          <div className="flex justify-center items-center h-64">
+            <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+        <>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -398,6 +429,8 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
             </Button>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

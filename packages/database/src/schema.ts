@@ -226,6 +226,13 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   order: one(orders, { fields: [reviews.orderId], references: [orders.id] }),
 }));
 
+// ============ APP SETTINGS (key-value, e.g. mail config) ============
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // ============ DISCOUNT CODES (RABATTKODER) ============
 export const discountCodes = pgTable("discount_codes", {
   id: serial("id").primaryKey(),

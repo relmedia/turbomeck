@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, Tag } from "lucide-react";
+import { Plus, Trash2, Tag, RefreshCw } from "lucide-react";
 
 type Coupon = {
   id: number;
@@ -48,6 +48,7 @@ export default function CouponsPage() {
   const [error, setError] = useState("");
 
   const fetchCoupons = () => {
+    setLoading(true);
     fetch("/api/coupons")
       .then((r) => r.json())
       .then(setCoupons)
@@ -96,11 +97,21 @@ export default function CouponsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Rabattkoder</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Skapa och hantera rabattkoder för kundvagnen
-        </p>
+      <div className="mb-8 px-4 py-2 bg-secondary rounded-md flex items-center justify-between">
+        <div>
+          <h1 className="font-semibold">Rabattkoder</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Skapa och hantera rabattkoder för kundvagnen
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={fetchCoupons}
+          disabled={loading}
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

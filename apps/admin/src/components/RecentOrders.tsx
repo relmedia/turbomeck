@@ -40,7 +40,7 @@ export type OrderRow = {
   fullName: string;
   productName: string;
   amount: number;
-  status: "pending" | "processing" | "success" | "failed";
+  status: "pending" | "processing" | "shipped" | "success" | "failed";
   productImage?: string | null;
 };
 
@@ -57,6 +57,7 @@ const MOCK_ORDERS: OrderRow[] = [
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   processing: { label: "Behandlas", className: "bg-blue-50 text-blue-700 border border-blue-200" },
+  shipped: { label: "Skickad", className: "bg-sky-50 text-sky-700 border border-sky-200" },
   pending: { label: "Betald", className: "bg-amber-50 text-amber-700 border border-amber-200" },
   success: { label: "Slutförd", className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   failed: { label: "Misslyckad", className: "bg-red-50 text-red-700 border border-red-200" },
@@ -228,6 +229,9 @@ export function RecentOrders({ hideTitle, onToolbarRender, orders: ordersProp, f
                   <Link href={`/studio/payments/${order.id}`}>
                     Visa betalningsinformation
                   </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/studio/payments/${order.id}`}>Visa leveransdetaljer</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/studio/payments">Visa alla ordrar</Link>

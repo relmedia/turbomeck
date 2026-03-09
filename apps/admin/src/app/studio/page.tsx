@@ -17,9 +17,9 @@ async function getRecentOrders(): Promise<OrderRow[]> {
       limit: 20,
       with: { items: { columns: { productName: true, productImage: true } } },
     });
-    const statusMap: Record<string, "pending" | "processing" | "success" | "failed"> = {
+    const statusMap: Record<string, "pending" | "processing" | "shipped" | "success" | "failed"> = {
       confirmed: "processing",
-      shipped: "processing",
+      shipped: "shipped",
       delivered: "success",
       cancelled: "failed",
     };

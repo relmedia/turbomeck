@@ -93,6 +93,31 @@ app.get('/receipt-url', async (c) => {
   }
 })
 
+app.get('/payment-method-details', async (c) => {
+  if (!stripe) {
+    return c.json({ error: 'Stripe is not configured', last4: null }, 503)
+  }
+
+  const paymentIntentId = c.req.query('paymentIntentId')
+  if (!paymentIntentId?.startsWith('pi_')) {
+    return c.json({ error: 'Invalid paymentIntentId', last4: null }, 400)
+  }
+
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['payment_method'],
+    })
+    const pm = pi.payment_method
+    if (pm && typeof pm === 'object' && 'card' in pm && pm.card && typeof pm.card === 'object' && 'last4' in pm.card) {
+      return c.json({ last4: String((pm.card as { last4: string }).last4) })
+    }
+    return c.json({ last4: null })
+  } catch (err) {
+    console.error('[stripe payment-method-details]', err)
+    return c.json({ last4: null }, 500)
+  }
+})
+
 const port = Number(process.env.PORT) || 8002
 
 serve(

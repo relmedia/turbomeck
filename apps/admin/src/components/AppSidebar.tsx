@@ -4,9 +4,7 @@ import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import {
   Home,
-  Inbox,
   Star,
-  Search,
   Settings,
   Plus,
   Package,
@@ -16,6 +14,7 @@ import {
   LogOut,
   EllipsisVertical,
   Tag,
+  Truck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,7 +25,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "./ui/sidebar";
@@ -53,23 +51,13 @@ const items = [
     icon: Home,
   },
   {
-    title: "Inkorg",
-    url: "#",
-    icon: Inbox,
-  },
-  {
     title: "Recensioner",
     url: "/studio/reviews",
     icon: Star,
   },
   {
-    title: "Sök...",
-    url: "#",
-    icon: Search,
-  },
-  {
     title: "Inställningar",
-    url: "#",
+    url: "/studio/settings",
     icon: Settings,
   },
 ];
@@ -162,7 +150,7 @@ const AppSidebar = ({
                 >
                   <SheetTrigger asChild>
                     <SidebarMenuButton asChild>
-                      <button type="button">
+                      <button type="button" className="cursor-pointer">
                         <Plus />
                         Lägg till Kategori
                       </button>
@@ -218,6 +206,14 @@ const AppSidebar = ({
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
+                  <Link href="/studio/shipping">
+                    <Truck />
+                    Leveransdetaljer
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
                   <Link href="/studio/coupons">
                     <Tag />
                     Rabattkoder
@@ -250,7 +246,7 @@ const AppSidebar = ({
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="cursor-pointer data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} />

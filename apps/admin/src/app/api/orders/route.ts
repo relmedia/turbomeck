@@ -80,10 +80,10 @@ export async function GET() {
 
 function mapOrderStatus(
   status: string | null
-): "pending" | "success" | "shipped" | "delivered" | "failed" {
+): "pending" | "processing" | "success" | "shipped" | "delivered" | "failed" {
   switch (status) {
     case "confirmed":
-      return "pending";
+      return "processing";
     case "shipped":
       return "shipped";
     case "delivered":
@@ -91,6 +91,6 @@ function mapOrderStatus(
     case "cancelled":
       return "failed";
     default:
-      return "pending";
+      return "processing";
   }
 }

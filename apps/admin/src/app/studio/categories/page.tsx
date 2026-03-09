@@ -80,7 +80,12 @@ const CategoriesPage = () => {
   return (
     <div className="">
       <div className="mb-8 px-4 py-2 bg-secondary rounded-md flex items-center justify-between">
-        <h1 className="font-semibold">Alla Kategorier</h1>
+        <div>
+          <h1 className="font-semibold">Alla Kategorier</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Organisera produkter i kategorier för enklare navigering
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"

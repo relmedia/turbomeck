@@ -16,8 +16,12 @@ export function PageTitle() {
     if (pathname.startsWith("/studio/products")) return "Produkter";
     if (pathname.startsWith("/studio/users")) return "Användare";
     if (pathname.startsWith("/studio/payments")) return "Transaktioner";
+    if (pathname.startsWith("/studio/shipping")) return "Leveransdetaljer";
     if (pathname.startsWith("/studio/categories")) return "Kategorier";
+    if (pathname.startsWith("/studio/coupons")) return "Kuponger";
+    if (pathname.startsWith("/studio/reviews")) return "Recensioner";
     if (pathname.startsWith("/studio/account")) return "Konto";
+    if (pathname.startsWith("/studio/settings")) return "Inställningar";
     return "Dashboard";
   };
 

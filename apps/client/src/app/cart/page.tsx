@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, ShoppingCart, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
@@ -298,12 +298,15 @@ const CartPage: React.FC = () => {
   if (cart.length === 0) {
     return (
       <div className="w-full mt-8 lg:mt-12">
-        <div className="bg-card border rounded-lg p-12 text-center">
-          <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground text-lg">{t("cart.empty")}</p>
+        <div className="bg-card border rounded-lg p-12 text-center flex flex-col items-center gap-4">
+          <ShoppingBag className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
+          <h2 className="text-xl font-bold text-foreground">{t("cart.empty")}</h2>
+          <p className="text-sm text-muted-foreground whitespace-nowrap">
+            {t("cart.emptyDescription")}
+          </p>
           <Button
             variant="outline"
-            className="mt-4"
+            className="mt-2"
             onClick={() => router.push("/products")}
           >
             {t("cart.continueShopping")}

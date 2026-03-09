@@ -1,35 +1,103 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const RATINGS = [
-  { stars: 5, count: 4000, color: "bg-emerald-500" },
-  { stars: 4, count: 2100, color: "bg-emerald-400" },
-  { stars: 3, count: 800, color: "bg-amber-400" },
-  { stars: 2, count: 631, color: "bg-amber-500" },
-  { stars: 1, count: 344, color: "bg-red-500" },
+type RatingBar = { stars: number; count: number; color: string };
+type LatestReview = {
+  userName: string;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  createdAt: string;
+  orderId: number | null;
+};
+
+const DEFAULT_RATINGS: RatingBar[] = [
+  { stars: 5, count: 0, color: "bg-emerald-500" },
+  { stars: 4, count: 0, color: "bg-emerald-400" },
+  { stars: 3, count: 0, color: "bg-amber-400" },
+  { stars: 2, count: 0, color: "bg-amber-500" },
+  { stars: 1, count: 0, color: "bg-red-500" },
 ];
 
-const totalReviews = RATINGS.reduce((sum, r) => sum + r.count, 0);
-const maxCount = Math.max(...RATINGS.map((r) => r.count));
-const avgRating =
-  RATINGS.reduce((sum, r) => sum + r.stars * r.count, 0) / totalReviews;
-
 export function CustomerReviews() {
+  const [stats, setStats] = useState<{
+    total: number;
+    avg: number;
+    byRating: RatingBar[];
+    latestReview: LatestReview | null;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/reviews/stats")
+      .then((r) => r.json())
+      .then((data) => {
+        setStats({
+          total: data.total ?? 0,
+          avg: data.avg ?? 0,
+          byRating: data.byRating ?? DEFAULT_RATINGS,
+          latestReview: data.latestReview ?? null,
+        });
+      })
+      .catch(() => setStats({
+        total: 0,
+        avg: 0,
+        byRating: DEFAULT_RATINGS,
+        latestReview: null,
+      }));
+  }, []);
+
+  const totalReviews = stats?.total ?? 0;
+  const avgRating = totalReviews > 0 ? (stats?.avg ?? 0) : 0;
+  const ratings = stats?.byRating ?? DEFAULT_RATINGS;
+  const maxCount = Math.max(1, ...ratings.map((r) => r.count));
+  const latest = stats?.latestReview;
+
+  if (stats === null) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-lg font-semibold">Kundrecensioner</h1>
+            <p className="text-sm text-muted-foreground">Laddar...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString("sv-SE", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">Kundrecensioner</h1>
           <p className="text-sm text-muted-foreground">
-            Baserat på {totalReviews.toLocaleString("sv-SE")} verifierade köp
+            {totalReviews === 0
+              ? "Inga recensioner ännu"
+              : `Baserat på ${totalReviews.toLocaleString("sv-SE")} recension${totalReviews !== 1 ? "er" : ""}`}
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          Visa alla
-          <ChevronRight className="ml-1 h-4 w-4" />
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/studio/reviews">
+            Visa alla
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Link>
         </Button>
       </div>
 
@@ -51,7 +119,7 @@ export function CustomerReviews() {
         </div>
 
         <div className="space-y-2">
-          {RATINGS.map((r) => (
+          {ratings.map((r) => (
             <div key={r.stars} className="flex items-center gap-2">
               <span className="w-8 text-sm text-muted-foreground">
                 {r.stars}★
@@ -70,27 +138,46 @@ export function CustomerReviews() {
         </div>
       </div>
 
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex text-amber-500">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star key={s} className="h-4 w-4 fill-current" />
-            ))}
+      {latest ? (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Senaste recension</h3>
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex text-amber-500">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star
+                  key={s}
+                  className={cn("h-4 w-4", s <= latest.rating ? "fill-current" : "fill-amber-200")}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {formatDate(latest.createdAt)}
+            </span>
           </div>
-          <span className="text-xs text-muted-foreground">12 mars 2025</span>
+          {latest.title && (
+            <p className="font-medium text-sm">{latest.title}</p>
+          )}
+          {latest.comment && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {latest.comment}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{latest.userName}</span>
+            {latest.orderId && (
+              <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                Verifierat köp
+              </span>
+            )}
+          </div>
         </div>
-        <p className="font-medium text-sm">Överträffade mina förväntningar!</p>
-        <p className="text-sm text-muted-foreground">
-          Jag var tveksam först, men denna produkt har helt förändrat min
-          vardag. Kvaliteten är enastående och den är så lätt att använda.
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Sarah J.</span>
-          <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-            Verifierat köp
-          </span>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-lg border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
+          Inga recensioner ännu
+        </div>
+      )}
     </div>
   );
 }

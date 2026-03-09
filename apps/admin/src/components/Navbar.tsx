@@ -41,14 +41,14 @@ const Navbar = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" onClick={cycleTheme} title="Byt tema (Ljus → Mörk → System)">
+      <Button variant="ghost" size="icon" onClick={cycleTheme} title="Byt tema (Ljus → Mörk → System)" className="cursor-pointer">
         <ThemeIcon className="h-[1.2rem] w-[1.2rem]" />
         <span className="sr-only">Byt tema</span>
       </Button>
       {/* USER AVATAR DROPDOWN */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative size-8 rounded-full">
+          <Button variant="ghost" className="relative size-8 rounded-full cursor-pointer">
             <Avatar className="size-8">
               <AvatarImage src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} />
               <AvatarFallback>{initials}</AvatarFallback>

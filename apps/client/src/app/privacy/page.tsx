@@ -69,7 +69,6 @@ export default function IntegritetspolicyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li><strong>Stripe</strong> — betalningshantering (USA/EU, DPA)</li>
             <li><strong>PostNord</strong> — frakt och spårning (Sverige/Norden)</li>
-            <li><strong>Resend</strong> — e-postutskick (t.ex. återställning av lösenord)</li>
             <li><strong>Google/Facebook</strong> — endast vid inloggning via sociala nätverk (OAuth)</li>
             <li>Behöriga myndigheter vid lagstadgat krav</li>
           </ul>

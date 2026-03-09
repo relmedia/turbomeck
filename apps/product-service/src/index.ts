@@ -687,14 +687,14 @@ app.put("/api/products/:id", async (req, res) => {
 
 // ============ ORDERS ============
 
+const ORDER_NUMBER_START = 257;
+
 async function generateOrderNumber(): Promise<string> {
-  const year = new Date().getFullYear();
   const result = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(orders)
-    .where(sql`extract(year from ${orders.createdAt}) = ${year}`);
-  const seq = ((result[0]?.count ?? 0) + 1).toString().padStart(4, "0");
-  return `TM-${year}-${seq}`;
+    .from(orders);
+  const num = ORDER_NUMBER_START + (result[0]?.count ?? 0);
+  return `#${num}`;
 }
 
 // POST create order (checkout)
@@ -738,6 +738,11 @@ app.post("/api/orders", async (req, res) => {
 
     const orderNumber = await generateOrderNumber();
 
+    const hasTrackingId = !!(
+      body.postNordTrackingId &&
+      String(body.postNordTrackingId).trim() &&
+      String(body.postNordTrackingId).toLowerCase() !== "null"
+    );
     const [order] = await db
       .insert(orders)
       .values({
@@ -760,6 +765,7 @@ app.post("/api/orders", async (req, res) => {
         total: String(body.total),
         stripePaymentId: body.stripePaymentId ?? null,
         postNordTrackingId: body.postNordTrackingId ?? null,
+        status: hasTrackingId ? "shipped" : "confirmed",
       })
       .returning();
 

@@ -63,6 +63,7 @@ export function AuthModal({
   callbackUrl = "/",
 }: AuthModalProps) {
   const [mode, setMode] = useState<AuthMode>(defaultMode);
+  const [loginMethod, setLoginMethod] = useState<"password" | "emailLink">("password");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -135,20 +136,11 @@ export function AuthModal({
     setError("");
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      await signIn("email", {
+        email: email.trim().toLowerCase(),
         callbackUrl,
+        redirect: true,
       });
-      if (result?.error) {
-        setError("Ogiltig e-post eller lösenord");
-        return;
-      }
-      if (result?.ok) {
-        handleOpenChange(false);
-        window.location.href = callbackUrl;
-      }
     } catch {
       setError("Något gick fel");
     } finally {
@@ -203,7 +195,7 @@ export function AuthModal({
               {mode === "forgot" && "Glömt lösenord?"}
             </DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {mode === "login" && "Ange dina uppgifter för att logga in"}
+              {mode === "login" && "Ange din e-post så skickar vi en inloggningslänk till din mejl"}
               {mode === "register" && "Fyll i uppgifterna för att registrera dig"}
               {mode === "forgot" && "Ange din e-post så skickar vi en återställningslänk"}
             </p>
@@ -297,7 +289,7 @@ export function AuthModal({
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="modal-email" className="text-sm font-medium">
-                  E-postadress <span className="text-destructive">*</span>
+                  {t("auth.email")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="modal-email"
@@ -310,54 +302,12 @@ export function AuthModal({
                   className="h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="modal-password" className="text-sm font-medium">
-                  {t("auth.password")} <span className="text-destructive">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="modal-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="h-10 pr-10"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showPassword ? "Dölj lösenord" : "Visa lösenord"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={rememberMe}
-                    onCheckedChange={(v) => setRememberMe(v === true)}
-                  />
-                  <span className="text-sm font-medium">Kom ihåg mig</span>
-                </label>
-                <button
-                  type="button"
-                  className="text-sm text-muted-foreground hover:text-foreground cursor-pointer"
-                  onClick={() => switchMode("forgot")}
-                >
-                  {t("auth.forgotPassword")}
-                </button>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Vi skickar en inloggningslänk till din e-post. Klicka på länken för att logga in.
+              </p>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
-                {loading ? t("auth.loggingIn") : t("auth.loginToTurbomeck")}
+                {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
               </Button>
             </form>
           ) : (

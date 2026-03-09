@@ -42,6 +42,11 @@ const globalFilterFn: FilterFn<unknown> = (row, _columnId, filterValue) => {
     obj.productName,
     obj.orderId,
     obj.id,
+    obj.orderNumber,
+    obj.address,
+    obj.city,
+    obj.postalCode,
+    obj.postNordTrackingId,
   ]
     .filter(Boolean)
     .map((v) => String(v).toLowerCase());
@@ -59,9 +64,15 @@ const columnLabels: Record<string, string> = {
   productName: "Produkt",
   amount: "Belopp",
   customer: "Kund",
+  fullName: "Kund",
+  phone: "Telefon",
+  address: "Adress",
   date: "Datum",
+  createdAt: "Datum",
   type: "Typ",
   status: "Status",
+  deliveryOption: "Leveranstyp",
+  postNordTrackingId: "Spårningsnr",
   actions: "Åtgärder",
 };
 
