@@ -1,14 +1,13 @@
 import fs from "fs";
 import path from "path";
-import { removeBackground } from "@imgly/background-removal-node";
 
 const TARGET_SIZE = 1200;
 
-/** Resize and save as PNG using Sharp (fast, native). */
+/** Resize and save as PNG using Sharp (fast, native). Uses "contain" to avoid cropping. */
 async function resizeWithSharp(buffer: Buffer, outputPath: string): Promise<void> {
   const sharp = (await import("sharp")).default;
   await sharp(buffer)
-    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "cover", position: "center" })
+    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
     .png({ compressionLevel: 6 })
     .toFile(outputPath);
 }
@@ -17,58 +16,78 @@ async function resizeWithSharp(buffer: Buffer, outputPath: string): Promise<void
 async function resizeWithJimp(buffer: Buffer, outputPath: string): Promise<void> {
   const { default: Jimp } = await import("jimp");
   const image = await Jimp.read(buffer);
-  await image.cover(TARGET_SIZE, TARGET_SIZE).writeAsync(outputPath);
+  image.background(0xffffffff);
+  const contained = image.contain(TARGET_SIZE, TARGET_SIZE);
+  await contained.writeAsync(outputPath);
 }
 
+/** Result of processing a product image - either file path or buffer for R2 upload. */
+export type ProcessProductImageResult =
+  | { outputPath: string; filename: string; buffer?: undefined }
+  | { outputPath?: undefined; filename: string; buffer: Buffer };
+
 /**
- * Process product image: remove background + resize to square.
+ * Process product image: resize to square.
  * Uses Sharp when available; falls back to Jimp on Windows if Sharp fails (ERR_DLOPEN).
+ * When returnBuffer is true, returns buffer instead of writing to disk (for R2 upload).
  */
-export async function processProductImage(inputPath: string): Promise<{ outputPath: string; filename: string }> {
+export async function processProductImage(
+  inputPath: string,
+  returnBuffer = false
+): Promise<ProcessProductImageResult> {
   const ext = path.extname(inputPath);
   const baseName = path.basename(inputPath, ext);
   const dir = path.dirname(inputPath);
   const outputFilename = `${baseName}.png`;
   const outputPath = path.join(dir, outputFilename);
 
-  let imageBuffer: Buffer;
+  const imageBuffer = fs.readFileSync(inputPath);
 
-  const inputBuffer = fs.readFileSync(inputPath);
-  const mimeTypes: Record<string, string> = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-  };
-  const mimeType = mimeTypes[ext.toLowerCase()] || "image/jpeg";
-
+  let finalBuffer: Buffer | undefined;
   try {
-    const inputBlob = new Blob([inputBuffer], { type: mimeType });
-    const blob = await removeBackground(inputBlob, {
-      model: "small",
-      output: { format: "image/png", quality: 0.9 },
-    });
-    imageBuffer = Buffer.from(await blob.arrayBuffer());
-  } catch (err) {
-    console.warn("Background removal failed, using original image:", err);
-    imageBuffer = inputBuffer;
-  }
-
-  try {
-    await resizeWithSharp(imageBuffer, outputPath);
+    if (returnBuffer) {
+      const sharp = (await import("sharp")).default;
+      finalBuffer = await sharp(imageBuffer)
+        .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
+        .png({ compressionLevel: 6 })
+        .toBuffer();
+    } else {
+      await resizeWithSharp(imageBuffer, outputPath);
+    }
   } catch (sharpErr) {
     const msg = String(sharpErr);
     if (msg.includes("ERR_DLOPEN_FAILED") || msg.includes("Could not load the \"sharp\"")) {
-      await resizeWithJimp(imageBuffer, outputPath);
+      if (returnBuffer) {
+        const { default: Jimp } = await import("jimp");
+        const image = await Jimp.read(imageBuffer);
+        const scaled = image.scaleToFit(TARGET_SIZE, TARGET_SIZE);
+        finalBuffer = await scaled.getBufferAsync("image/png");
+      } else {
+        await resizeWithJimp(imageBuffer, outputPath);
+      }
     } else {
       throw sharpErr;
     }
   }
 
-  if (path.resolve(inputPath) !== path.resolve(outputPath)) {
-    fs.unlinkSync(inputPath);
+  if (returnBuffer && !finalBuffer) {
+    throw new Error("Failed to process image to buffer");
   }
 
-  return { outputPath, filename: outputFilename };
+  if (!returnBuffer) {
+    if (path.resolve(inputPath) !== path.resolve(outputPath)) {
+      fs.unlinkSync(inputPath);
+    }
+    return { outputPath, filename: outputFilename };
+  }
+
+  if (path.resolve(inputPath) !== path.resolve(outputPath)) {
+    try {
+      fs.unlinkSync(inputPath);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return { filename: outputFilename, buffer: finalBuffer! };
 }

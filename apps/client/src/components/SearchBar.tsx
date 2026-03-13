@@ -4,10 +4,11 @@ import { Search } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";
 import { ProductType } from "@/types";
 import { productUrl } from "@/lib/utils";
+import { resolveImageUrl } from "@/lib/api";
 
 const DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -86,15 +87,8 @@ const SearchBar = () => {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        const UPLOADS_BASE = process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
-        const resolveImg = (path: string | null) => {
-          if (!path) return "/products/1g.png";
-          if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
-          if (path.startsWith("http")) return path;
-          return path;
-        };
         const products: ProductType[] = (Array.isArray(data) ? data : []).map((p: { id: number; slug?: string; name: string; shortDescription?: string; description?: string; price: number; image?: string | null; thumbnails?: string[] }) => {
-          const img = resolveImg(p.image || p.thumbnails?.[0]);
+          const img = resolveImageUrl(p.image || p.thumbnails?.[0] || null);
           return {
             id: p.id,
             slug: p.slug,
@@ -229,8 +223,8 @@ const SearchBar = () => {
                       className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden bg-gray-100">
-                        <Image
-                          src={product.images?.default || product.galleryImages?.[0] || "/products/1g.png"}
+                        <ImageWithFallback
+                          src={product.images?.default || product.galleryImages?.[0] || "/logo.svg"}
                           alt={product.name}
                           fill
                           className="object-cover"

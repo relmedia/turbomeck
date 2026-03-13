@@ -7,14 +7,16 @@
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/index.ts",
     "check-types": "tsc --noEmit",
+    "delete-r2-images": "tsx --env-file=.env scripts/delete-all-r2-images.ts",
+    "migrate-images": "tsx --env-file=.env scripts/migrate-images-from-turbomeck.ts",
     "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts",
-    "remove-bg": "tsx --env-file=.env scripts/remove-background.ts"
+    "set-r2-cors": "tsx --env-file=.env scripts/set-r2-cors.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@imgly/background-removal-node": "^1.4.5",
+    "@aws-sdk/client-s3": "^3.1008.0",
     "@repo/database": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/express": "^5.0.5",
@@ -22,8 +24,8 @@
     "cors": "^2.8.5",
     "drizzle-orm": "^0.39.0",
     "express": "^5.0.3",
-    "multer": "^2.0.2",
     "jimp": "^0.22.12",
+    "multer": "^2.0.2",
     "sharp": "^0.34.5"
   },
   "devDependencies": {

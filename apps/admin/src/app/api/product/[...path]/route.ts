@@ -31,6 +31,7 @@ export async function POST(
 ) {
   const { path } = await params;
   const pathStr = path.join("/");
+  const isUpload = pathStr.startsWith("upload");
   try {
     const contentType = req.headers.get("content-type") || "";
     let body: FormData | string;
@@ -46,14 +47,30 @@ export async function POST(
     if (typeof body === "string") {
       (fetchInit as Record<string, unknown>).headers = { "Content-Type": contentType || "application/json" };
     }
+    if (isUpload) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+      (fetchInit as RequestInit).signal = controller.signal;
+      try {
+        const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, fetchInit);
+        const text = await res.text();
+        const data = text ? JSON.parse(text) : {};
+        return NextResponse.json(data, { status: res.status });
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
     const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, fetchInit);
     const text = await res.text();
     const data = text ? JSON.parse(text) : {};
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy POST error:", err);
+    const msg = (err as Error)?.cause && String((err as Error).cause).includes("ECONNRESET")
+      ? "Anslutningen avbröts. Bildbehandling kan ta lång tid – försök igen eller kontrollera att product-service körs."
+      : "Kunde inte ansluta till produkt-tjänsten.";
     return NextResponse.json(
-      { error: "Kunde inte ansluta till produkt-tjänsten." },
+      { error: msg },
       { status: 502 }
     );
   }

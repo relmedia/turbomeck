@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
+import { resolveImageUrl } from "@/lib/image-utils";
 
 type OrderItem = {
   productName: string;
@@ -488,7 +489,7 @@ export default function OrderDetailPage() {
                     <td className="py-2">
                       <div className="flex items-center gap-2">
                         <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted">
-                          <img src={item.productImage} alt={item.productName} className="h-full w-full object-cover" />
+                          <img src={resolveImageUrl(item.productImage)} alt={item.productName} className="h-full w-full object-cover" />
                         </div>
                         <div>
                           <span className="font-medium">{item.productName}</span>

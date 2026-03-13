@@ -29,6 +29,7 @@ import {
 import Image from "next/image";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PRODUCT_API } from "@/lib/product-api";
+import { resolveImageUrl } from "@/lib/image-utils";
 
 type Category = {
   id: number;
@@ -112,7 +113,7 @@ export default function ProductViewPage() {
   };
 
   const allImages = product
-    ? [product.image, ...(product.thumbnails ?? [])].filter(Boolean) as string[]
+    ? [product.image, ...(product.thumbnails ?? [])].filter(Boolean).map(resolveImageUrl) as string[]
     : [];
 
   const categoryNames = (product?.categoryIds ?? [])

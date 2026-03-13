@@ -5,7 +5,7 @@ import { useLanguage, useTranslation } from "@/i18n/context";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import {
   Package,
   ExternalLink,
@@ -514,8 +514,8 @@ export default function AccountPage() {
                         href={productUrl(product)}
                         className="relative w-16 h-16 shrink-0 rounded-md overflow-hidden bg-muted"
                       >
-                        <Image
-                          src={product.galleryImages?.[0] ?? product.images?.default ?? ""}
+                        <ImageWithFallback
+                          src={product.galleryImages?.[0] ?? product.images?.default ?? "/logo.svg"}
                           alt={product.name}
                           fill
                           className="object-cover"

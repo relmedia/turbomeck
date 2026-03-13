@@ -2,6 +2,8 @@ import { ProductType } from "@/types";
 import { PRODUCT_API } from "./product-api";
 const UPLOADS_BASE =
   process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
+/** Public R2 base URL (e.g. https://pub-xxx.r2.dev) – used to rewrite S3 endpoint URLs which return 400 for unauthenticated requests */
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 export type ApiCategory = {
   id: number;
@@ -29,10 +31,26 @@ export type ApiProduct = {
   updatedAt: string;
 };
 
-function resolveImageUrl(path: string | null): string {
-  if (!path) return "/products/1g.png";
+/**
+ * Resolve image URL for display. Rewrites R2 S3 endpoint URLs (r2.cloudflarestorage.com)
+ * to the public R2 URL when NEXT_PUBLIC_R2_PUBLIC_URL is set – the S3 endpoint returns
+ * 400 for unauthenticated requests.
+ */
+export function resolveImageUrl(path: string | null): string {
+  if (!path) return "/logo.svg";
   if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
-  if (path.startsWith("http")) return path;
+  if (path.startsWith("http")) {
+    if (R2_PUBLIC_URL && path.includes("r2.cloudflarestorage.com")) {
+      try {
+        const url = new URL(path);
+        const base = R2_PUBLIC_URL.replace(/\/$/, "");
+        return `${base}${url.pathname}`;
+      } catch {
+        return path;
+      }
+    }
+    return path;
+  }
   return path;
 }
 

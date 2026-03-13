@@ -1,23 +1,14 @@
 "use client";
 
 import type { Order } from "@/lib/api";
+import { resolveImageUrl } from "@/lib/api";
 import { useLanguage, useTranslation } from "@/i18n/context";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
-
-const UPLOADS_BASE =
-  process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
-
-function resolveImageUrl(path: string | null): string {
-  if (!path) return "/products/1g.png";
-  if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
-  if (path.startsWith("http")) return path;
-  return path;
-}
 
 type OrderDetailModalProps = {
   order: Order | null;
@@ -110,7 +101,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 {order.items!.map((item) => (
                   <li key={item.id} className="flex gap-3">
                     <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-                      <Image
+                      <ImageWithFallback
                         src={resolveImageUrl(item.productImage)}
                         alt={item.productName || t("orderDetail.product")}
                         fill

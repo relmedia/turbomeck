@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+function getR2ImagePattern() {
+  try {
+    const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+    if (!url) return [];
+    return [{ protocol: "https" as const, hostname: new URL(url).hostname, pathname: "/**" }];
+  } catch {
+    return [];
+  }
+}
+
 const nextConfig: NextConfig = {
   env: {
     // Must be inlined for client - next-auth defaults to :3000 otherwise
@@ -27,6 +37,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
+      // R2 S3 endpoint (fallback; set NEXT_PUBLIC_R2_PUBLIC_URL for public URLs)
+      { protocol: "https", hostname: "10249571bfc72d7eb7816158e9d29a34.r2.cloudflarestorage.com", pathname: "/**" },
+      // R2 public URL – set NEXT_PUBLIC_R2_PUBLIC_URL=https://pub-xxx.r2.dev for working images
+      ...getR2ImagePattern(),
     ],
   },
 };

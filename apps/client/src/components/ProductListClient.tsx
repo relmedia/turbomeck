@@ -6,6 +6,7 @@ import { useLanguage } from "@/i18n/context";
 import Categories from "./Categories";
 import { ProductsToolbar } from "./ProductsToolbar";
 import { ProductListContent } from "./ProductListContent";
+import { ProductCardSkeleton } from "./ProductCardSkeleton";
 import { fetchProducts, fetchCategories } from "@/lib/api";
 import { getCategoryIdsForFilter } from "@/lib/utils";
 
@@ -131,10 +132,7 @@ export function ProductListClient({
         {params === "products" && <ProductsToolbar />}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
           {[...Array(8)].map((_, i) => (
-            <div
-              key={i}
-              className="h-80 rounded-lg bg-muted/50 animate-pulse"
-            />
+            <ProductCardSkeleton key={i} />
           ))}
         </div>
       </div>

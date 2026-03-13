@@ -7,16 +7,18 @@ import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
 import { eq, inArray, desc, sql } from "drizzle-orm";
 import { processProductImage } from "./image-utils.js";
+import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Configure multer for file uploads
+// Configure multer for file uploads (temp dir for R2, otherwise admin/public/uploads)
 const UPLOAD_DIR = path.resolve(__dirname, "../../admin/public/uploads");
+const USE_R2 = isR2Configured();
 
-// Ensure upload directory exists
+// Ensure upload directory exists (for local storage or temp when migrating)
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -55,7 +57,7 @@ app.use(
   })
 );
 
-// Upload image endpoint
+// Upload image endpoint (R2 or local)
 app.post("/api/upload", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -64,14 +66,32 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
 
     const inputPath = path.join(UPLOAD_DIR, req.file.filename);
 
-    const { filename } = await processProductImage(inputPath);
-
-    const imageUrl = `/uploads/${filename}`;
-    res.json({
-      success: true,
-      url: imageUrl,
-      filename,
-    });
+    if (USE_R2) {
+      const result = await processProductImage(inputPath, true);
+      if (!result.buffer) {
+        return res.status(500).json({ error: "Failed to process image" });
+      }
+      const imageUrl = await uploadToR2(result.filename, result.buffer, "image/png");
+      // Clean up local temp file
+      try {
+        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      } catch {
+        /* ignore */
+      }
+      res.json({
+        success: true,
+        url: imageUrl,
+        filename: result.filename,
+      });
+    } else {
+      const { filename } = await processProductImage(inputPath);
+      const imageUrl = `/uploads/${filename}`;
+      res.json({
+        success: true,
+        url: imageUrl,
+        filename,
+      });
+    }
   } catch (error) {
     console.error("Error uploading file:", error);
     res.status(500).json({ error: "Failed to upload file" });
@@ -81,55 +101,39 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
 // List upload files (for attaching existing files to products)
 app.get("/api/upload", async (req, res) => {
   try {
-    const files = fs.readdirSync(UPLOAD_DIR);
-    const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
-    const imageFiles = files
-      .filter((f) => imageExtensions.includes(path.extname(f).toLowerCase()))
-      .map((f) => `/uploads/${f}`)
-      .sort();
-    res.json({ files: imageFiles });
+    if (USE_R2) {
+      const files = await listR2Products();
+      res.json({ files });
+    } else {
+      const dirFiles = fs.readdirSync(UPLOAD_DIR);
+      const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+      const files = dirFiles
+        .filter((f) => imageExtensions.includes(path.extname(f).toLowerCase()))
+        .map((f) => `/uploads/${f}`)
+        .sort();
+      res.json({ files });
+    }
   } catch (error) {
     console.error("Error listing uploads:", error);
     res.status(500).json({ error: "Failed to list uploads" });
   }
 });
 
-// Remove background from existing image
-app.post("/api/upload/remove-background", express.json(), async (req, res) => {
-  try {
-    const { filename, url } = req.body || {};
-    const basename =
-      typeof filename === "string"
-        ? filename.replace(/^.*[/\\]/, "")
-        : typeof url === "string"
-          ? url.replace(/^.*[/\\]/, "").split("?")[0]
-          : null;
-    if (!basename) {
-      return res.status(400).json({ error: "filename or url required" });
-    }
-    const filePath = path.join(UPLOAD_DIR, basename);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found" });
-    }
-    const { filename: outFilename } = await processProductImage(filePath);
-    res.json({ success: true, url: `/uploads/${outFilename}`, filename: outFilename });
-  } catch (error) {
-    console.error("Error removing background:", error);
-    res.status(500).json({ error: "Failed to remove background" });
-  }
-});
-
 // Delete image endpoint
-app.delete("/api/upload/:filename", (req, res) => {
+app.delete("/api/upload/:filename", async (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(UPLOAD_DIR, filename);
-
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (USE_R2) {
+      await deleteFromR2(filename);
       res.json({ success: true, message: "File deleted successfully" });
     } else {
-      res.status(404).json({ error: "File not found" });
+      const filePath = path.join(UPLOAD_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        res.json({ success: true, message: "File deleted successfully" });
+      } else {
+        res.status(404).json({ error: "File not found" });
+      }
     }
   } catch (error) {
     console.error("Error deleting file:", error);

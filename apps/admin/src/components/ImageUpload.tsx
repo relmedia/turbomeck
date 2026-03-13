@@ -3,9 +3,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, X, Loader2, ImageIcon, Eraser } from "lucide-react";
+import { Upload, X, Loader2, ImageIcon } from "lucide-react";
 import Image from "next/image";
 import { PRODUCT_API } from "@/lib/product-api";
+import { resolveImageUrl } from "@/lib/image-utils";
 
 interface ImageUploadProps {
   value?: string | null;
@@ -15,33 +16,9 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleRemoveBackground = async () => {
-    if (!value) return;
-    setIsRemovingBg(true);
-    setError(null);
-    try {
-      const res = await fetch(`${PRODUCT_API}/upload/remove-background`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: value }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Kunde inte ta bort bakgrund.");
-      }
-      const data = await res.json();
-      onChange(data.url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunde inte ta bort bakgrund.");
-    } finally {
-      setIsRemovingBg(false);
-    }
-  };
 
   const handleUpload = async (file: File) => {
     if (!file) return;
@@ -139,7 +116,7 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
         <div className="relative">
           <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted border">
             <Image
-              src={value}
+              src={resolveImageUrl(value)}
               alt="Uploaded image"
               fill
               className="object-contain"
@@ -149,26 +126,11 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
           <div className="absolute top-2 right-2 flex gap-1">
             <Button
               type="button"
-              variant="secondary"
-              size="icon"
-              className="cursor-pointer"
-              onClick={handleRemoveBackground}
-              disabled={disabled || isUploading || isRemovingBg}
-              title="Ta bort bakgrund"
-            >
-              {isRemovingBg ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Eraser className="w-4 h-4" />
-              )}
-            </Button>
-            <Button
-              type="button"
               variant="destructive"
               size="icon"
               className="cursor-pointer"
               onClick={handleRemove}
-              disabled={disabled || isUploading || isRemovingBg}
+              disabled={disabled || isUploading}
               title="Ta bort bild"
             >
               <X className="w-4 h-4" />

@@ -1,6 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -74,11 +73,38 @@ function SignInContent() {
     setLoading(true);
     form.setError("root", { message: "" });
     try {
-      await signIn("email", {
+      const csrfRes = await fetch("/api/auth/csrf");
+      const csrfText = await csrfRes.text();
+      if (!csrfRes.ok) {
+        throw new Error("Kunde inte hämta säkerhetstoken. Försök igen.");
+      }
+      let csrfToken: string;
+      try {
+        const csrfData = JSON.parse(csrfText);
+        csrfToken = csrfData?.csrfToken ?? "";
+      } catch {
+        throw new Error("Ogiltigt svar från servern. Försök igen.");
+      }
+      if (!csrfToken) {
+        throw new Error("Saknar säkerhetstoken.");
+      }
+      const params = new URLSearchParams({
+        csrfToken,
         email: values.email,
         callbackUrl,
-        redirect: true,
       });
+      const res = await fetch("/api/auth/signin/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        const match = text.match(/error=([^&"'\s]+)/);
+        throw new Error(match ? decodeURIComponent(match[1]) : "Inloggningen misslyckades");
+      }
+      const targetUrl = res.redirected && res.url ? res.url : "/logga-in/verify";
+      window.location.href = targetUrl;
     } catch (err) {
       form.setError("root", { message: err instanceof Error ? err.message : "Något gick fel" });
     } finally {

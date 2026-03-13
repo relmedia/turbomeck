@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
+import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,11 +41,11 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                   className="relative shrink-0 aspect-square"
                   style={{ width: `${100 / displayImages.length}%` }}
                 >
-                  <Image
+                  <ImageWithFallback
                     src={src}
                     alt={alt}
                     fill
-                    className="object-contain"
+                    className="object-cover"
                     sizes="(max-width: 1024px) 100vw, 40vw"
                     priority={i === 0}
                   />
@@ -111,11 +111,11 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                         i === selectedIndex ? "opacity-100" : "opacity-60 hover:opacity-80"
                       }`}
                     >
-                      <Image
+                      <ImageWithFallback
                         src={src}
                         alt={`${alt} - bild ${i + 1}`}
                         fill
-                        className="object-contain"
+                        className="object-cover"
                         sizes="80px"
                       />
                     </button>

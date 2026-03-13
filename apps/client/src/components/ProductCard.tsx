@@ -9,13 +9,14 @@ import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShoppingCart, Heart, Star } from "lucide-react";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useTranslation } from "@/i18n/context";
 
 const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const t = useTranslation();
+  const [imageLoaded, setImageLoaded] = useState(false);
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
   const hasVariants =
     (product.sizes.length > 1 || product.sizes[0] !== "-") &&
@@ -69,7 +70,10 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
     <div className="flex flex-col h-full shadow-lg rounded-lg overflow-hidden">
       {/* IMAGE */}
       <Link href={productUrl(product)}>
-        <div className="relative aspect-square overflow-hidden bg-muted shrink-0 group">
+        <div className="relative aspect-[4/3] overflow-hidden bg-muted shrink-0 group">
+          {!imageLoaded && (
+            <Skeleton className="absolute inset-0 z-0 rounded-none" />
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -90,11 +94,12 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               className={`w-4 h-4 ${isInWishlist(Number(product.id)) ? "fill-red-500 text-red-500" : ""}`}
             />
           </button>
-          <Image
-            src={product.images?.[productTypes.color] || ""}
+          <ImageWithFallback
+            src={product.images?.[productTypes.color] || "/logo.svg"}
             alt={product.name}
             fill
-            className="object-cover hover:scale-105 transition-all duration-300"
+            className="object-cover hover:scale-[1.02] transition-all duration-300 relative z-10"
+            onLoad={() => setImageLoaded(true)}
           />
         </div>
       </Link>

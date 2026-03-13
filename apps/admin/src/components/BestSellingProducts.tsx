@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw } from "lucide-react";
 import Image from "next/image";
+import { resolveImageUrl } from "@/lib/image-utils";
 import Link from "next/link";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -113,7 +114,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
                 {p.image ? (
                   <Image
-                    src={p.image}
+                    src={resolveImageUrl(p.image)}
                     alt={p.name}
                     fill
                     className="object-cover"

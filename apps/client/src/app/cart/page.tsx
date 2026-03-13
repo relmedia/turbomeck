@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import { getShippingPrice } from "@/lib/postnord";
@@ -509,7 +509,7 @@ function CartItemRow({
   return (
     <div className="flex gap-4 py-4 border-b border-border last:border-0">
       <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted">
-        <Image
+        <ImageWithFallback
           src={imageSrc}
           alt={item.name}
           fill

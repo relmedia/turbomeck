@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal, Star } from "lucide-react";
 import Image from "next/image";
+import { resolveImageUrl } from "@/lib/image-utils";
 import Link from "next/link";
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -145,7 +146,7 @@ export const createColumns = (
           <div className="w-12 h-12 relative rounded-md overflow-hidden bg-muted shrink-0">
             {product.image ? (
               <Image
-                src={product.image}
+                src={resolveImageUrl(product.image)}
                 alt={product.name}
                 fill
                 className="object-cover"

@@ -3,25 +3,16 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/i18n/context";
 import type { Order } from "@/lib/api";
+import { resolveImageUrl } from "@/lib/api";
 import type { MyReview } from "@/lib/api";
 import { fetchMyReviews, createReview, updateReview } from "@/lib/api";
 import { Star, X, Pencil, Lock, Info } from "lucide-react";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
-
-const UPLOADS_BASE =
-  process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
-
-function resolveImageUrl(path: string | null): string {
-  if (!path) return "/products/1g.png";
-  if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
-  if (path.startsWith("http")) return path;
-  return path;
-}
 
 function OrderItemReviewForm({
   productId,
@@ -70,7 +61,7 @@ function OrderItemReviewForm({
     <form onSubmit={handleSubmit} className="space-y-3 p-4 rounded-lg border bg-muted/30">
       <div className="flex gap-3">
         <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-          <Image
+          <ImageWithFallback
             src={resolveImageUrl(productImage)}
             alt={productName}
             fill
@@ -185,7 +176,7 @@ function OrderItemReviewCard({
       <form onSubmit={handleSave} className="p-4 rounded-lg border bg-muted/30 space-y-3">
         <div className="flex gap-3">
           <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-            <Image
+            <ImageWithFallback
               src={resolveImageUrl(item.productImage)}
               alt={item.productName}
               fill
@@ -254,7 +245,7 @@ function OrderItemReviewCard({
     <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
       <div className="flex gap-3">
         <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-          <Image
+          <ImageWithFallback
             src={resolveImageUrl(item.productImage)}
             alt={item.productName}
             fill

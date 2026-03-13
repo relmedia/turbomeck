@@ -13,8 +13,8 @@
     "db:generate": "pnpm --filter @repo/database db:generate",
     "db:migrate": "pnpm --filter @repo/database db:migrate",
     "db:studio": "pnpm --filter @repo/database db:studio",
-    "remove-bg": "pnpm --filter product-service remove-bg",
-    "regenerate-images": "pnpm --filter product-service remove-bg"
+    "delete-r2-images": "pnpm --filter product-service delete-r2-images",
+    "migrate-images": "pnpm --filter product-service migrate-images"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
