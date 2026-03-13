@@ -115,6 +115,16 @@ export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]
   return data.map(apiProductToProductType);
 }
 
+/** Fetch products featured in the homepage slider (featuredInSlider=1, ordered by sliderOrder) */
+export async function fetchSliderProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
+  const params = new URLSearchParams({ featuredInSlider: "1" });
+  if (locale) params.set("locale", locale);
+  const res = await fetchWithRetry(`${PRODUCT_API}/products?${params}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data: ApiProduct[] = await res.json();
+  return data.map(apiProductToProductType);
+}
+
 export type OrderItem = {
   id: number;
   productId: number | null;

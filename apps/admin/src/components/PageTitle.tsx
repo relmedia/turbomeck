@@ -22,6 +22,7 @@ export function PageTitle() {
     if (pathname.startsWith("/studio/reviews")) return "Recensioner";
     if (pathname.startsWith("/studio/account")) return "Konto";
     if (pathname.startsWith("/studio/settings")) return "Inställningar";
+    if (pathname.startsWith("/studio/slider")) return "Startsidan slider";
     return "Dashboard";
   };
 

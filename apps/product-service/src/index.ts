@@ -6,7 +6,7 @@ import fs from "fs";
 import os from "os";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
-import { eq, inArray, desc, sql } from "drizzle-orm";
+import { eq, inArray, desc, asc, sql } from "drizzle-orm";
 import { processProductImage } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 
@@ -347,10 +347,11 @@ async function getProductCategoryIds(productIds: number[]): Promise<Map<number, 
   return map;
 }
 
-// GET all products (optional ?ids=1,2,3 for filtering, ?locale=sv|en for translated content)
+// GET all products (optional ?ids=1,2,3 for filtering, ?featuredInSlider=1 for homepage slider, ?locale=sv|en for translated content)
 app.get("/api/products", async (req, res) => {
   try {
     const idsParam = req.query.ids as string | undefined;
+    const featuredInSliderParam = req.query.featuredInSlider === "1" || req.query.featuredInSlider === "true";
     const locale = (req.query.locale as string) || "sv";
     const filterIds = idsParam
       ? idsParam.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
@@ -370,12 +371,23 @@ app.get("/api/products", async (req, res) => {
       weight: products.weight,
       attributes: products.attributes,
       depositAmount: products.depositAmount,
+      featuredInSlider: products.featuredInSlider,
+      sliderOrder: products.sliderOrder,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     };
-    const allProducts = filterIds?.length
-      ? await db.select(productCols).from(products).where(inArray(products.id, filterIds))
-      : await db.select(productCols).from(products);
+    let allProducts;
+    if (featuredInSliderParam) {
+      allProducts = await db
+        .select(productCols)
+        .from(products)
+        .where(eq(products.featuredInSlider, 1))
+        .orderBy(asc(products.sliderOrder), asc(products.id));
+    } else if (filterIds?.length) {
+      allProducts = await db.select(productCols).from(products).where(inArray(products.id, filterIds));
+    } else {
+      allProducts = await db.select(productCols).from(products);
+    }
     const productIds = allProducts.map((p) => p.id);
     const categoryMap = await getProductCategoryIds(productIds);
     const formatted = allProducts.map((p) => {
@@ -394,6 +406,8 @@ app.get("/api/products", async (req, res) => {
       categoryIds: categoryMap.get(p.id) ?? [],
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
+      featuredInSlider: (p as { featuredInSlider?: number | null }).featuredInSlider ?? 0,
+      sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     };
@@ -607,7 +621,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, depositAmount } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, depositAmount, featuredInSlider, sliderOrder } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -638,6 +652,13 @@ app.put("/api/products/:id", async (req, res) => {
     if (depositAmount !== undefined) {
       const da = depositAmount != null && String(depositAmount).trim() !== "" ? Number(depositAmount) : NaN;
       updateData.depositAmount = !Number.isNaN(da) && da > 0 ? String(da) : null;
+    }
+    if (featuredInSlider !== undefined) {
+      updateData.featuredInSlider = featuredInSlider === true || featuredInSlider === 1 || featuredInSlider === "1" ? 1 : 0;
+    }
+    if (sliderOrder !== undefined) {
+      const so = sliderOrder != null && String(sliderOrder).trim() !== "" ? Number(sliderOrder) : NaN;
+      updateData.sliderOrder = !Number.isNaN(so) && so >= 0 ? so : null;
     }
 
     const updated = await db.update(products).set(updateData).where(eq(products.id, id)).returning();

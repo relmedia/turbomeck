@@ -4,17 +4,18 @@ import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import {
   Home,
-  Star,
-  Settings,
+  ImageIcon,
   Plus,
   Package,
+  Settings,
+  Star,
+  Tag,
+  Truck,
   User,
   ShoppingBag,
   FolderTree,
   LogOut,
   EllipsisVertical,
-  Tag,
-  Truck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,6 +50,11 @@ const items = [
     title: "Dashboard",
     url: "/studio",
     icon: Home,
+  },
+  {
+    title: "Startsidan slider",
+    url: "/studio/slider",
+    icon: ImageIcon,
   },
   {
     title: "Recensioner",

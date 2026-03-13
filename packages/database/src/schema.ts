@@ -76,6 +76,9 @@ export const products = pgTable("products", {
   attributes: jsonb("attributes").$type<{ name: string; options: string[] }[]>().default([]),
   /** Core exchange: requires customer to send old part first. Deposit (SEK) paid upfront; balance paid after new part shipped */
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
+  /** Homepage slider: 1 = show in slider, 0 = hide; sliderOrder = display order (lower first) */
+  featuredInSlider: integer("featured_in_slider").default(0),
+  sliderOrder: integer("slider_order"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
