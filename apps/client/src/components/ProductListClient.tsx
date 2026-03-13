@@ -130,7 +130,7 @@ export function ProductListClient({
       <div className="w-full">
         <Categories categories={categories} />
         {params === "products" && <ProductsToolbar />}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {[...Array(8)].map((_, i) => (
             <ProductCardSkeleton key={i} />
           ))}

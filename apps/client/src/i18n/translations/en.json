@@ -86,7 +86,9 @@
     "refundPolicy": "Refund Policy",
     "home": "Home",
     "products": "Products",
-    "notFound": "Product not found"
+    "notFound": "Product not found",
+    "adding": "Adding...",
+    "selectVariant": "Select variant before adding to cart."
   },
   "reviews": {
     "title": "Reviews",

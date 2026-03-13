@@ -86,7 +86,9 @@
     "refundPolicy": "Återbetalningspolicy",
     "home": "Hem",
     "products": "Produkter",
-    "notFound": "Produkt hittades inte"
+    "notFound": "Produkt hittades inte",
+    "adding": "Lägger till...",
+    "selectVariant": "Välj variant innan du lägger i varukorgen."
   },
   "reviews": {
     "title": "Recensioner",
