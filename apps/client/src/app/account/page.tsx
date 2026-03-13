@@ -877,9 +877,11 @@ export default function AccountPage() {
               <Key className="w-4 h-4" />
               {t("account.changePasswordTitle")}
             </DialogTitle>
-            <DialogDescription>
-              {t("account.changePasswordDesc")}
-            </DialogDescription>
+            {profile?.hasPassword !== false && (
+              <DialogDescription>
+                {t("account.changePasswordDesc")}
+              </DialogDescription>
+            )}
           </DialogHeader>
           {profile?.hasPassword === false ? (
             <p className="text-sm text-muted-foreground">

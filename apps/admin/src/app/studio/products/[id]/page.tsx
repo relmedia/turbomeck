@@ -72,6 +72,7 @@ type Product = {
   thumbnails: string[];
   stock: number;
   weight: number | null;
+  depositAmount?: number | null;
   categoryIds: number[];
   createdAt: string;
   updatedAt: string;
@@ -107,6 +108,7 @@ export default function ProductDetailPage() {
     price: string;
     stock: string;
     weight: string;
+    depositAmount: string;
     categoryIds: number[];
     attributes: { name: string; options: string[] }[];
     image: string | null;
@@ -121,6 +123,7 @@ export default function ProductDetailPage() {
     price: "",
     stock: "",
     weight: "",
+    depositAmount: "",
     categoryIds: [],
     image: null,
     thumbnails: [],
@@ -151,6 +154,7 @@ export default function ProductDetailPage() {
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
         weight: data.weight != null ? data.weight.toString() : "",
+        depositAmount: data.depositAmount != null ? data.depositAmount.toString() : "",
         categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
         attributes: Array.isArray(data.attributes)
           ? data.attributes.filter((a: { name?: string; options?: string[] }) => a?.name && Array.isArray(a?.options))
@@ -287,6 +291,7 @@ export default function ProductDetailPage() {
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
           weight: formData.weight ? Number(formData.weight) : null,
+          depositAmount: formData.depositAmount ? Number(formData.depositAmount) : null,
           categoryIds: Array.isArray(formData.categoryIds) ? formData.categoryIds : [],
           attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
           image: formData.image ?? null,
@@ -381,7 +386,8 @@ export default function ProductDetailPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-6 md:px-6 border-b border-border">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-semibold tracking-tight">
             {formData.name || "Redigera produkt"}
           </h1>
@@ -426,6 +432,7 @@ export default function ProductDetailPage() {
               {saving ? "Sparar..." : "Spara"}
             </Button>
           </div>
+          </div>
         </div>
       </div>
 
@@ -447,7 +454,7 @@ export default function ProductDetailPage() {
                 <Input
                   id="name"
                   name="name"
-                  value={formData.name}
+                  value={formData.name ?? ""}
                   onChange={handleInputChange}
                   placeholder="Ange produktnamn"
                 />
@@ -458,7 +465,7 @@ export default function ProductDetailPage() {
                 <Input
                   id="shortDescription"
                   name="shortDescription"
-                  value={formData.shortDescription}
+                  value={formData.shortDescription ?? ""}
                   onChange={handleInputChange}
                   placeholder="Kort beskrivning för produktlistan"
                 />
@@ -511,7 +518,7 @@ export default function ProductDetailPage() {
                     <Input
                       id="shortDescriptionEn"
                       name="shortDescriptionEn"
-                      value={formData.shortDescriptionEn}
+                      value={formData.shortDescriptionEn ?? ""}
                       onChange={handleInputChange}
                       placeholder="Short description (English)"
                     />
@@ -520,7 +527,7 @@ export default function ProductDetailPage() {
                     <Label htmlFor="descriptionEn">Fullständig beskrivning (engelska)</Label>
                     <RichTextEditor
                       id="descriptionEn"
-                      value={formData.descriptionEn}
+                      value={formData.descriptionEn ?? ""}
                       onChange={(html) => {
                         setFormData((prev) => ({ ...prev, descriptionEn: html }));
                       }}
@@ -604,7 +611,7 @@ export default function ProductDetailPage() {
                     name="price"
                     type="number"
                     step="0.01"
-                    value={formData.price}
+                    value={formData.price ?? ""}
                     onChange={handleInputChange}
                     placeholder="0.00"
                   />
@@ -615,7 +622,7 @@ export default function ProductDetailPage() {
                     id="stock"
                     name="stock"
                     type="number"
-                    value={formData.stock}
+                    value={formData.stock ?? ""}
                     onChange={handleInputChange}
                     placeholder="0"
                   />
@@ -628,9 +635,22 @@ export default function ProductDetailPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={formData.weight}
+                    value={formData.weight ?? ""}
                     onChange={handleInputChange}
                     placeholder="t.ex. 2.5"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="depositAmount">Deposition (kr) – kärnbyte</Label>
+                  <Input
+                    id="depositAmount"
+                    name="depositAmount"
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.depositAmount ?? ""}
+                    onChange={handleInputChange}
+                    placeholder="0 = full betalning"
                   />
                 </div>
                 <div className="space-y-4 col-span-2">

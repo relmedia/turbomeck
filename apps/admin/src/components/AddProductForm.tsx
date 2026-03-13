@@ -65,6 +65,7 @@ const formSchema = z.object({
   }),
   stock: z.coerce.number().min(0).default(0),
   weight: z.coerce.number().min(0).optional().nullable(),
+  depositAmount: z.coerce.number().min(0).optional().nullable(),
   image: z.string().nullable().optional(),
   thumbnails: z.array(z.string()).optional().default([]),
   categoryIds: z.array(z.number()).optional().default([]),
@@ -100,6 +101,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       price: 0,
       stock: 0,
       weight: undefined,
+      depositAmount: undefined,
       image: null,
       thumbnails: [],
       categoryIds: [],
@@ -203,6 +205,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           price: values.price,
           stock: values.stock,
           weight: values.weight ?? null,
+          depositAmount: values.depositAmount != null && values.depositAmount > 0 ? values.depositAmount : null,
           image: values.image || null,
           thumbnails: values.thumbnails ?? [],
           categoryIds: values.categoryIds ?? [],
@@ -441,6 +444,39 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                     ref={field.ref}
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="depositAmount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Deposition (kr) – Kärnbyte</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="1"
+                    min={0}
+                    placeholder="0 = full betalning"
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : Number(e.target.value)
+                      )
+                    }
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Om kund skickar in gammal del: deposition nu, återstod efter mottagen del.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

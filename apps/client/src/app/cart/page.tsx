@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import { getShippingPrice } from "@/lib/postnord";
@@ -47,6 +48,8 @@ const CartPage: React.FC = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [savedAddress, setSavedAddress] = useState<SavedAddress | undefined>();
+  const [geoCountry, setGeoCountry] = useState<string | null>(null);
+
   useEffect(() => {
     if (userId) {
       fetch("/api/user/me")
@@ -56,6 +59,13 @@ const CartPage: React.FC = () => {
       setSavedAddress(undefined);
     }
   }, [userId]);
+
+  useEffect(() => {
+    fetch("/api/geo/country")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setGeoCountry(d?.country ?? null))
+      .catch(() => setGeoCountry(null));
+  }, []);
 
   const deliveryOption =
     shippingForm?.deliveryOption ?? shippingPreview?.deliveryOption ?? "servicepoint";
@@ -116,6 +126,15 @@ const CartPage: React.FC = () => {
         ? shippingFromApi
         : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
   const total = subtotal - discount + shipping;
+
+  // Deposit flow: only for Sweden, determined by IP geolocation. Shipping form country does not affect deposit.
+  const orderDeposit = cart.reduce(
+    (acc, item) => acc + (item.depositAmount ?? 0) * item.quantity,
+    0
+  );
+  const isDepositOrder = orderDeposit > 0 && geoCountry === "SE";
+  const balanceDue = isDepositOrder ? Math.max(0, total - orderDeposit) : 0;
+  const amountToCharge = isDepositOrder ? orderDeposit : total;
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
@@ -188,7 +207,7 @@ const CartPage: React.FC = () => {
       title: t("cart.paymentMethod"),
       content: shippingForm ? (
         <PaymentForm
-          total={total}
+          total={amountToCharge}
           getOrderPayload={() => ({
             userId: userId ?? undefined,
             email: shippingForm!.email,
@@ -206,6 +225,8 @@ const CartPage: React.FC = () => {
             shippingCost: shipping,
             discount,
             total,
+            depositAmount: isDepositOrder ? orderDeposit : undefined,
+            balanceDue: isDepositOrder ? balanceDue : undefined,
             postNordTrackingId: undefined,
             items: cart.map((item) => ({
               productId: typeof item.id === "number" ? item.id : undefined,
@@ -263,6 +284,8 @@ const CartPage: React.FC = () => {
                 shippingCost: shipping,
                 discount,
                 total,
+                depositAmount: isDepositOrder ? orderDeposit : undefined,
+                balanceDue: isDepositOrder ? balanceDue : undefined,
                 stripePaymentId: result.stripePaymentId,
                 postNordTrackingId: postNordTrackingId ?? undefined,
                 items: cart.map((item) => ({
@@ -369,6 +392,31 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
+              {isDepositOrder && (
+                <>
+                  <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                    <span>{t("cart.depositNow")}</span>
+                    <span className="font-medium">
+                      {orderDeposit.toLocaleString("sv-SE", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      kr
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground text-xs">
+                    <span>{t("cart.balanceLater")}</span>
+                    <span>
+                      {balanceDue.toLocaleString("sv-SE", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      kr
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("cart.depositInfo")}</p>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.vat")}</span>
                 <span className="font-medium">
@@ -380,9 +428,9 @@ const CartPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-1">
-                <span>{t("cart.total")}</span>
+                <span>{isDepositOrder ? t("cart.depositNow") : t("cart.total")}</span>
                 <span>
-                  {total.toLocaleString("sv-SE", {
+                  {amountToCharge.toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
                   })}{" "}
@@ -449,36 +497,48 @@ const CartPage: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Checkout Forms */}
+        {/* RIGHT COLUMN - Checkout Forms or Login Prompt */}
         <div className="lg:w-3/5 space-y-4">
-          {sections.map((section) => (
-            <div
-              key={section.id}
-              className="bg-card border rounded-lg overflow-hidden"
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setExpandedSection(
-                    expandedSection === section.id ? expandedSection : section.id
-                  )
-                }
-                className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors"
-              >
-                {section.title}
-                {expandedSection === section.id ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
-              {expandedSection === section.id && (
-                <div className="px-4 pb-4 border-t border-border pt-4">
-                  {section.content}
-                </div>
-              )}
+          {!session ? (
+            <div className="bg-card border rounded-lg p-8 flex flex-col items-center justify-center text-center gap-4">
+              <h3 className="text-lg font-semibold">{t("cart.loginToComplete")}</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                {t("cart.loginToCompleteDesc")}
+              </p>
+              <Button asChild>
+                <Link href="/logga-in?callbackUrl=%2Fcart">{t("nav.login")}</Link>
+              </Button>
             </div>
-          ))}
+          ) : (
+            sections.map((section) => (
+              <div
+                key={section.id}
+                className="bg-card border rounded-lg overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedSection(
+                      expandedSection === section.id ? expandedSection : section.id
+                    )
+                  }
+                  className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors"
+                >
+                  {section.title}
+                  {expandedSection === section.id ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+                {expandedSection === section.id && (
+                  <div className="px-4 pb-4 border-t border-border pt-4">
+                    {section.content}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

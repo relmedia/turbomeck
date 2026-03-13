@@ -304,7 +304,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
                   <SelectItem key={c.code} value={c.code}>
                     <span className="flex items-center gap-2">
                       <CountryFlag code={c.code} />
-                      <span>{t(`shipping.country.${c.code}`)}</span>
+                      <span>{t(`shipping.countryNames.${c.code}`)}</span>
                     </span>
                   </SelectItem>
                 ))}

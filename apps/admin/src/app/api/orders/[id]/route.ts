@@ -4,7 +4,7 @@ import { orders, orderItems } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-const VALID_STATUSES = ["confirmed", "shipped", "delivered", "cancelled"] as const;
+const VALID_STATUSES = ["confirmed", "deposit_paid", "shipped", "delivered", "cancelled", "completed"] as const;
 
 /** PATCH /api/orders/[id] - Admin update order status and tracking */
 export async function PATCH(
@@ -41,6 +41,9 @@ export async function PATCH(
     }
     if (postNordTrackingId !== undefined) {
       updates.postNordTrackingId = postNordTrackingId === "" ? null : String(postNordTrackingId).trim() || null;
+    }
+    if (coreReceived === true) {
+      updates.coreReceivedAt = new Date();
     }
 
     if (Object.keys(updates).length === 0) {
@@ -178,10 +181,12 @@ function mapToDeliveryStatus(
 ): "processing" | "shipped" | "out_for_delivery" | "delivered" {
   switch (status) {
     case "confirmed":
+    case "deposit_paid":
       return "processing";
     case "shipped":
       return "shipped";
     case "delivered":
+    case "completed":
       return "delivered";
     case "cancelled":
       return "processing";

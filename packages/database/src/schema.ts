@@ -74,6 +74,8 @@ export const products = pgTable("products", {
   thumbnails: jsonb("thumbnails").$type<string[]>().default([]), // Additional gallery images
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T","14t"] }] - customer must choose when adding to cart */
   attributes: jsonb("attributes").$type<{ name: string; options: string[] }[]>().default([]),
+  /** Core exchange: requires customer to send old part first. Deposit (SEK) paid upfront; balance paid after new part shipped */
+  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -165,8 +167,17 @@ export const orders = pgTable("orders", {
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0").notNull(),
   total: decimal("total", { precision: 12, scale: 2 }).notNull(),
-  status: text("status").default("confirmed").notNull(), // confirmed, shipped, delivered, cancelled
+  status: text("status").default("confirmed").notNull(), // confirmed, deposit_paid, shipped, delivered, cancelled, completed
+  /** Deposit flow: amount paid upfront (SEK); null for full-payment orders */
+  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
+  /** Balance due after deposit; paid when customer sends old part and receives new turbo */
+  balanceDue: decimal("balance_due", { precision: 12, scale: 2 }),
+  /** Stripe payment ID for deposit */
   stripePaymentId: text("stripe_payment_id"),
+  /** Stripe payment ID for balance (when customer pays remainder) */
+  stripeBalancePaymentId: text("stripe_balance_payment_id"),
+  /** Set when store receives customer's old turbo part */
+  coreReceivedAt: timestamp("core_received_at", { mode: "date" }),
   postNordTrackingId: text("post_nord_tracking_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -226,6 +237,17 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   order: one(orders, { fields: [reviews.orderId], references: [orders.id] }),
 }));
 
+// ============ PAGE VISITS (analytics - device and browser for dashboard charts) ============
+export const pageVisits = pgTable("page_visits", {
+  id: serial("id").primaryKey(),
+  /** mobile | desktop | tablet */
+  deviceType: text("device_type").notNull(),
+  /** chrome | safari | firefox | edge | other */
+  browser: text("browser"),
+  path: text("path"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ============ APP SETTINGS (key-value, e.g. mail config) ============
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),
@@ -268,3 +290,6 @@ export type NewReview = typeof reviews.$inferInsert;
 
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export type NewDiscountCode = typeof discountCodes.$inferInsert;
+
+export type PageVisit = typeof pageVisits.$inferSelect;
+export type NewPageVisit = typeof pageVisits.$inferInsert;

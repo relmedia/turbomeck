@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { PhoneInput, EUROPEAN_COUNTRIES, CountryFlag } from "./PhoneInput";
 import { getDefaultCountryFromBrowser } from "@/lib/utils";
+import { useTranslation } from "@/i18n/context";
 
 const addressSchema = shippingFormSchema.pick({
   firstName: true,
@@ -48,6 +49,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslation();
 
   const {
     register,
@@ -172,7 +174,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
                   <SelectItem key={c.code} value={c.code}>
                     <span className="flex items-center gap-2">
                       <CountryFlag code={c.code} />
-                      <span>{c.name}</span>
+                      <span>{t(`shipping.countryNames.${c.code}`)}</span>
                     </span>
                   </SelectItem>
                 ))}

@@ -1,0 +1,1 @@
+ALTER TABLE "page_visits" ADD COLUMN "browser" text;

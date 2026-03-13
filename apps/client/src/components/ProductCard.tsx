@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useCartStore from "@/stores/cartStore";
 import type { ProductType } from "@/types";
 import { productUrl } from "@/lib/utils";
@@ -26,18 +27,11 @@ import { useTranslation } from "@/i18n/context";
 
 const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const t = useTranslation();
+  const router = useRouter();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0]);
   const [selectedColor, setSelectedColor] = useState<string>(product.colors[0]);
   const attrs = product.attributes ?? [];
-  const initialVariants = Object.fromEntries(
-    attrs.map((a) => [a.name, a.options[0]!])
-  );
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(initialVariants);
-  const selectedVariant =
-    attrs.length > 0
-      ? attrs.map((a) => `${a.name}: ${selectedVariants[a.name] ?? a.options[0]}`).join(" | ")
-      : null;
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
@@ -80,8 +74,9 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (attrs.length > 0 && !selectedVariant) {
-      toast.info(t("product.selectVariant"));
+    // Products with attributes require selection on the product page – don't add from card
+    if (attrs.length > 0) {
+      router.push(productUrl(product));
       return;
     }
     setIsAddingToCart(true);
@@ -90,7 +85,6 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
       quantity: 1,
       selectedSize,
       selectedColor,
-      selectedVariant: selectedVariant ?? undefined,
     });
     toast.success(t("product.addedToCart"));
     setTimeout(() => setIsAddingToCart(false), 600);
@@ -113,14 +107,17 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const hasSizes = product.sizes.length > 1 || product.sizes[0] !== "-";
   const hasColors =
     product.colors.length > 1 || product.colors[0] !== "default";
-  const hasAttributes =
-    product.attributes && product.attributes.length > 0;
 
   return (
     <Link href={productUrl(product)} className="block h-full">
       <Card className="h-full w-full max-w-sm overflow-hidden group bg-background text-foreground shadow-none rounded-md flex flex-col pt-0 pb-4 gap-3">
         {/* Image carousel */}
         <div className="relative aspect-square overflow-hidden bg-muted">
+          {product.depositAmount != null && product.depositAmount > 0 && (
+            <span className="absolute top-3 left-3 z-20 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-md">
+              Utbytes
+            </span>
+          )}
           <motion.div
             key={currentImageIndex}
             className="absolute inset-0"
@@ -214,6 +211,11 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t("product.adding")}
+                </>
+              ) : attrs.length > 0 ? (
+                <>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  {t("common.selectOptions")}
                 </>
               ) : (
                 <>
@@ -345,40 +347,6 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                 </div>
               </div>
             )}
-
-            {/* Attributes (variants like "Typ: 13C") */}
-            {hasAttributes &&
-              product.attributes?.map((attr) => (
-                <div key={attr.name} className="space-y-1.5">
-                  <div className="text-xs text-muted-foreground">
-                    {attr.name}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {attr.options.map((opt) => {
-                      const isSelected = (selectedVariants[attr.name] ?? attr.options[0]) === opt;
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          className={cn(
-                            "min-w-10 h-8 px-2 rounded-md text-xs font-medium transition-all",
-                            isSelected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted/60 hover:bg-muted"
-                          )}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setSelectedVariants((prev) => ({ ...prev, [attr.name]: opt }));
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
           </div>
         </CardContent>
 

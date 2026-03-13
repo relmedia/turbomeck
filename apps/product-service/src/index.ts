@@ -3,6 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
 import { eq, inArray, desc, sql } from "drizzle-orm";
@@ -14,11 +15,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Configure multer for file uploads (temp dir for R2, otherwise admin/public/uploads)
-const UPLOAD_DIR = path.resolve(__dirname, "../../admin/public/uploads");
+// Use temp dir for uploads – images go to R2 only, never to public folder
+const UPLOAD_DIR = path.join(os.tmpdir(), "turbomeck-product-uploads");
 const USE_R2 = isR2Configured();
 
-// Ensure upload directory exists (for local storage or temp when migrating)
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -57,84 +57,70 @@ app.use(
   })
 );
 
-// Upload image endpoint (R2 or local)
+// Upload image endpoint – R2 only (no public folder)
 app.post("/api/upload", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const inputPath = path.join(UPLOAD_DIR, req.file.filename);
-
-    if (USE_R2) {
-      const result = await processProductImage(inputPath, true);
-      if (!result.buffer) {
-        return res.status(500).json({ error: "Failed to process image" });
-      }
-      const imageUrl = await uploadToR2(result.filename, result.buffer, "image/png");
-      // Clean up local temp file
+    if (!USE_R2) {
       try {
-        if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+        fs.unlinkSync(path.join(UPLOAD_DIR, req.file.filename));
       } catch {
         /* ignore */
       }
-      res.json({
-        success: true,
-        url: imageUrl,
-        filename: result.filename,
-      });
-    } else {
-      const { filename } = await processProductImage(inputPath);
-      const imageUrl = `/uploads/${filename}`;
-      res.json({
-        success: true,
-        url: imageUrl,
-        filename,
+      return res.status(503).json({
+        error: "Image upload requires Cloudflare R2. Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL.",
       });
     }
+
+    const inputPath = path.join(UPLOAD_DIR, req.file.filename);
+
+    const result = await processProductImage(inputPath, true);
+    if (!result.buffer) {
+      return res.status(500).json({ error: "Failed to process image" });
+    }
+    const imageUrl = await uploadToR2(result.filename, result.buffer, "image/png");
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+    } catch {
+      /* ignore */
+    }
+    res.json({
+      success: true,
+      url: imageUrl,
+      filename: result.filename,
+    });
   } catch (error) {
     console.error("Error uploading file:", error);
     res.status(500).json({ error: "Failed to upload file" });
   }
 });
 
-// List upload files (for attaching existing files to products)
+// List upload files (for attaching existing files to products) – R2 only
 app.get("/api/upload", async (req, res) => {
   try {
-    if (USE_R2) {
-      const files = await listR2Products();
-      res.json({ files });
-    } else {
-      const dirFiles = fs.readdirSync(UPLOAD_DIR);
-      const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
-      const files = dirFiles
-        .filter((f) => imageExtensions.includes(path.extname(f).toLowerCase()))
-        .map((f) => `/uploads/${f}`)
-        .sort();
-      res.json({ files });
+    if (!USE_R2) {
+      return res.json({ files: [] });
     }
+    const files = await listR2Products();
+    res.json({ files });
   } catch (error) {
     console.error("Error listing uploads:", error);
     res.status(500).json({ error: "Failed to list uploads" });
   }
 });
 
-// Delete image endpoint
+// Delete image endpoint – R2 only
 app.delete("/api/upload/:filename", async (req, res) => {
   try {
     const filename = req.params.filename;
-    if (USE_R2) {
-      await deleteFromR2(filename);
-      res.json({ success: true, message: "File deleted successfully" });
-    } else {
-      const filePath = path.join(UPLOAD_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        res.json({ success: true, message: "File deleted successfully" });
-      } else {
-        res.status(404).json({ error: "File not found" });
-      }
+    if (!USE_R2) {
+      return res.status(503).json({ error: "R2 not configured" });
     }
+    await deleteFromR2(filename);
+    res.json({ success: true, message: "File deleted successfully" });
   } catch (error) {
     console.error("Error deleting file:", error);
     res.status(500).json({ error: "Failed to delete file" });
@@ -383,6 +369,7 @@ app.get("/api/products", async (req, res) => {
       stock: products.stock,
       weight: products.weight,
       attributes: products.attributes,
+      depositAmount: products.depositAmount,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     };
@@ -406,6 +393,7 @@ app.get("/api/products", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryMap.get(p.id) ?? [],
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     };
@@ -451,6 +439,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        depositAmount: products.depositAmount,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -479,6 +468,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -508,6 +498,7 @@ app.get("/api/products/:id", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        depositAmount: products.depositAmount,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -545,6 +536,7 @@ app.get("/api/products/:id", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       orderCount,
       totalRevenue,
       createdAt: p.createdAt,
@@ -559,7 +551,7 @@ app.get("/api/products/:id", async (req, res) => {
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn, depositAmount } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
@@ -615,7 +607,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, depositAmount } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -642,6 +634,10 @@ app.put("/api/products/:id", async (req, res) => {
       updateData.attributes = Array.isArray(attributes)
         ? attributes.filter((a: unknown) => a && typeof a === "object" && "name" in a && "options" in a && Array.isArray((a as { options: unknown }).options))
         : [];
+    }
+    if (depositAmount !== undefined) {
+      const da = depositAmount != null && String(depositAmount).trim() !== "" ? Number(depositAmount) : NaN;
+      updateData.depositAmount = !Number.isNaN(da) && da > 0 ? String(da) : null;
     }
 
     const updated = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
@@ -721,6 +717,8 @@ app.post("/api/orders", async (req, res) => {
       shippingCost: number;
       discount?: number;
       total: number;
+      depositAmount?: number;
+      balanceDue?: number;
       stripePaymentId?: string;
       postNordTrackingId?: string;
       items: Array<{
@@ -747,6 +745,8 @@ app.post("/api/orders", async (req, res) => {
       String(body.postNordTrackingId).trim() &&
       String(body.postNordTrackingId).toLowerCase() !== "null"
     );
+    const isDepositOrder = body.depositAmount != null && body.depositAmount > 0 && (body.balanceDue ?? 0) >= 0;
+    const initialStatus = hasTrackingId ? "shipped" : isDepositOrder ? "deposit_paid" : "confirmed";
     const [order] = await db
       .insert(orders)
       .values({
@@ -767,9 +767,11 @@ app.post("/api/orders", async (req, res) => {
         shippingCost: String(body.shippingCost),
         discount: String(body.discount ?? 0),
         total: String(body.total),
+        depositAmount: body.depositAmount != null ? String(body.depositAmount) : null,
+        balanceDue: body.balanceDue != null ? String(body.balanceDue) : null,
         stripePaymentId: body.stripePaymentId ?? null,
         postNordTrackingId: body.postNordTrackingId ?? null,
-        status: hasTrackingId ? "shipped" : "confirmed",
+        status: initialStatus,
       })
       .returning();
 
@@ -837,6 +839,9 @@ app.get("/api/orders", async (req, res) => {
           shippingCost: parseFloat(o.shippingCost),
           discount: parseFloat(o.discount),
           total: parseFloat(o.total),
+          depositAmount: (o as { depositAmount?: string | null }).depositAmount != null ? parseFloat((o as { depositAmount: string }).depositAmount) : undefined,
+          balanceDue: (o as { balanceDue?: string | null }).balanceDue != null ? parseFloat((o as { balanceDue: string }).balanceDue) : undefined,
+          coreReceivedAt: (o as { coreReceivedAt?: Date | null }).coreReceivedAt ?? undefined,
           status: o.status,
           postNordTrackingId: o.postNordTrackingId,
           stripePaymentId: o.stripePaymentId,
@@ -892,6 +897,9 @@ app.get("/api/orders/:id", async (req, res) => {
       shippingCost: parseFloat(order.shippingCost),
       discount: parseFloat(order.discount),
       total: parseFloat(order.total),
+      depositAmount: (order as { depositAmount?: string | null }).depositAmount != null ? parseFloat((order as { depositAmount: string }).depositAmount) : undefined,
+      balanceDue: (order as { balanceDue?: string | null }).balanceDue != null ? parseFloat((order as { balanceDue: string }).balanceDue) : undefined,
+      coreReceivedAt: (order as { coreReceivedAt?: Date | null }).coreReceivedAt ?? undefined,
       status: order.status,
       postNordTrackingId: order.postNordTrackingId,
       stripePaymentId: order.stripePaymentId,
@@ -909,6 +917,66 @@ app.get("/api/orders/:id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching order:", error);
     res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+// GET order balance (for pay-balance page - no auth, link is shared by admin)
+app.get("/api/orders/:id/balance", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
+    const stripeBalancePaymentId = (order as { stripeBalancePaymentId?: string | null }).stripeBalancePaymentId;
+    const bal = balanceDue != null ? parseFloat(balanceDue) : 0;
+    if (bal <= 0 || stripeBalancePaymentId) {
+      return res.status(400).json({
+        error: stripeBalancePaymentId ? "Balance already paid" : "No balance due for this order",
+      });
+    }
+    res.json({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      balanceDue: bal,
+      customerName: `${order.firstName} ${order.lastName}`.trim(),
+    });
+  } catch (error) {
+    console.error("Error fetching order balance:", error);
+    res.status(500).json({ error: "Failed to fetch order balance" });
+  }
+});
+
+// PATCH record balance payment (after customer pays remainder)
+app.patch("/api/orders/:id/balance-paid", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const body = req.body as { stripePaymentId?: string };
+    const stripePaymentId = body?.stripePaymentId;
+    if (!stripePaymentId || !stripePaymentId.startsWith("pi_")) {
+      return res.status(400).json({ error: "Invalid stripePaymentId" });
+    }
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
+    const existing = (order as { stripeBalancePaymentId?: string | null }).stripeBalancePaymentId;
+    if (!balanceDue || parseFloat(balanceDue) <= 0 || existing) {
+      return res.status(400).json({ error: "Order has no balance due or already paid" });
+    }
+    await db
+      .update(orders)
+      .set({
+        stripeBalancePaymentId: stripePaymentId,
+        status: "completed",
+      } as Record<string, unknown>)
+      .where(eq(orders.id, id));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error recording balance payment:", error);
+    res.status(500).json({ error: "Failed to record payment" });
   }
 });
 

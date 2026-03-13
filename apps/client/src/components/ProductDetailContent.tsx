@@ -59,6 +59,16 @@ export function ProductDetailContent({
         <h1 className="text-2xl font-medium">{product.name}</h1>
         <ProductReviewsSummary />
         <RichTextContent html={product.description} />
+        {product.depositAmount != null && product.depositAmount > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4">
+            <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+              {t("product.utbyteTitle")}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              {t("product.utbyteDescription")}
+            </p>
+          </div>
+        )}
         <h2 className="text-2xl font-semibold">
           {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}{" "}
           {t("common.kr")}

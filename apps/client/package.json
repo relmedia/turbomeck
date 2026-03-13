@@ -10,6 +10,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1008.0",
     "@hookform/resolvers": "^5.2.1",
     "@radix-ui/react-dropdown-menu": "^2.1.7",
     "@radix-ui/react-hover-card": "^1.1.7",
@@ -21,6 +22,7 @@
     "@repo/database": "workspace:*",
     "@stripe/react-stripe-js": "^3.6.0",
     "@stripe/stripe-js": "^7.0.0",
+    "@tabler/icons-react": "^3.40.0",
     "bcryptjs": "^2.4.3",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -31,6 +33,7 @@
     "isomorphic-dompurify": "^3.0.0",
     "jsdom": "^28.1.0",
     "lucide-react": "^0.535.0",
+    "motion": "^12.36.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.25",
     "pdf-lib": "^1.17.1",

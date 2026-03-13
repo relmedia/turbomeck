@@ -11,6 +11,7 @@ import {
   CookieBanner,
   CookieSettings,
 } from "@/components/cookie-consent";
+import { VisitTracker } from "@/components/VisitTracker";
 import { ToastContainer } from "react-toastify";
 
 const geistSans = Geist({
@@ -73,6 +74,7 @@ export default function RootLayout({
               ],
             }}
           >
+            <VisitTracker />
             <div className="max-w-screen-xl mx-auto p-4">
               <Navbar />
               {children}

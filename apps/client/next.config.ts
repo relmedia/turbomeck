@@ -12,6 +12,7 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   webpack: (config) => {
     // Ensure monorepo root node_modules is in resolution path (fixes CSS @import in turbo)
     config.resolve.modules = [

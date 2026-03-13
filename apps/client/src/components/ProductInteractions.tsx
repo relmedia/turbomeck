@@ -7,6 +7,7 @@ import { useTranslation } from "@/i18n/context";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
 
 const ProductInteraction = ({
   product,
@@ -153,33 +154,31 @@ const ProductInteraction = ({
           </div>
         </div>
       )}
-      {/* QUANTITY */}
-      <div className="flex flex-col gap-2 text-sm">
-        <span className="text-gray-500">Antal</span>
-        <div className="flex items-center gap-2">
-          <button
-            className="cursor-pointer border-1 border-gray-300 p-1"
-            onClick={() => handleQuantityChange("decrement")}
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <span>{quantity}</span>
-          <button
-            className="cursor-pointer border-1 border-gray-300 p-1"
-            onClick={() => handleQuantityChange("increment")}
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+      {/* QUANTITY + ADD TO CART */}
+      <div className="flex w-full flex-nowrap items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 text-sm">
+            <button
+              className="cursor-pointer border-1 border-gray-300 p-1"
+              onClick={() => handleQuantityChange("decrement")}
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span>{quantity}</span>
+            <button
+              className="cursor-pointer border-1 border-gray-300 p-1"
+              onClick={() => handleQuantityChange("increment")}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
         </div>
+        <button
+          onClick={handleAddToCart}
+          className="flex-1 min-w-0 bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg flex items-center justify-center gap-2 cursor-pointer text-sm font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          {t("common.addToCart")}
+        </button>
       </div>
-      {/* BUTTONS */}
-      <button
-        onClick={handleAddToCart}
-        className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-lg flex items-center justify-center gap-2 cursor-pointer text-sm font-medium"
-      >
-        <Plus className="w-4 h-4" />
-        {t("common.addToCart")}
-      </button>
       <button
         onClick={handleBuyNow}
         className="ring-1 ring-gray-400 shadow-lg text-gray-800 px-4 py-2 rounded-md flex items-center justify-center cursor-pointer gap-2 text-sm font-medium"

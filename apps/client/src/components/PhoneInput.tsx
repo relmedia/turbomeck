@@ -133,12 +133,12 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     return (
       <div className={cn("flex gap-1", className)}>
         <Select value={country} onValueChange={handleCountryChange}>
-          <SelectTrigger className="w-[120px] shrink-0">
+          <SelectTrigger className="w-[140px] shrink-0 min-w-0">
             <SelectValue>
               <span className="flex items-center gap-2">
                 <CountryFlag code={countryData?.code ?? "SE"} />
-                <span className="text-xs text-muted-foreground">
-                  {countryData?.dial}
+                <span className="text-xs truncate">
+                  {countryData ? `${t(`shipping.countryNames.${countryData.code}`)} ${countryData.dial}` : ""}
                 </span>
               </span>
             </SelectValue>
@@ -148,7 +148,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
               <SelectItem key={c.code} value={c.code}>
                 <span className="flex items-center gap-2">
                   <CountryFlag code={c.code} />
-                  <span>{t(`shipping.country.${c.code}`)}</span>
+                  <span>{t(`shipping.countryNames.${c.code}`)}</span>
                   <span className="text-muted-foreground text-xs">
                     {c.dial}
                   </span>

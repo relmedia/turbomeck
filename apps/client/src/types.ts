@@ -16,6 +16,8 @@ export type ProductType = {
   colors: [string, ...string[]];
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T"] }] - customer must choose when adding to cart */
   attributes?: { name: string; options: string[] }[];
+  /** Core exchange: deposit (SEK) paid upfront; balance after old part received and new turbo shipped */
+  depositAmount?: number;
   images: Record<string, string>;
   /** All images for gallery (main + thumbnails) */
   galleryImages?: string[];

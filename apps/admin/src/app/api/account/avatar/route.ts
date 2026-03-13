@@ -4,9 +4,11 @@ import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import path from "path";
-import fs from "fs/promises";
+import {
+  isR2Configured,
+  uploadAvatarToR2,
+} from "@/lib/r2-avatars";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
@@ -15,6 +17,16 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
+    }
+
+    if (!isR2Configured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Avatar-uppladdning kräver Cloudflare R2. Konfigurera R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL.",
+        },
+        { status: 503 }
+      );
     }
 
     const formData = await req.formData();
@@ -40,16 +52,16 @@ export async function POST(req: Request) {
       );
     }
 
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-
     const ext = path.extname(file.name) || ".png";
-    const filename = `avatar-${session.user.id}-${Date.now()}${ext}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
-
     const bytes = await file.arrayBuffer();
-    await fs.writeFile(filepath, Buffer.from(bytes));
+    const buffer = Buffer.from(bytes);
 
-    const imageUrl = `/uploads/avatars/${filename}`;
+    const imageUrl = await uploadAvatarToR2(
+      session.user.id,
+      buffer,
+      file.type,
+      ext
+    );
 
     await db
       .update(users)

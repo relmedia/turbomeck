@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pencil, RefreshCw, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, TrendingUp, Trash2, Star, PlusCircle } from "lucide-react";
+import { Pencil, RefreshCw, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, TrendingUp, Trash2, Star, List } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -42,6 +42,22 @@ function categoryDisplayName(c: Category): string {
   return c.parentName ? `${c.parentName} › ${c.name}` : c.name;
 }
 
+function formatTimeAgo(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffDays === 0) return "Idag";
+  if (diffDays === 1) return "Igår";
+  if (diffDays < 7) return `${diffDays} dagar sedan`;
+  if (diffWeeks === 1) return "1 vecka sedan";
+  if (diffWeeks < 4) return `${diffWeeks} veckor sedan`;
+  return d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+}
+
+const AVATAR_COLORS = ["bg-blue-500", "bg-purple-500", "bg-orange-500", "bg-teal-500", "bg-pink-500"];
+
 type Product = {
   id: number;
   name: string;
@@ -69,6 +85,10 @@ export default function ProductViewPage() {
   const fromQuery = fromPage ? `?fromPage=${fromPage}` : "";
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [reviews, setReviews] = useState<
+    { id: number; userName: string; rating: number; title: string | null; comment: string | null; createdAt: string }[]
+  >([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -94,9 +114,32 @@ export default function ProductViewPage() {
     }
   }, [productId]);
 
+  const fetchReviewsForProduct = useCallback(async (pid: string) => {
+    setReviewsLoading(true);
+    try {
+      const res = await fetch(`/api/reviews?productId=${pid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReviews(data);
+      } else {
+        setReviews([]);
+      }
+    } catch {
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (productId) fetchProduct();
   }, [productId, fetchProduct]);
+
+  useEffect(() => {
+    if (productId && product) {
+      fetchReviewsForProduct(productId);
+    }
+  }, [productId, product, fetchReviewsForProduct]);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -448,77 +491,122 @@ export default function ProductViewPage() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 px-6 items-start">
               <div className="space-y-4">
-                  {[
-                    { name: "Mark P.", rating: 3.2, title: "Okej men kunde varit bättre", body: "Produkten är okej, men jag förväntade mig mer för priset. Några mindre brister, men totalt sett acceptabel.", ago: "3 dagar sedan", color: "bg-blue-500" },
-                    { name: "Jessica K.", rating: 5, title: "Snygg design", body: "Jag älskar det eleganta designen och enkelheten. Har inte hittat en så stilren produkt på länge. Mycket nöjd!", ago: "2 veckor sedan", color: "bg-purple-500" },
-                    { name: "Michael B.", rating: 4.5, title: "Nöjd med köpet", body: "Jag är riktigt nöjd med detta köp. Kvaliteten är bra och den fungerar precis som beskrivet.", ago: "4 dagar sedan", color: "bg-orange-500" },
-                    { name: "Anna M.", rating: 3, title: "Fungerar men kan förbättras", body: "Produkten fungerar, men det finns utrymme för förbättring. Byggkvaliteten känns lite billig.", ago: "1 dag sedan", color: "bg-teal-500" },
-                  ].map((r, i) => (
-                    <div key={i} className="relative border rounded-lg p-5">
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6">Inga recensioner ännu.</p>
+                ) : (
+                  reviews.map((r, i) => (
+                    <div key={r.id} className="relative border rounded-lg p-5">
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <p className="font-medium text-sm">{r.name}</p>
+                        <p className="font-medium text-sm">{r.userName}</p>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs text-muted-foreground">{r.ago}</span>
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs cursor-pointer">
-                            <Pencil className="w-3 h-3 mr-1" />
-                            Redigera
+                          <span className="text-xs text-muted-foreground">{formatTimeAgo(r.createdAt)}</span>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs cursor-pointer" asChild>
+                            <Link href={`/studio/reviews/${r.id}/edit`}>
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Redigera
+                            </Link>
                           </Button>
                         </div>
                       </div>
                       <div className="flex gap-3">
                         <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarFallback className={`${r.color} text-white text-sm`}>
-                            {r.name.split(" ").map((n) => n[0]).join("")}
+                          <AvatarFallback className={`${AVATAR_COLORS[i % AVATAR_COLORS.length]} text-white text-sm`}>
+                            {r.userName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1 text-sm text-amber-500 mb-1">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span className="text-muted-foreground">{r.rating}</span>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`w-4 h-4 ${s <= r.rating ? "fill-current" : ""}`}
+                              />
+                            ))}
+                            <span className="text-muted-foreground ml-0.5">{r.rating}</span>
                           </div>
-                          <p className="font-medium text-sm">{r.title}</p>
-                          <p className="text-sm text-muted-foreground mt-0.5">{r.body}</p>
+                          {r.title && <p className="font-medium text-sm">{r.title}</p>}
+                          {r.comment && (
+                            <p className="text-sm text-muted-foreground mt-0.5">{r.comment}</p>
+                          )}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                )}
+              </div>
               <div className="space-y-3 border rounded-lg p-3 text-sm">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <div className="flex text-amber-500">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} className={`w-4 h-4 ${s <= 4 ? "fill-current" : "fill-amber-200"}`} />
-                      ))}
-                    </div>
-                    <span className="font-semibold text-sm">4.3</span>
-                    <span className="text-xs text-muted-foreground">(12)</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="mt-1.5 w-full justify-center cursor-pointer h-8 text-xs">
-                    <PlusCircle className="h-4 w-4 mr-1.5" />
-                    Skicka recension
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { stars: 5, pct: 70 },
-                    { stars: 4, pct: 17 },
-                    { stars: 3, pct: 7 },
-                    { stars: 2, pct: 4 },
-                    { stars: 1, pct: 2 },
-                  ].map(({ stars, pct }) => (
-                    <div key={stars} className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground w-10">{stars}★</span>
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{ width: `${pct}%` }}
-                        />
+                {(() => {
+                  const totalCount = reviews.length;
+                  const averageRating =
+                    totalCount > 0
+                      ? Math.round(
+                          (reviews.reduce((s, r) => s + r.rating, 0) / totalCount) * 10
+                        ) / 10
+                      : 0;
+                  const dist = [5, 4, 3, 2, 1].map((stars) => ({
+                    stars,
+                    count: reviews.filter((r) => r.rating === stars).length,
+                  }));
+                  const maxCount = Math.max(1, ...dist.map((d) => d.count));
+                  return (
+                    <>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="flex text-amber-500">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`w-4 h-4 ${
+                                  s <= Math.round(averageRating) ? "fill-current" : "fill-amber-200"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="font-semibold text-sm">{averageRating}</span>
+                          <span className="text-xs text-muted-foreground">({totalCount})</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1.5 w-full justify-center cursor-pointer h-8 text-xs"
+                          asChild
+                        >
+                          <Link href="/studio/reviews">
+                            <List className="w-4 h-4 mr-1.5" />
+                            Visa alla recensioner
+                          </Link>
+                        </Button>
                       </div>
-                      <span className="text-xs font-medium w-7">{pct}%</span>
-                    </div>
-                  ))}
-                </div>
+                      {totalCount > 0 && (
+                        <div className="space-y-2">
+                          {dist.map(({ stars, count }) => (
+                            <div key={stars} className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-10">{stars}★</span>
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full transition-all"
+                                  style={{ width: `${(count / maxCount) * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-medium w-7">
+                                {totalCount > 0 ? Math.round((count / totalCount) * 100) : 0}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </Card>

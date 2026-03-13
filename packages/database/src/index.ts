@@ -4,8 +4,11 @@ import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5433/turbodb";
 
-// Create postgres client
-const client = postgres(connectionString);
+// Limit pool size to avoid "too many clients" (client + admin + product-service share DB)
+const client = postgres(connectionString, {
+  max: 5,
+  idle_timeout: 20,
+});
 
 // Create drizzle instance with schema
 export const db = drizzle(client, { schema });

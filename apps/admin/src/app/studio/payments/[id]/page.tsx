@@ -49,6 +49,9 @@ type OrderDetail = {
   shipping: number;
   discount?: number;
   total: number;
+  depositAmount?: number;
+  balanceDue?: number;
+  coreReceivedAt?: string | null;
   status?: string;
   deliveryStatus: "processing" | "shipped" | "out_for_delivery" | "delivered";
   shippedDate?: string;
@@ -139,6 +142,7 @@ export default function OrderDetailPage() {
   const [trackingData, setTrackingData] = useState<Record<string, unknown> | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [markingCoreReceived, setMarkingCoreReceived] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -175,6 +179,30 @@ export default function OrderDetailPage() {
       setTrackingData(null);
     } finally {
       setTrackingLoading(false);
+    }
+  };
+
+  const handleMarkCoreReceived = async () => {
+    if (!id) return;
+    setMarkingCoreReceived(true);
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coreReceived: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Kunde inte markera");
+        return;
+      }
+      toast.success("Gamla delen mottagen");
+      const refetch = await fetch(`/api/orders/${id}`);
+      setOrder(await refetch.json());
+    } catch {
+      toast.error("Kunde inte markera");
+    } finally {
+      setMarkingCoreReceived(false);
     }
   };
 
@@ -281,7 +309,7 @@ export default function OrderDetailPage() {
                     </p>
                   )}
                 </div>
-                <div className="pt-3">
+                <div className="pt-3 space-y-3">
                   <div className="bg-muted flex items-center gap-3 rounded-md border p-4">
                     <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <div>
@@ -293,6 +321,53 @@ export default function OrderDetailPage() {
                       </p>
                     </div>
                   </div>
+                  {order.depositAmount != null && order.depositAmount > 0 && order.balanceDue != null && order.balanceDue > 0 && !order.coreReceivedAt && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleMarkCoreReceived}
+                        disabled={markingCoreReceived}
+                      >
+                        {markingCoreReceived ? "Sparar..." : "Gamla del mottagen"}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Markera när kundens gamla turbo har kommit in – då kan du skicka den nya och kund betalar resten.
+                      </span>
+                    </div>
+                  )}
+                  {order.coreReceivedAt && (
+                    <p className="text-xs text-emerald-600 font-medium">
+                      Gamla del mottagen {formatDate(new Date(order.coreReceivedAt).toISOString().slice(0, 10))}
+                    </p>
+                  )}
+                  {order.balanceDue != null && order.balanceDue > 0 && order.coreReceivedAt && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+                      <p className="text-sm font-medium mb-1">Betalningslänk för återstod</p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Skicka denna länk till kunden så kan de betala {formatCurrency(order.balanceDue)}.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-white dark:bg-muted px-2 py-1 rounded truncate max-w-[240px]">
+                          {typeof window !== "undefined"
+                            ? `${process.env.NEXT_PUBLIC_CLIENT_URL || window.location.origin.replace("3002", "3000")}/order/pay-balance?orderId=${order.orderId}`
+                            : ""}
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            const base = process.env.NEXT_PUBLIC_CLIENT_URL || (typeof window !== "undefined" ? window.location.origin.replace("3002", "3000") : "");
+                            const url = `${base}/order/pay-balance?orderId=${order.orderId}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success("Länk kopierad");
+                          }}
+                        >
+                          Kopiera
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -322,6 +397,20 @@ export default function OrderDetailPage() {
                   <span>Rabatt</span>
                   <span>-{formatCurrency(order.discount)}</span>
                 </div>
+              )}
+              {order.depositAmount != null && order.depositAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                    <span>Deposition (betald)</span>
+                    <span>{formatCurrency(order.depositAmount)}</span>
+                  </div>
+                  {order.balanceDue != null && order.balanceDue > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Återstod (betalas senare)</span>
+                      <span>{formatCurrency(order.balanceDue)}</span>
+                    </div>
+                  )}
+                </>
               )}
               <div className="border-t pt-2 flex justify-between font-semibold">
                 <span>Totalt</span>

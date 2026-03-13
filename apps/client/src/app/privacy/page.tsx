@@ -8,14 +8,31 @@ export const metadata = {
 export default function IntegritetspolicyPage() {
   return (
     <div className="max-w-3xl mx-auto py-12 px-4">
-      <h1 className="text-2xl font-bold mb-8">Integritetspolicy</h1>
-      <p className="text-sm text-muted-foreground mb-8">
-        Senast uppdaterad: februari 2025
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 px-4 py-2 mb-8 text-sm font-medium bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+      >
+        ← Tillbaka till startsidan
+      </Link>
+
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        Integritetspolicy
+      </h1>
+      <p className="text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
+        Läs gärna igenom integritetspolicyn för Turbomeck. Vid frågor eller funderingar,{" "}
+        <a href="mailto:shopp@turbomeck.se" className="underline hover:text-foreground">
+          kontakta oss
+        </a>{" "}
+        så hjälper vi dig så snart vi kan.
       </p>
 
-      <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6 text-sm">
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-8">
+        Senast uppdaterad: mars 2025
+      </h2>
+
+      <div className="space-y-8 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
         <section>
-          <h2 className="text-lg font-semibold mb-2">1. Personuppgiftsansvarig</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">1. Personuppgiftsansvarig</h2>
           <p>
             Turbomeck är personuppgiftsansvarig för de personuppgifter som vi samlar in och
             behandlar. Du når oss via shopp@turbomeck.se eller på adressen nedan.
@@ -30,7 +47,7 @@ export default function IntegritetspolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">2. Vilka uppgifter samlar vi in?</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">2. Vilka uppgifter samlar vi in?</h2>
           <p>Vi samlar in följande typer av uppgifter när du handlar eller skapar ett konto:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Kontaktuppgifter: namn, e-postadress, telefonnummer</li>
@@ -52,7 +69,7 @@ export default function IntegritetspolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">4. Rättslig grund</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">4. Rättslig grund</h2>
           <p>
             Behandlingen grundas på avtalsuppfyllelse (för beställningar) samt vårt berättigade
             intresse att bedriva e-handel och ge kundservice.
@@ -60,7 +77,7 @@ export default function IntegritetspolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">5. Lagring och delning</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">5. Lagring och delning</h2>
           <p>
             Vi lagrar dina uppgifter så länge det krävs för att fullgöra beställningar och uppfylla
             bokföringslagen (7 år). Betalningsdata hanteras av Stripe enligt deras integritetspolicy.
@@ -93,19 +110,13 @@ export default function IntegritetspolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">7. Cookies</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-3">7. Cookies</h2>
           <p>
             Vi använder nödvändiga cookies för att webbplatsen ska fungera (t.ex. varukorg och
             inloggning). Inga spårningscookies för marknadsföring används utan ditt samtycke.
           </p>
         </section>
       </div>
-
-      <p className="mt-12 text-sm text-muted-foreground">
-        <Link href="/" className="underline hover:text-foreground">
-          ← Tillbaka till startsidan
-        </Link>
-      </p>
     </div>
   );
 }

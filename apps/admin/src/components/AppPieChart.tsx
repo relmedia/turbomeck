@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Label, Pie, PieChart } from "recharts";
 import {
   ChartConfig,
@@ -7,7 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "./ui/chart";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 
 const chartConfig = {
   visitors: {
@@ -35,19 +36,91 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const chartData = [
-  { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
-  { browser: "firefox", visitors: 287, fill: "var(--color-firefox)" },
-  { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
-  { browser: "other", visitors: 190, fill: "var(--color-other)" },
-];
+const BROWSER_FILL: Record<string, string> = {
+  chrome: "var(--color-chrome)",
+  safari: "var(--color-safari)",
+  firefox: "var(--color-firefox)",
+  edge: "var(--color-edge)",
+  other: "var(--color-other)",
+};
+
+const BROWSER_LABEL: Record<string, string> = {
+  chrome: "Chrome",
+  safari: "Safari",
+  firefox: "Firefox",
+  edge: "Edge",
+  other: "Övriga",
+};
+
+type BrowserRow = { browser: string; visitors: number };
 
 const AppPieChart = () => {
+  const [data, setData] = useState<BrowserRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [change, setChange] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // If you don't use React compiler use useMemo hook to improve performance
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/dashboard/browsers")
+      .then((res) => {
+        if (!res.ok) throw new Error("Kunde inte hämta data");
+        return res.json();
+      })
+      .then((json: { data: BrowserRow[]; total: number; change: number }) => {
+        if (!cancelled) {
+          setData(json.data ?? []);
+          setTotal(json.total ?? 0);
+          setChange(json.change ?? 0);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Ett fel uppstod");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const chartData = data
+    .filter((r) => r.visitors > 0)
+    .map((r) => ({
+      browser: BROWSER_LABEL[r.browser] ?? r.browser,
+      visitors: r.visitors,
+      fill: BROWSER_FILL[r.browser] ?? BROWSER_FILL.other,
+    }));
+
   const totalVisitors = chartData.reduce((acc, curr) => acc + curr.visitors, 0);
-  
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[250px]">
+        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-sm text-destructive py-8">
+        {error}
+      </div>
+    );
+  }
+
+  if (chartData.length === 0) {
+    return (
+      <div>
+        <h1 className="text-lg font-medium mb-6">Webbläsaranvändning</h1>
+        <p className="text-sm text-muted-foreground py-8">Ingen besöksdata de senaste 6 månaderna.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="">
       <h1 className="text-lg font-medium mb-6">Webbläsaranvändning</h1>
@@ -82,7 +155,7 @@ const AppPieChart = () => {
                         y={viewBox.cy}
                         className="fill-foreground text-3xl font-bold"
                       >
-                        {totalVisitors.toLocaleString()}
+                        {totalVisitors.toLocaleString("sv-SE")}
                       </tspan>
                       <tspan
                         x={viewBox.cx}
@@ -101,7 +174,17 @@ const AppPieChart = () => {
       </ChartContainer>
       <div className="mt-4 flex flex-col gap-2 items-center">
         <div className="flex items-center gap-2 font-medium leading-none">
-          Uppåt med 5,2 % denna månad <TrendingUp className="h-4 w-4 text-green-500" />
+          {change >= 0 ? (
+            <>
+              Uppåt med {change.toLocaleString("sv-SE")} % denna månad{" "}
+              <TrendingUp className="h-4 w-4 text-green-500" />
+            </>
+          ) : (
+            <>
+              Ned {Math.abs(change).toLocaleString("sv-SE")} % denna månad{" "}
+              <TrendingDown className="h-4 w-4 text-red-500" />
+            </>
+          )}
         </div>
         <div className="leading-none text-muted-foreground">
           Visar totalt antal besökare de senaste 6 månaderna

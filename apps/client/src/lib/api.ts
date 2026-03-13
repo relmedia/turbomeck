@@ -27,6 +27,8 @@ export type ApiProduct = {
   weight: number | null;
   categoryIds: number[];
   attributes?: { name: string; options: string[] }[];
+  /** Core exchange: deposit (SEK) to pay upfront; balance paid after old part received and new turbo shipped */
+  depositAmount?: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -68,6 +70,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     weight: api.weight ?? undefined,
     categoryIds: api.categoryIds ?? [],
     attributes: api.attributes ?? [],
+    depositAmount: api.depositAmount ?? undefined,
     sizes: ["-"],
     colors: ["default"],
     images: { default: mainImg },
@@ -161,6 +164,8 @@ export async function createOrder(orderData: {
   shippingCost: number;
   discount?: number;
   total: number;
+  depositAmount?: number;
+  balanceDue?: number;
   stripePaymentId?: string;
   postNordTrackingId?: string;
   items: Array<{

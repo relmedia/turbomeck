@@ -67,6 +67,31 @@ export async function POST(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const pathStr = path.join("/");
+  try {
+    const body = await req.text();
+    const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, {
+      method: "PATCH",
+      headers: { "Content-Type": req.headers.get("content-type") || "application/json" },
+      body: body || undefined,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    console.error("Product proxy PATCH error:", err);
+    return NextResponse.json(
+      { error: "Kunde inte ansluta till produkt-tjänsten." },
+      { status: 502 }
+    );
+  }
+}
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
