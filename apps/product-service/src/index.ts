@@ -7,7 +7,7 @@ import os from "os";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
 import { eq, inArray, desc, asc, sql } from "drizzle-orm";
-import { processProductImage } from "./image-utils.js";
+import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -124,6 +124,29 @@ app.delete("/api/upload/:filename", async (req, res) => {
   } catch (error) {
     console.error("Error deleting file:", error);
     res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
+// Remove background from image – fetches from URL, processes, uploads to R2
+app.post("/api/remove-background", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ error: "Missing or invalid url" });
+    }
+    if (!USE_R2) {
+      return res.status(503).json({ error: "R2 not configured" });
+    }
+    const { filename, buffer } = await removeBackgroundFromImageUrl(url);
+    const imageUrl = await uploadToR2(filename, buffer, "image/png");
+    // Add cache-bust so browser loads the updated image
+    const separator = imageUrl.includes("?") ? "&" : "?";
+    res.json({ url: `${imageUrl}${separator}v=${Date.now()}` });
+  } catch (error) {
+    console.error("Error removing background:", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to remove background",
+    });
   }
 });
 

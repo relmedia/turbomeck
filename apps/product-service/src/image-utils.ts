@@ -1,25 +1,8 @@
 import fs from "fs";
 import path from "path";
+import { removeBackground } from "@imgly/background-removal-node";
 
 const TARGET_SIZE = 1200;
-
-/** Resize and save as PNG using Sharp (fast, native). Uses "contain" to avoid cropping. */
-async function resizeWithSharp(buffer: Buffer, outputPath: string): Promise<void> {
-  const sharp = (await import("sharp")).default;
-  await sharp(buffer)
-    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
-    .png({ compressionLevel: 6 })
-    .toFile(outputPath);
-}
-
-/** Fallback: resize with Jimp (pure JS, works when Sharp fails on Windows). */
-async function resizeWithJimp(buffer: Buffer, outputPath: string): Promise<void> {
-  const { default: Jimp } = await import("jimp");
-  const image = await Jimp.read(buffer);
-  image.background(0xffffffff);
-  const contained = image.contain(TARGET_SIZE, TARGET_SIZE);
-  await contained.writeAsync(outputPath);
-}
 
 /** Result of processing a product image - either file path or buffer for R2 upload. */
 export type ProcessProductImageResult =
@@ -27,9 +10,19 @@ export type ProcessProductImageResult =
   | { outputPath?: undefined; filename: string; buffer: Buffer };
 
 /**
+ * Resize buffer with Sharp.
+ */
+async function resizeWithSharp(buffer: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  return sharp(buffer)
+    .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
+    .png({ compressionLevel: 6 })
+    .toBuffer();
+}
+
+/**
  * Process product image: resize to square.
- * Uses Sharp when available; falls back to Jimp on Windows if Sharp fails (ERR_DLOPEN).
- * When returnBuffer is true, returns buffer instead of writing to disk (for R2 upload).
+ * When returnBuffer is true, returns buffer for R2 upload.
  */
 export async function processProductImage(
   inputPath: string,
@@ -43,40 +36,21 @@ export async function processProductImage(
 
   const imageBuffer = fs.readFileSync(inputPath);
 
-  let finalBuffer: Buffer | undefined;
+  let finalBuffer: Buffer;
   try {
-    if (returnBuffer) {
-      const sharp = (await import("sharp")).default;
-      finalBuffer = await sharp(imageBuffer)
-        .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
-        .png({ compressionLevel: 6 })
-        .toBuffer();
-    } else {
-      await resizeWithSharp(imageBuffer, outputPath);
-    }
+    finalBuffer = await resizeWithSharp(imageBuffer);
   } catch (sharpErr) {
-    const msg = String(sharpErr);
-    if (msg.includes("ERR_DLOPEN_FAILED") || msg.includes("Could not load the \"sharp\"")) {
-      if (returnBuffer) {
-        const { default: Jimp } = await import("jimp");
-        const image = await Jimp.read(imageBuffer);
-        const scaled = image.scaleToFit(TARGET_SIZE, TARGET_SIZE);
-        finalBuffer = await scaled.getBufferAsync("image/png");
-      } else {
-        await resizeWithJimp(imageBuffer, outputPath);
-      }
-    } else {
-      throw sharpErr;
-    }
-  }
-
-  if (returnBuffer && !finalBuffer) {
-    throw new Error("Failed to process image to buffer");
+    throw sharpErr;
   }
 
   if (!returnBuffer) {
+    fs.writeFileSync(outputPath, finalBuffer);
     if (path.resolve(inputPath) !== path.resolve(outputPath)) {
-      fs.unlinkSync(inputPath);
+      try {
+        fs.unlinkSync(inputPath);
+      } catch {
+        /* ignore */
+      }
     }
     return { outputPath, filename: outputFilename };
   }
@@ -89,5 +63,108 @@ export async function processProductImage(
     }
   }
 
-  return { filename: outputFilename, buffer: finalBuffer! };
+  return { filename: outputFilename, buffer: finalBuffer as Buffer };
+}
+
+/**
+ * Extract filename from R2/product image URL.
+ * e.g. https://pub-xxx.r2.dev/products/product-104-0-xxx.png -> product-104-0-xxx.png
+ */
+export function extractFilenameFromImageUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname;
+    const segments = pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    if (last && /\.(png|jpg|jpeg|gif|webp)$/i.test(last)) {
+      return last;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Normalize image URL to ensure it points to a fetchable R2 path (products/ prefix).
+ */
+function normalizeImageUrlForFetch(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname.replace(/^\//, "");
+    if (pathname && !pathname.startsWith("products/")) {
+      const filename = pathname.split("/").pop() || pathname;
+      parsed.pathname = `/products/${filename}`;
+      return parsed.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Remove background from image at URL, resize, return buffer for R2 upload.
+ */
+export async function removeBackgroundFromImageUrl(imageUrl: string): Promise<{
+  filename: string;
+  buffer: Buffer;
+}> {
+  const normalizedUrl = normalizeImageUrlForFetch(imageUrl);
+  const filename = extractFilenameFromImageUrl(normalizedUrl);
+  if (!filename) {
+    throw new Error(`Invalid image URL, could not extract filename: ${imageUrl}`);
+  }
+
+  let blob: Blob;
+  try {
+    blob = await removeBackground(normalizedUrl, {
+      model: "medium",
+      output: { format: "image/png", quality: 0.95 },
+    });
+  } catch (urlErr) {
+    // Fallback: fetch image and pass buffer (handles URL fetch failures)
+    const res = await fetch(normalizedUrl, { headers: { "User-Agent": "Turbomeck-RemoveBg/1.0" } });
+    if (!res.ok) {
+      throw new Error(
+        `Kunde inte hämta bilden (HTTP ${res.status}). Kontrollera att URL:en är giltig: ${normalizedUrl}`
+      );
+    }
+    const imageBuffer = Buffer.from(await res.arrayBuffer());
+    blob = await removeBackground(imageBuffer, {
+      model: "medium",
+      output: { format: "image/png", quality: 0.95 },
+    });
+  }
+  const noBgBuffer = Buffer.from(await blob.arrayBuffer());
+  const finalBuffer = await resizeWithSharp(noBgBuffer);
+  const outputFilename = filename.replace(/\.[^.]+$/, ".png");
+
+  return { filename: outputFilename, buffer: finalBuffer as Buffer };
+}
+
+/**
+ * Process product image from URL: fetch, resize, return buffer.
+ * Use for reprocessing existing R2 images (e.g. resize only).
+ */
+export async function processProductImageFromUrl(imageUrl: string): Promise<{
+  filename: string;
+  buffer: Buffer;
+}> {
+  const filename = extractFilenameFromImageUrl(imageUrl);
+  if (!filename) {
+    throw new Error(`Invalid image URL, could not extract filename: ${imageUrl}`);
+  }
+
+  const res = await fetch(imageUrl, {
+    headers: { "User-Agent": "Turbomeck-Reprocess/1.0" },
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch image: HTTP ${res.status}`);
+  }
+  const imageBuffer = Buffer.from(await res.arrayBuffer());
+  const finalBuffer = await resizeWithSharp(imageBuffer);
+  const outputFilename = filename.replace(/\.[^.]+$/, ".png");
+
+  return { filename: outputFilename, buffer: finalBuffer as Buffer };
 }

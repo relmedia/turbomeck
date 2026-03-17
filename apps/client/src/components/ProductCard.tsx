@@ -29,6 +29,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const t = useTranslation();
   const router = useRouter();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>(product.sizes[0]);
   const [selectedColor, setSelectedColor] = useState<string>(product.colors[0]);
   const attrs = product.attributes ?? [];
@@ -62,12 +63,14 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const nextImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setImageLoaded(false);
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
   };
 
   const prevImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setImageLoaded(false);
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
@@ -118,6 +121,9 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               Utbytes
             </span>
           )}
+          {!imageLoaded && (
+            <Skeleton className="absolute inset-x-0 top-0 bottom-16 z-10 rounded-none" />
+          )}
           <motion.div
             key={currentImageIndex}
             className="absolute inset-0"
@@ -130,6 +136,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               alt={`${product.name} - View ${currentImageIndex + 1}`}
               fill
               className="object-cover"
+              onLoad={() => setImageLoaded(true)}
             />
           </motion.div>
 

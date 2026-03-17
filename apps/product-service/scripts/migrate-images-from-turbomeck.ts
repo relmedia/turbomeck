@@ -42,28 +42,12 @@ async function fetchImageBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arr);
 }
 
-function resizeToSquare(buffer: Buffer): Promise<Buffer> {
-  return (async () => {
-    try {
-      const sharp = (await import("sharp")).default;
-      return sharp(buffer)
-        .resize(1200, 1200, { fit: "inside" })
-        .png({ compressionLevel: 6 })
-        .toBuffer();
-    } catch (err) {
-      const msg = String(err);
-      if (
-        msg.includes("ERR_DLOPEN_FAILED") ||
-        msg.includes('Could not load the "sharp"')
-      ) {
-        const { default: Jimp } = await import("jimp");
-        const image = await Jimp.read(buffer);
-        const scaled = image.scaleToFit(1200, 1200);
-        return scaled.getBufferAsync("image/png");
-      }
-      throw err;
-    }
-  })();
+async function resizeToSquare(buffer: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  return sharp(buffer)
+    .resize(1200, 1200, { fit: "inside" })
+    .png({ compressionLevel: 6 })
+    .toBuffer();
 }
 
 function uniqueFilename(productId: number, index: number): string {

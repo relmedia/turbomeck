@@ -3,10 +3,15 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, X, Loader2, ImageIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Upload, X, Loader2, ImageIcon, Eraser } from "lucide-react";
 import Image from "next/image";
 import { PRODUCT_API } from "@/lib/product-api";
-import { resolveImageUrl } from "@/lib/image-utils";
+import { resolveImageUrl, getFetchableImageUrl } from "@/lib/image-utils";
 
 interface ImageUploadProps {
   value?: string | null;
@@ -16,6 +21,7 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,6 +96,26 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
     }
   };
 
+  const handleRemoveBackground = async () => {
+    if (!value) return;
+    setIsRemovingBg(true);
+    setError(null);
+    try {
+      const res = await fetch(`${PRODUCT_API}/remove-background`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: getFetchableImageUrl(value) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Kunde inte ta bort bakgrund.");
+      onChange(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort bakgrund.");
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
   const handleRemove = async () => {
     if (value) {
       // Extract filename from URL
@@ -124,17 +150,40 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             />
           </div>
           <div className="absolute top-2 right-2 flex gap-1">
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="cursor-pointer"
-              onClick={handleRemove}
-              disabled={disabled || isUploading}
-              title="Ta bort bild"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="cursor-pointer"
+                  onClick={handleRemoveBackground}
+                  disabled={disabled || isUploading || isRemovingBg}
+                >
+                  {isRemovingBg ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Eraser className="w-4 h-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ta bort bakgrund</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="cursor-pointer"
+                  onClick={handleRemove}
+                  disabled={disabled || isUploading || isRemovingBg}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ta bort bild</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       ) : (

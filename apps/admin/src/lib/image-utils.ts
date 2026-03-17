@@ -24,3 +24,27 @@ export function resolveImageUrl(path: string | null): string {
   }
   return path;
 }
+
+/** Full fetchable URL for API calls (e.g. remove-background). */
+export function getFetchableImageUrl(path: string | null): string {
+  if (!path) return "";
+  if (path.startsWith("http")) {
+    // Ensure R2 path includes products/ prefix (some stored URLs may omit it)
+    try {
+      const url = new URL(path);
+      const pathname = url.pathname.replace(/^\//, "");
+      if (pathname && !pathname.startsWith("products/") && !pathname.includes("/products/")) {
+        url.pathname = `/products/${pathname}`;
+        return url.toString();
+      }
+      return path;
+    } catch {
+      return path;
+    }
+  }
+  const base = (R2_PUBLIC_URL || "").replace(/\/$/, "");
+  if (!base) return path;
+  // Ensure path has products/ prefix for R2
+  const normalized = path.startsWith("products/") ? path : `products/${path.replace(/^.*[/\\]/, "")}`;
+  return `${base}/${normalized}`;
+}

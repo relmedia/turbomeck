@@ -3,10 +3,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, X, Loader2, FolderOpen, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, X, Loader2, FolderOpen, RefreshCw, Trash2, Eraser } from "lucide-react";
 import Image from "next/image";
 import { PRODUCT_API } from "@/lib/product-api";
-import { resolveImageUrl } from "@/lib/image-utils";
+import { resolveImageUrl, getFetchableImageUrl } from "@/lib/image-utils";
 import {
   Popover,
   PopoverContent,
@@ -22,6 +22,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ThumbnailsUploadProps {
   value?: string[];
@@ -37,6 +42,7 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [deleteConfirmUrl, setDeleteConfirmUrl] = useState<string | null>(null);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
+  const [removingBgUrl, setRemovingBgUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadExistingUploads = async () => {
@@ -111,6 +117,27 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
     onChange(value.filter((_, i) => i !== index));
   };
 
+  const handleRemoveBackground = async (url: string, index: number) => {
+    setRemovingBgUrl(url);
+    setError(null);
+    try {
+      const res = await fetch(`${PRODUCT_API}/remove-background`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: getFetchableImageUrl(url) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Kunde inte ta bort bakgrund.");
+      const updated = [...value];
+      updated[index] = data.url;
+      onChange(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort bakgrund.");
+    } finally {
+      setRemovingBgUrl(null);
+    }
+  };
+
   const handleDeleteFromStorage = async (url: string) => {
     setDeleteConfirmUrl(null);
     setDeletingUrl(url);
@@ -151,17 +178,40 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
                 />
               </div>
               <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="h-6 w-6 cursor-pointer"
-                  onClick={() => handleRemove(index)}
-                  disabled={disabled || isUploading}
-                  title="Ta bort"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="h-6 w-6 cursor-pointer"
+                      onClick={() => handleRemoveBackground(url, index)}
+                      disabled={disabled || isUploading || !!removingBgUrl}
+                    >
+                      {removingBgUrl === url ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Eraser className="w-3 h-3" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ta bort bakgrund</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="h-6 w-6 cursor-pointer"
+                      onClick={() => handleRemove(index)}
+                      disabled={disabled || isUploading || !!removingBgUrl}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ta bort</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           ))}

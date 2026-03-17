@@ -32,6 +32,7 @@ export async function POST(
   const { path } = await params;
   const pathStr = path.join("/");
   const isUpload = pathStr.startsWith("upload");
+  const isRemoveBackground = pathStr === "remove-background";
   try {
     const contentType = req.headers.get("content-type") || "";
     let body: FormData | string;
@@ -47,15 +48,28 @@ export async function POST(
     if (typeof body === "string") {
       (fetchInit as Record<string, unknown>).headers = { "Content-Type": contentType || "application/json" };
     }
-    if (isUpload) {
+    if (isUpload || isRemoveBackground) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
       (fetchInit as RequestInit).signal = controller.signal;
+      const maxRetries = isRemoveBackground ? 2 : 0;
       try {
-        const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, fetchInit);
-        const text = await res.text();
-        const data = text ? JSON.parse(text) : {};
-        return NextResponse.json(data, { status: res.status });
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, fetchInit);
+            const text = await res.text();
+            const data = text ? JSON.parse(text) : {};
+            return NextResponse.json(data, { status: res.status });
+          } catch (e) {
+            const isConnReset =
+              (e as Error)?.cause && String((e as Error).cause).includes("ECONNRESET");
+            if (attempt < maxRetries && isConnReset) {
+              await new Promise((r) => setTimeout(r, 2000));
+              continue;
+            }
+            throw e;
+          }
+        }
       } finally {
         clearTimeout(timeout);
       }

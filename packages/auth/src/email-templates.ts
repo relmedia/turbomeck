@@ -9,9 +9,45 @@ const MUTED_COLOR = "#6b7280";
 const BORDER_COLOR = "#e5e7eb";
 const BG_LIGHT = "#f9fafb";
 
-// Logo removed – CID/base64 not reliable; using text "T" + TURBOMECK instead.
+// Logo URL – prefer Cloudflare R2 (branding/logo.png), then app URL (logo.svg)
+const LOGO_URL =
+  typeof process !== "undefined" && process.env
+    ? (() => {
+        const env = process.env;
+        if (env.EMAIL_LOGO_URL) return env.EMAIL_LOGO_URL;
+        const r2Base = (env.R2_PUBLIC_URL || env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
+        if (r2Base) return `${r2Base}/branding/logo.png`;
+        const appBase = (env.NEXT_PUBLIC_APP_URL || env.NEXTAUTH_URL || "").replace(/\/$/, "");
+        if (appBase) return `${appBase}/logo.svg`;
+        return "";
+      })()
+    : "";
 
 function baseWrapper(innerHtml: string) {
+  const headerContent = LOGO_URL
+    ? `
+                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 14px;">
+                          <img src="${LOGO_URL}" alt="Turbomeck" width="35" height="35" style="display: block; width: 35px; height: 35px;" />
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                        </td>
+                      </tr>
+                    </table>`
+    : `
+                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 14px;">
+                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                        </td>
+                      </tr>
+                    </table>`;
+
   return `
 <!DOCTYPE html>
 <html lang="sv">
@@ -29,15 +65,8 @@ function baseWrapper(innerHtml: string) {
             <td style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="background: linear-gradient(135deg, ${BRAND_COLOR} 0%, #5ab800 100%); padding: 28px 32px; text-align: center;">
-                    <table role="presentation" align="center" cellspacing="0" cellpadding="0">
-                      <tr>
-                        <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
-                          <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
-                        </td>
-                      </tr>
-                    </table>
-                    <p style="margin: 12px 0 0 0; font-size: 26px; font-weight: 700; font-style: italic; letter-spacing: 0.08em; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">TURBOMECK</p>
+                  <td style="background: linear-gradient(135deg, ${BRAND_COLOR} 0%, #5ab800 100%); padding: 28px 32px; text-align: left;">
+                    ${headerContent}
                   </td>
                 </tr>
                 <tr>
