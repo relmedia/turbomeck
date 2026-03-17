@@ -413,6 +413,24 @@ app.get("/api/products", async (req, res) => {
     }
     const productIds = allProducts.map((p) => p.id);
     const categoryMap = await getProductCategoryIds(productIds);
+
+    // Average rating per product (products without reviews get null)
+    const ratingMap = new Map<number, { avg: number; count: number }>();
+    if (productIds.length > 0) {
+      const ratingRows = await db
+        .select({
+          productId: reviews.productId,
+          avgRating: sql<number>`round(avg(${reviews.rating})::numeric, 1)`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(reviews)
+        .where(inArray(reviews.productId, productIds))
+        .groupBy(reviews.productId);
+      for (const r of ratingRows) {
+        ratingMap.set(r.productId, { avg: Number(r.avgRating), count: r.count });
+      }
+    }
+
     const formatted = allProducts.map((p) => {
       const loc = localizeProduct(p, locale);
       return {
@@ -433,6 +451,8 @@ app.get("/api/products", async (req, res) => {
       sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
+      averageRating: ratingMap.get(p.id)?.avg ?? null,
+      reviewCount: ratingMap.get(p.id)?.count ?? 0,
     };
     });
     res.json(formatted);

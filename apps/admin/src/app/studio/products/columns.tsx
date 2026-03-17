@@ -37,6 +37,8 @@ export type Product = {
   categoryIds: number[];
   stock?: number;
   sku?: string;
+  averageRating?: number | null;
+  reviewCount?: number;
 };
 
 function DeleteProductDialog({
@@ -237,12 +239,16 @@ export const createColumns = (
   {
     id: "rating",
     header: "Betyg",
-    cell: () => (
-      <span className="flex items-center gap-1 text-muted-foreground">
-        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-        —
-      </span>
-    ),
+    cell: ({ row }: { row: { original: Product } }) => {
+      const avg = row.original.averageRating;
+      const count = row.original.reviewCount ?? 0;
+      return (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Star className={`w-4 h-4 ${avg != null ? "fill-amber-400 text-amber-400" : ""}`} />
+          {avg != null ? `${avg}${count > 0 ? ` (${count})` : ""}` : "—"}
+        </span>
+      );
+    },
   },
   {
     id: "status",
