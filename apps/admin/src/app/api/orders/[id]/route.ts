@@ -24,12 +24,17 @@ export async function PATCH(
     }
 
     const body = await req.json().catch(() => ({}));
-    const { status, postNordTrackingId } = body as {
+    const { status, postNordTrackingId, coreReceived } = body as {
       status?: string;
       postNordTrackingId?: string;
+      coreReceived?: boolean;
     };
 
-    const updates: Partial<{ status: string; postNordTrackingId: string | null }> = {};
+    const updates: Partial<{
+      status: string;
+      postNordTrackingId: string | null;
+      coreReceivedAt: Date;
+    }> = {};
     if (status !== undefined) {
       if (!VALID_STATUSES.includes(status as (typeof VALID_STATUSES)[number])) {
         return NextResponse.json(

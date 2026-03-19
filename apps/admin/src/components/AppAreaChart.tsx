@@ -42,13 +42,13 @@ const AppAreaChart = () => {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/dashboard/orders")
+    fetch("/api/dashboard/visitors")
       .then((res) => {
         if (!res.ok) throw new Error("Kunde inte hämta data");
         return res.json();
       })
-      .then((rows: VisitorRow[]) => {
-        if (!cancelled) setData(rows);
+      .then((rows: unknown) => {
+        if (!cancelled) setData(Array.isArray(rows) ? (rows as VisitorRow[]) : []);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Ett fel uppstod");
@@ -63,8 +63,9 @@ const AppAreaChart = () => {
 
   const chartData = data.map((r) => ({
     month: r.monthLabel,
-    totalt: r.totalt,
-    slutforda: r.slutforda,
+    mobile: r.mobile,
+    desktop: r.desktop,
+    tablet: r.tablet,
   }));
 
   if (loading) {

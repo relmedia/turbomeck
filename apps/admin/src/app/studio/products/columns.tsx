@@ -195,7 +195,7 @@ export const createColumns = (
       const ids = row.original.categoryIds ?? [];
       const names = ids
         .map((id) => categoryMap[id])
-        .filter(Boolean);
+        .filter((n): n is string => typeof n === "string" && n.length > 0);
       const fullText = names.join(", ");
       const shortNames = names.map((n) => n.replace(/^Alla Produkter › /i, ""));
       const text = shortNames.join(", ");

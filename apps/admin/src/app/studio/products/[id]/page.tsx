@@ -125,6 +125,7 @@ export default function ProductDetailPage() {
     weight: "",
     depositAmount: "",
     categoryIds: [],
+    attributes: [],
     image: null,
     thumbnails: [],
   });
@@ -556,8 +557,9 @@ export default function ProductDetailPage() {
                     onChange={(e) =>
                       setFormData((prev) => {
                         const next = [...prev.attributes];
+                        const prevAttr = next[idx];
                         next[idx] = {
-                          ...next[idx],
+                          name: prevAttr?.name ?? "",
                           options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
                         };
                         return { ...prev, attributes: next };

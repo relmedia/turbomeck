@@ -160,13 +160,14 @@ export function DataTable<TData extends { id: number | string }, TValue>({
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: (updater) => {
-      const next = updater(pagination);
-      setPagination(next);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("page", String(next.pageIndex + 1));
-      params.set("pageSize", String(next.pageSize));
-      const url = `${pathname}?${params.toString()}`;
-      window.history.replaceState(null, "", url);
+      setPagination((old) => {
+        const next = typeof updater === "function" ? updater(old) : updater;
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("page", String(next.pageIndex + 1));
+        params.set("pageSize", String(next.pageSize));
+        window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+        return next;
+      });
     },
     state: {
       sorting,

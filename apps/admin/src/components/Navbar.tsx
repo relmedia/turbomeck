@@ -31,10 +31,11 @@ const Navbar = () => {
     : session?.user?.email?.[0]?.toUpperCase() ?? "?";
 
   const cycleTheme = () => {
-    const current = theme || "system";
+    const current = theme ?? "system";
     const idx = THEME_ORDER.indexOf(current as (typeof THEME_ORDER)[number]);
-    const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
-    setTheme(next);
+    const nextIdx =
+      ((idx + 1) % THEME_ORDER.length + THEME_ORDER.length) % THEME_ORDER.length;
+    setTheme(THEME_ORDER[nextIdx] ?? "system");
   };
 
   const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;

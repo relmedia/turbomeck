@@ -10,6 +10,7 @@ import {
   useReactTable,
   type ColumnDef,
   type FilterFn,
+  type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
 import {
@@ -106,6 +107,10 @@ type RecentOrdersProps = {
 export function RecentOrders({ hideTitle, onToolbarRender, orders: ordersProp, firstUserId }: RecentOrdersProps = {}) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 8,
+  });
 
   const columns = useMemo<ColumnDef<OrderRow>[]>(
     () => [
@@ -250,12 +255,13 @@ export function RecentOrders({ hideTitle, onToolbarRender, orders: ordersProp, f
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel({ pageSize: 8 }),
+    getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
-    state: { globalFilter, sorting },
+    onPaginationChange: setPagination,
+    state: { globalFilter, sorting, pagination },
     globalFilterFn,
   });
 

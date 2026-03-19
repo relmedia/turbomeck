@@ -10,6 +10,7 @@ import {
   useReactTable,
   type ColumnDef,
   type FilterFn,
+  type PaginationState,
   type SortingState,
 } from "@tanstack/react-table";
 import {
@@ -69,6 +70,10 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
   const [loading, setLoading] = useState(true);
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 8,
+  });
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -214,12 +219,13 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel({ pageSize: 8 }),
+    getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
-    state: { globalFilter, sorting },
+    onPaginationChange: setPagination,
+    state: { globalFilter, sorting, pagination },
     globalFilterFn,
   });
 

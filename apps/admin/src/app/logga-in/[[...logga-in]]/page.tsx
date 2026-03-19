@@ -101,7 +101,10 @@ function SignInContent() {
       if (!res.ok) {
         const text = await res.text();
         const match = text.match(/error=([^&"'\s]+)/);
-        throw new Error(match ? decodeURIComponent(match[1]) : "Inloggningen misslyckades");
+        const errCode = match?.[1];
+        throw new Error(
+          errCode ? decodeURIComponent(errCode) : "Inloggningen misslyckades"
+        );
       }
       const targetUrl = res.redirected && res.url ? res.url : "/logga-in/verify";
       window.location.href = targetUrl;
