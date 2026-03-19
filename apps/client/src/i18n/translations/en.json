@@ -314,6 +314,15 @@
     "loginToComplete": "Log in to complete your purchase",
     "loginToCompleteDesc": "You need to be logged in to proceed to checkout."
   },
+  "slider": {
+    "regionLabel": "Featured products",
+    "featured": "Featured",
+    "from": "From",
+    "prevSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "goToSlide": "Go to slide {{n}}",
+    "position": "{{current}} / {{total}}"
+  },
   "footer": {
     "quickLinks": "Quick links",
     "products": "Products",

@@ -124,6 +124,23 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes homepage-slider-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-slider-progress-fill {
+    animation: none !important;
+    transform: scaleX(1);
+    opacity: 0.28;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

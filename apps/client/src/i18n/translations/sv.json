@@ -314,6 +314,15 @@
     "loginToComplete": "Logga in för att slutföra köpet",
     "loginToCompleteDesc": "Du måste vara inloggad för att kunna slutföra köpet"
   },
+  "slider": {
+    "regionLabel": "Utvalda produkter",
+    "featured": "Utvalt",
+    "from": "Från",
+    "prevSlide": "Föregående",
+    "nextSlide": "Nästa",
+    "goToSlide": "Gå till slide {{n}}",
+    "position": "{{current}} / {{total}}"
+  },
   "footer": {
     "quickLinks": "Snabb länkar",
     "products": "Produkter",
