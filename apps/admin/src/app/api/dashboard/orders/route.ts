@@ -2,7 +2,11 @@ import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { monthLabelSv } from "@/lib/dashboard-month-labels";
+
+const MONTH_NAMES_SV = [
+  "Januari", "Februari", "Mars", "April", "Maj", "Juni",
+  "Juli", "Augusti", "September", "Oktober", "November", "December",
+];
 
 /** GET /api/dashboard/orders - Order counts per month (last 6 months) for chart */
 export async function GET() {
@@ -35,7 +39,7 @@ export async function GET() {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       byMonth.set(key, {
         month: key,
-        monthLabel: monthLabelSv(d.getMonth()),
+        monthLabel: MONTH_NAMES_SV[d.getMonth()] ?? "",
         totalt: 0,
         slutforda: 0,
         pagang: 0,
