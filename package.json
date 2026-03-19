@@ -13,6 +13,8 @@
     "db:generate": "pnpm --filter @repo/database db:generate",
     "db:migrate": "pnpm --filter @repo/database db:migrate",
     "db:studio": "pnpm --filter @repo/database db:studio",
+    "db:seed": "pnpm --filter @repo/database db:seed",
+    "db:check": "pnpm --filter @repo/database db:check",
     "delete-r2-images": "pnpm --filter product-service delete-r2-images",
     "migrate-images": "pnpm --filter product-service migrate-images"
   },

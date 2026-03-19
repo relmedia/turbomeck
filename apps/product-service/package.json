@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=.env --watch src/index.ts",
+    "start": "tsx --env-file=.env src/index.ts",
     "check-types": "tsc --noEmit",
     "delete-r2-images": "tsx --env-file=.env scripts/delete-all-r2-images.ts",
     "migrate-images": "tsx --env-file=.env scripts/migrate-images-from-turbomeck.ts",

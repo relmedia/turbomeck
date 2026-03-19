@@ -1061,6 +1061,7 @@ app.delete("/api/products/:id", async (req, res) => {
   }
 });
 
-app.listen(8000, () => {
-  console.log("Product service is running on port 8000");
+const port = Number(process.env.PORT) || 8000;
+app.listen(port, () => {
+  console.log(`Product service is running on port ${port}`);
 });
