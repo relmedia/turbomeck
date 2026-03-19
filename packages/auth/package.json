@@ -19,6 +19,7 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
+    "@types/nodemailer": "^7.0.11",
     "sharp": "^0.34.5",
     "typescript": "^5.9.2"
   }

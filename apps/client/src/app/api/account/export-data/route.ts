@@ -160,7 +160,7 @@ export async function GET() {
   const pdfBytes = await pdfDoc.save();
   const filename = `turbomeck-mina-uppgifter-${new Date().toISOString().slice(0, 10)}.pdf`;
 
-  return new NextResponse(pdfBytes, {
+  return new NextResponse(Buffer.from(pdfBytes), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

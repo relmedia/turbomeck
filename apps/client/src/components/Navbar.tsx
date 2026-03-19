@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SearchBar from "./SearchBar";
@@ -44,7 +44,16 @@ const Navbar = () => {
       </Link>
       {/*RIGHT*/}
       <div className="flex items-center gap-6">
-        <SearchBar />
+        <Suspense
+          fallback={
+            <div
+              className="h-9 w-full min-w-[120px] max-w-[200px] rounded-md bg-muted md:max-w-md"
+              aria-hidden
+            />
+          }
+        >
+          <SearchBar />
+        </Suspense>
         <WishlistIcon />
         <ShoppingCartIcon />
         <LanguageSwitcher />

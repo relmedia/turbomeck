@@ -69,9 +69,9 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
   useEffect(() => {
     if (initialAddress) {
       reset({
-        country: "SE",
-        phone: "",
         ...initialAddress,
+        country: initialAddress.country ?? "SE",
+        phone: initialAddress.phone ?? "",
       });
     }
   }, [initialAddress, reset]);

@@ -34,8 +34,10 @@ app.post('/create-payment-intent', async (c) => {
   }
 
   try {
-    const body = await c.req.json<{ amount?: number }>().catch(() => ({}))
-    const amountSek = parseFloat(String(body?.amount ?? 0)) || 0
+    const body = await c.req
+      .json<{ amount?: number }>()
+      .catch((): { amount?: number } => ({}))
+    const amountSek = parseFloat(String(body.amount ?? 0)) || 0
 
     if (amountSek <= 0) {
       return c.json({ error: 'Amount must be greater than 0' }, 400)

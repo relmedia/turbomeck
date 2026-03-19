@@ -45,6 +45,8 @@ function useReducedMotion(): boolean {
 }
 
 const AUTO_ADVANCE_MS = 6000;
+const SLIDER_DOT_W_ACTIVE = 18;
+const SLIDER_DOT_W_IDLE = 6;
 
 export function HomepageSlider() {
   const { locale, t } = useLanguage();
@@ -144,7 +146,7 @@ export function HomepageSlider() {
         if (!dot) return;
         const inner = dot.querySelector("[data-dot-inner]") as HTMLElement | null;
         if (inner) {
-          inner.style.width = i === index ? "24px" : "8px";
+          inner.style.width = i === index ? `${SLIDER_DOT_W_ACTIVE}px` : `${SLIDER_DOT_W_IDLE}px`;
           inner.style.backgroundColor = i === index ? "rgb(245 158 11)" : "rgb(82 82 91)";
         }
       });
@@ -227,7 +229,7 @@ export function HomepageSlider() {
       const inner = dot.querySelector("[data-dot-inner]") as HTMLElement | null;
       if (!inner) return;
       gsap.to(inner, {
-        width: i === index ? 24 : 8,
+        width: i === index ? SLIDER_DOT_W_ACTIVE : SLIDER_DOT_W_IDLE,
         backgroundColor: i === index ? "rgb(245 158 11)" : "rgb(82 82 91)",
         duration: 0.32,
         ease: "power2.out",
@@ -480,7 +482,7 @@ export function HomepageSlider() {
           >
             <ChevronRight className="h-5 w-5" aria-hidden strokeWidth={2.25} />
           </button>
-          <div className="absolute bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-white/10 bg-zinc-950/65 px-2 py-2 backdrop-blur-md md:bottom-5">
+          <div className="absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-px rounded-full border border-white/6 bg-zinc-950/30 px-1 py-1 backdrop-blur-sm md:bottom-4">
             {products.map((_, i) => (
               <button
                 key={i}
@@ -490,14 +492,14 @@ export function HomepageSlider() {
                   e.preventDefault();
                   goTo(i);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/5"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-white transition-colors hover:bg-white/5"
                 aria-label={t("slider.goToSlide", { n: i + 1 })}
                 aria-current={i === index ? "true" : undefined}
               >
                 <span
                   data-dot-inner
-                  className="block h-2 rounded-full bg-zinc-600"
-                  style={{ width: i === index ? 24 : 8 }}
+                  className="block h-1.5 rounded-full bg-zinc-600"
+                  style={{ width: i === index ? SLIDER_DOT_W_ACTIVE : SLIDER_DOT_W_IDLE }}
                 />
               </button>
             ))}

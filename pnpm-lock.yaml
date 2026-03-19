@@ -478,6 +478,9 @@ importers:
       '@types/bcryptjs':
         specifier: ^2.4.6
         version: 2.4.6
+      '@types/nodemailer':
+        specifier: ^7.0.11
+        version: 7.0.11
       sharp:
         specifier: 0.32.6
         version: 0.32.6

@@ -42,10 +42,14 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
     totalCount: number;
   } | "loading" | "error">("loading");
 
-  const images =
+  const images: string[] =
     product.galleryImages && product.galleryImages.length > 0
-      ? product.galleryImages
+      ? product.galleryImages.filter(
+          (u): u is string => typeof u === "string" && u.length > 0
+        )
       : [product.images?.default || "/logo.svg"];
+
+  const cardImageSrc = images[currentImageIndex] ?? images[0] ?? "/logo.svg";
 
   useEffect(() => {
     const pid = Number(product.id);
@@ -132,7 +136,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
             transition={{ duration: 0.3 }}
           >
             <ImageWithFallback
-              src={images[currentImageIndex]}
+              src={cardImageSrc}
               alt={`${product.name} - View ${currentImageIndex + 1}`}
               fill
               className="object-cover"
@@ -270,10 +274,13 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      ({reviewStats !== "error" ? reviewStats.totalCount : 0}{" "}
-                      {reviewStats.totalCount === 1
+                      (
+                      {typeof reviewStats === "object" ? reviewStats.totalCount : 0}{" "}
+                      {typeof reviewStats === "object" &&
+                      reviewStats.totalCount === 1
                         ? t("common.review")
-                        : t("common.reviews")})
+                        : t("common.reviews")}
+                      )
                     </span>
                   </>
                 )}
