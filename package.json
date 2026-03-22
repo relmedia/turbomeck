@@ -17,6 +17,7 @@
     "db:export": "pnpm --filter @repo/database db:export",
     "db:import": "pnpm --filter @repo/database db:import",
     "db:check": "pnpm --filter @repo/database db:check",
+    "debug:products": "node scripts/debug/product-pipeline.mjs",
     "delete-r2-images": "pnpm --filter product-service delete-r2-images",
     "migrate-images": "pnpm --filter product-service migrate-images"
   },

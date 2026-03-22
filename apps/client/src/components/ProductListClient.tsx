@@ -70,22 +70,55 @@ export function ProductListClient({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([fetchProducts(locale), fetchCategories(locale)])
-      .then(([productsData, categoriesData]) => {
-        if (!cancelled) {
-          setProducts(productsData);
-          setCategoriesState(categoriesData);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          console.error("Failed to fetch:", e);
+    Promise.allSettled([fetchProducts(locale), fetchCategories(locale)]).then(
+      (results) => {
+        if (cancelled) return;
+        const [pRes, cRes] = results;
+        // #region agent log
+        fetch(
+          "http://127.0.0.1:7853/ingest/a34f3511-3fde-4631-9546-6f9d6739df56",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "e93869",
+            },
+            body: JSON.stringify({
+              sessionId: "e93869",
+              hypothesisId: "H8",
+              location: "ProductListClient.tsx:useEffect",
+              message: "fetchProducts + fetchCategories settled",
+              data: {
+                locale,
+                productsStatus: pRes.status,
+                categoriesStatus: cRes.status,
+                productsCount:
+                  pRes.status === "fulfilled" ? pRes.value.length : null,
+                productsReason:
+                  pRes.status === "rejected"
+                    ? String((pRes.reason as Error)?.message ?? pRes.reason)
+                    : null,
+                categoriesReason:
+                  cRes.status === "rejected"
+                    ? String((cRes.reason as Error)?.message ?? cRes.reason)
+                    : null,
+              },
+              timestamp: Date.now(),
+            }),
+          },
+        ).catch(() => {});
+        // #endregion
+        if (pRes.status === "fulfilled") setProducts(pRes.value);
+        else {
+          console.error("Failed to fetch products:", pRes.reason);
           setProducts([]);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        if (cRes.status === "fulfilled") setCategoriesState(cRes.value);
+        else console.error("Failed to fetch categories:", cRes.reason);
+      },
+    ).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
