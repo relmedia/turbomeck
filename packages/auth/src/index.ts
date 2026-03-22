@@ -87,12 +87,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.error("[Auth] Mail settings not configured. Configure SMTP in admin Settings.");
           throw new Error("E-post är inte konfigurerad. Kontakta administratören.");
         }
+        const rejectUnauthorized = process.env.SMTP_REJECT_UNAUTHORIZED !== "false";
         const transporter = nodemailer.createTransport({
           host: config.host,
           port: config.port || 587,
           secure: config.secure,
           auth: config.user ? { user: config.user, pass: config.password } : undefined,
-          tls: { rejectUnauthorized: process.env.NODE_ENV === "production" },
+          tls: { rejectUnauthorized },
         });
         const { html, text } = renderMagicLinkEmail(url);
         await transporter.sendMail({
