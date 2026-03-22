@@ -26,12 +26,11 @@ import { Field, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 
-const loginSchema = z.object({
+const emailLinkSchema = z.object({
   email: z.string().email({ message: "Ange en giltig e-postadress" }),
-  password: z.string().min(1, { message: "Lösenord krävs" }),
 });
 
-type SignInValues = z.infer<typeof loginSchema>;
+type SignInValues = z.infer<typeof emailLinkSchema>;
 
 function SignInContent() {
   const [loading, setLoading] = useState(false);
@@ -39,15 +38,17 @@ function SignInContent() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/studio";
   const errorParam = searchParams.get("error");
   const error =
-    errorParam === "CredentialsSignin"
-      ? "Fel e-post eller lösenord"
-      : errorParam
-        ? "Inloggningen misslyckades"
-        : "";
+    errorParam === "EmailSignin"
+      ? "Kunde inte skicka inloggningslänk. Kontrollera att e-post är konfigurerad i Inställningar."
+      : errorParam === "Verification"
+        ? "Inloggningslänken är inte längre giltig. Den kan redan ha använts eller ha gått ut."
+        : errorParam
+          ? "Inloggningen misslyckades"
+          : "";
 
   const form = useForm<SignInValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    resolver: zodResolver(emailLinkSchema),
+    defaultValues: { email: "" },
   });
 
   const formatDateTime = () => {
@@ -71,29 +72,40 @@ function SignInContent() {
     form.setError("root", { message: "" });
     try {
       const csrfRes = await fetch("/api/auth/csrf");
-      const csrfData = await csrfRes.json();
-      const csrfToken = csrfData?.csrfToken;
-      if (!csrfToken) {
-        throw new Error("Kunde inte hämta säkerhetstoken.");
+      const csrfText = await csrfRes.text();
+      if (!csrfRes.ok) {
+        throw new Error("Kunde inte hämta säkerhetstoken. Försök igen.");
       }
-
-      const res = await fetch("/api/auth/callback/credentials", {
+      let csrfToken: string;
+      try {
+        const csrfData = JSON.parse(csrfText);
+        csrfToken = csrfData?.csrfToken ?? "";
+      } catch {
+        throw new Error("Ogiltigt svar från servern. Försök igen.");
+      }
+      if (!csrfToken) {
+        throw new Error("Saknar säkerhetstoken.");
+      }
+      const params = new URLSearchParams({
+        csrfToken,
+        email: values.email,
+        callbackUrl,
+      });
+      const res = await fetch("/api/auth/signin/email", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          csrfToken,
-          email: values.email,
-          password: values.password,
-          callbackUrl,
-        }).toString(),
-        redirect: "follow",
+        body: params.toString(),
       });
-
-      if (res.url?.includes("error=")) {
-        throw new Error("Fel e-post eller lösenord");
+      if (!res.ok) {
+        const text = await res.text();
+        const match = text.match(/error=([^&"'\s]+)/);
+        const errCode = match?.[1];
+        throw new Error(
+          errCode ? decodeURIComponent(errCode) : "Inloggningen misslyckades"
+        );
       }
-
-      window.location.href = callbackUrl;
+      const targetUrl = res.redirected && res.url ? res.url : "/studio/verify";
+      window.location.href = targetUrl;
     } catch (err) {
       form.setError("root", {
         message: err instanceof Error ? err.message : "Något gick fel",
@@ -125,9 +137,9 @@ function SignInContent() {
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Admin Login</CardTitle>
+          <CardTitle>Logga in till ditt konto</CardTitle>
           <CardDescription>
-            Logga in med din e-post och lösenord
+            Ange din e-post så skickar vi en inloggningslänk till din mejl
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -144,28 +156,8 @@ function SignInContent() {
                         <Input
                           id="email"
                           type="email"
-                          placeholder="admin@example.com"
+                          placeholder="m@example.com"
                           autoComplete="email"
-                          className="w-full"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel htmlFor="password">Lösenord</FormLabel>
-                      <FormControl>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="••••••••"
-                          autoComplete="current-password"
                           className="w-full"
                           {...field}
                         />
@@ -181,7 +173,7 @@ function SignInContent() {
                 )}
                 <Field>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Loggar in..." : "Logga in"}
+                    {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
                   </Button>
                 </Field>
                 <Field>
