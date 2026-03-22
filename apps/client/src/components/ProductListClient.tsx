@@ -75,14 +75,10 @@ export function ProductListClient({
         if (cancelled) return;
         const [pRes, cRes] = results;
         // #region agent log
-        fetch(
-          "http://127.0.0.1:7853/ingest/a34f3511-3fde-4631-9546-6f9d6739df56",
-          {
+        if (process.env.NODE_ENV === "development") {
+          fetch("/api/debug-log", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "e93869",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionId: "e93869",
               hypothesisId: "H8",
@@ -103,10 +99,9 @@ export function ProductListClient({
                     ? String((cRes.reason as Error)?.message ?? cRes.reason)
                     : null,
               },
-              timestamp: Date.now(),
             }),
-          },
-        ).catch(() => {});
+          }).catch(() => {});
+        }
         // #endregion
         if (pRes.status === "fulfilled") setProducts(pRes.value);
         else {

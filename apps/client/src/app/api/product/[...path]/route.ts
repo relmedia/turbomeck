@@ -1,3 +1,5 @@
+import { appendFileSync } from "node:fs";
+import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { LOCALE_COOKIE_NAME } from "@/i18n/context";
 
@@ -23,9 +25,63 @@ export async function GET(
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) : {};
+    // #region agent log
+    if (process.env.NODE_ENV === "development") {
+      try {
+        const logPath = join(process.cwd(), "..", "..", "debug-e93869.log");
+        const arrLen = Array.isArray(data) ? data.length : null;
+        const errKey =
+          data && typeof data === "object" && "error" in data
+            ? String((data as { error: unknown }).error)
+            : null;
+        appendFileSync(
+          logPath,
+          `${JSON.stringify({
+            sessionId: "e93869",
+            hypothesisId: "H9",
+            location: "api/product/[...path]/GET",
+            message: "proxy upstream response",
+            data: {
+              pathStr,
+              upstreamStatus: res.status,
+              upstreamOk: res.ok,
+              arrayLength: arrLen,
+              errorField: errKey,
+            },
+            timestamp: Date.now(),
+          })}\n`,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    // #endregion
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy GET error:", err);
+    // #region agent log
+    if (process.env.NODE_ENV === "development") {
+      try {
+        const logPath = join(process.cwd(), "..", "..", "debug-e93869.log");
+        appendFileSync(
+          logPath,
+          `${JSON.stringify({
+            sessionId: "e93869",
+            hypothesisId: "H9",
+            location: "api/product/[...path]/GET",
+            message: "proxy fetch threw",
+            data: {
+              pathStr,
+              errorMessage: String((err as Error)?.message ?? err),
+            },
+            timestamp: Date.now(),
+          })}\n`,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    // #endregion
     return NextResponse.json(
       { error: "Kunde inte ansluta till produkt-tjänsten. Kontrollera att den körs på port 8000." },
       { status: 502 }
