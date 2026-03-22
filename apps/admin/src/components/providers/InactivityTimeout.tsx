@@ -22,7 +22,7 @@ export function InactivityTimeout() {
       clearTimeout(timeoutRef.current);
     }
     timeoutRef.current = setTimeout(() => {
-      signOut({ callbackUrl: "/logga-in" });
+      signOut({ callbackUrl: "/studio/logga-in" });
     }, INACTIVITY_MS);
   }, []);
 

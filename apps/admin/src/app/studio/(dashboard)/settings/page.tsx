@@ -10,7 +10,7 @@ export const metadata = {
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/logga-in");
+    redirect("/studio/logga-in");
   }
   if (session.user.role !== "admin") {
     redirect("/studio");

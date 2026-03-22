@@ -20,6 +20,21 @@ type MailConfig = {
   from: string;
 };
 
+/** VPS/bootstrap: set when `app_settings.mail` is not configured yet (e.g. before first admin login). */
+function getMailConfigFromEnv(): MailConfig | null {
+  const host = process.env.SMTP_HOST?.trim();
+  if (!host) return null;
+  const port = Number.parseInt(process.env.SMTP_PORT || "587", 10);
+  const secure =
+    process.env.SMTP_SECURE === "true" ||
+    process.env.SMTP_SECURE === "1" ||
+    process.env.SMTP_SECURE === "yes";
+  const user = process.env.SMTP_USER?.trim() ?? "";
+  const password = process.env.SMTP_PASSWORD?.trim() ?? "";
+  const from = process.env.MAIL_FROM?.trim() || user || "noreply@localhost";
+  return { host, port: Number.isFinite(port) ? port : 587, secure, user, password, from };
+}
+
 async function getMailConfig(): Promise<MailConfig | null> {
   try {
     const [row] = await db
@@ -27,13 +42,14 @@ async function getMailConfig(): Promise<MailConfig | null> {
       .from(appSettings)
       .where(eq(appSettings.key, "mail"))
       .limit(1);
-    if (!row?.value) return null;
-    const parsed = JSON.parse(row.value) as MailConfig;
-    if (!parsed.host?.trim()) return null;
-    return parsed;
+    if (row?.value) {
+      const parsed = JSON.parse(row.value) as MailConfig;
+      if (parsed.host?.trim()) return parsed;
+    }
   } catch {
-    return null;
+    /* fall through */
   }
+  return getMailConfigFromEnv();
 }
 
 declare module "next-auth" {

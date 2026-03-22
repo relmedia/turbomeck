@@ -73,7 +73,7 @@ const Navbar = () => {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onClick={() => signOut({ callbackUrl: "/logga-in" })}
+            onClick={() => signOut({ callbackUrl: "/studio/logga-in" })}
           >
             <LogOut className="size-4" />
             Logga ut
