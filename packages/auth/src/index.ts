@@ -59,6 +59,12 @@ declare module "next-auth" {
 }
 
 export { renderTestEmail } from "./email-templates";
+
+/** Storefront vs admin: each Next.js app sets AUTH_SIGNIN_PATH (and AUTH_VERIFY_PATH) in its own .env. */
+const authSignInPath = process.env.AUTH_SIGNIN_PATH?.trim() || "/logga-in";
+const authVerifyPath =
+  process.env.AUTH_VERIFY_PATH?.trim() || `${authSignInPath.replace(/\/$/, "")}/verify`;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   adapter: DrizzleAdapter(db, {
@@ -168,10 +174,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
+    /**
+     * Keep redirects on this app’s AUTH_URL (each app sets its own port in dev).
+     * Prevents cross-app jumps like client → localhost:3001/studio/logga-in.
+     */
+    redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        const next = new URL(url);
+        if (next.origin === new URL(baseUrl).origin) return url;
+      } catch {
+        /* ignore */
+      }
+      return baseUrl;
+    },
   },
   pages: {
-    signIn: "/logga-in",
-    verifyRequest: "/logga-in/verify",
-    error: "/logga-in",
+    signIn: authSignInPath,
+    verifyRequest: authVerifyPath,
+    error: authSignInPath,
   },
 });

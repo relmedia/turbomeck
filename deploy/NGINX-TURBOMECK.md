@@ -4,7 +4,7 @@
 
 Use **`deploy/nginx-turbomeck.cloud.conf`** as a **single paste** into `/etc/nginx/sites-available/turbomeck` (or your site file). It includes the two **`map`** blocks at the top (valid because `sites-enabled` is included inside **`http { }`** on Debian/Ubuntu), then the HTTPS + HTTP **server** blocks.
 
-It adds `^~ /api/product/` → 3000, removes `product` / `reviews` / `account` from the admin regex, adds `/login` → 3001, and uses **maps** for `/api/reviews` (POST vs GET) and numeric IDs (PATCH from `/studio` vs storefront).
+It adds `^~ /api/product/` → 3000, **`^~ /api/auth/` → 3000** (NextAuth must hit the storefront so redirects use `/logga-in`, not admin `/studio/logga-in`), removes `product` / `reviews` / `account` / **`auth`** from the admin regex, adds `/login` → 3001, and uses **maps** for `/api/reviews` (POST vs GET) and numeric IDs (PATCH from `/studio` vs storefront).
 
 **Two Next.js apps on one hostname** both request `/_next/static/...`. The reference config adds **`map $http_referer $next_static_upstream`** and **`location ^~ /_next/`** so requests **referred** from `/logga-in`, `/studio`, or `/login` go to **3001**; everything else defaults to **3000**. If anything still loads wrong assets (empty `Referer`), use **`basePath`** on the admin app or **`admin.turbomeck.cloud` → 3001** only.
 

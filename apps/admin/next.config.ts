@@ -13,8 +13,8 @@ function getR2ImagePattern() {
 
 const nextConfig: NextConfig = {
   env: {
-    // Must be inlined for client - next-auth defaults to :3000 otherwise
-    NEXTAUTH_URL: "http://localhost:3001",
+    // Must be inlined for client; read from apps/admin/.env (falls back for dev).
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3001",
   },
   turbopack: {
     root: path.resolve(__dirname, "../.."),

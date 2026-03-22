@@ -12,6 +12,10 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  env: {
+    // Pin next-auth/react to this app’s origin (avoid redirects to admin :3001 in dev).
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
+  },
   outputFileTracingRoot: path.join(__dirname, "../../"),
   webpack: (config) => {
     // Ensure monorepo root node_modules is in resolution path (fixes CSS @import in turbo)
