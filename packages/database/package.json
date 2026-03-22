@@ -18,6 +18,7 @@
     "db:export": "tsx scripts/export-db.ts",
     "db:import": "tsx scripts/import-db.ts",
     "db:check": "tsx src/check.ts",
+    "db:products": "tsx scripts/products-summary.ts",
     "db:migrate-categories": "tsx scripts/migrate-to-product-categories.ts",
     "db:set-admin": "tsx scripts/set-admin-role.ts"
   },
