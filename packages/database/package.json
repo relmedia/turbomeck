@@ -20,9 +20,11 @@
     "db:check": "tsx src/check.ts",
     "db:products": "tsx scripts/products-summary.ts",
     "db:migrate-categories": "tsx scripts/migrate-to-product-categories.ts",
-    "db:set-admin": "tsx scripts/set-admin-role.ts"
+    "db:set-admin": "tsx scripts/set-admin-role.ts",
+    "db:set-password": "tsx scripts/set-admin-password.ts"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "drizzle-orm": "^0.39.0",
     "postgres": "^3.4.5"
   },
