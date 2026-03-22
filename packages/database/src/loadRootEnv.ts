@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Load monorepo root `.env` into `process.env` when not already set (for CLI scripts). */
+/** Load monorepo root `.env` into `process.env` (for CLI and apps). */
 export function loadRootEnv(): void {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   // src/ → database/ → packages/ → monorepo root
@@ -21,6 +21,11 @@ export function loadRootEnv(): void {
     ) {
       val = val.slice(1, -1);
     }
-    if (process.env[key] === undefined) process.env[key] = val;
+    // Root `.env` is the single source for DATABASE_URL (overrides per-app `.env` / Docker defaults).
+    if (key === "DATABASE_URL" && val) {
+      process.env.DATABASE_URL = val;
+    } else if (process.env[key] === undefined) {
+      process.env[key] = val;
+    }
   }
 }
