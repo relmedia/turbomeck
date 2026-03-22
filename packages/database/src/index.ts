@@ -5,7 +5,15 @@ import { loadRootEnv } from "./loadRootEnv";
 
 loadRootEnv();
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5433/turbodb";
+// Default only when unset (local dev). Docker Compose often uses 5433 — set DATABASE_URL in root `.env`.
+const connectionString =
+  process.env.DATABASE_URL ||
+  (() => {
+    console.warn(
+      "[@repo/database] DATABASE_URL is unset; using dev default postgresql://postgres:postgres@127.0.0.1:5432/turbodb",
+    );
+    return "postgresql://postgres:postgres@127.0.0.1:5432/turbodb";
+  })();
 
 // Limit pool size to avoid "too many clients" (client + admin + product-service share DB)
 const client = postgres(connectionString, {
