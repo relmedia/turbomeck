@@ -2,7 +2,7 @@
  * Check database connectivity and verify all expected tables exist.
  * Usage: pnpm db:check
  *
- * Requires: DATABASE_URL env or postgresql://postgres:postgres@127.0.0.1:5433/turbodb
+ * Requires: DATABASE_URL env (see monorepo root `.env`) or default dev URL in this file.
  */
 import postgres from "postgres";
 import { loadRootEnv } from "./loadRootEnv";
@@ -28,7 +28,7 @@ const EXPECTED_TABLES = [
 
 async function check() {
   const connectionString =
-    process.env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5433/turbodb";
+    process.env.DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:5432/turbodb";
 
   console.log("Checking database...");
   console.log("Connection:", connectionString.replace(/:[^:@]+@/, ":****@"));

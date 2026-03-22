@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request } from "express";
 import cors from "cors";
 import multer from "multer";
 import path from "path";
@@ -12,6 +12,16 @@ import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-s
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/** Set EXPOSE_DB_ERRORS=1 temporarily on the server to see Postgres messages in JSON (debug only). */
+function jsonDbError(err: unknown, publicMessage: string) {
+  const code = (err as { code?: string })?.code;
+  const msg = err instanceof Error ? err.message : String(err);
+  if (process.env.EXPOSE_DB_ERRORS === "1") {
+    return { error: publicMessage, detail: msg, code: code ?? undefined };
+  }
+  return { error: publicMessage };
+}
 
 const app = express();
 
@@ -56,6 +66,33 @@ app.use(
     credentials: true,
   })
 );
+
+/** Only loopback — safe to return Postgres error text (no password). */
+function isLocalRequest(req: Request): boolean {
+  const raw =
+    req.socket.remoteAddress ??
+    (typeof req.headers["x-forwarded-for"] === "string"
+      ? req.headers["x-forwarded-for"].split(",")[0]?.trim()
+      : undefined);
+  if (!raw) return false;
+  const ip = raw.replace(/^::ffff:/, "");
+  return ip === "127.0.0.1" || ip === "::1";
+}
+
+/** Localhost-only DB probe: `curl -sS http://127.0.0.1:8000/api/health/db` on the VPS. */
+app.get("/api/health/db", async (req, res) => {
+  if (!isLocalRequest(req)) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  try {
+    await db.select({ id: categories.id }).from(categories).limit(1);
+    res.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = (e as { code?: string }).code;
+    res.status(500).json({ ok: false, message: msg, code });
+  }
+});
 
 // Upload image endpoint – R2 only (no public folder)
 app.post("/api/upload", upload.single("image"), async (req, res) => {
@@ -178,7 +215,7 @@ app.get("/api/categories", async (req, res) => {
     res.json(out);
   } catch (error) {
     console.error("Error fetching categories:", error);
-    res.status(500).json({ error: "Failed to fetch categories" });
+    res.status(500).json(jsonDbError(error, "Failed to fetch categories"));
   }
 });
 
@@ -417,17 +454,21 @@ app.get("/api/products", async (req, res) => {
     // Average rating per product (products without reviews get null)
     const ratingMap = new Map<number, { avg: number; count: number }>();
     if (productIds.length > 0) {
-      const ratingRows = await db
-        .select({
-          productId: reviews.productId,
-          avgRating: sql<number>`round(avg(${reviews.rating})::numeric, 1)`,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(reviews)
-        .where(inArray(reviews.productId, productIds))
-        .groupBy(reviews.productId);
-      for (const r of ratingRows) {
-        ratingMap.set(r.productId, { avg: Number(r.avgRating), count: r.count });
+      try {
+        const ratingRows = await db
+          .select({
+            productId: reviews.productId,
+            avgRating: sql<number>`round(avg(${reviews.rating})::numeric, 1)`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(reviews)
+          .where(inArray(reviews.productId, productIds))
+          .groupBy(reviews.productId);
+        for (const r of ratingRows) {
+          ratingMap.set(r.productId, { avg: Number(r.avgRating), count: r.count });
+        }
+      } catch (ratingErr) {
+        console.error("Error fetching review aggregates (continuing without ratings):", ratingErr);
       }
     }
 
@@ -458,7 +499,7 @@ app.get("/api/products", async (req, res) => {
     res.json(formatted);
   } catch (error) {
     console.error("Error fetching products:", error);
-    res.status(500).json({ error: "Failed to fetch products" });
+    res.status(500).json(jsonDbError(error, "Failed to fetch products"));
   }
 });
 
