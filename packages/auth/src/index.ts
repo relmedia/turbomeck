@@ -125,6 +125,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    /**
+     * NextAuth middleware gates requests before app `proxy.ts` runs. Without this,
+     * unauthenticated users get 307 → `pages.signIn` for matched routes (e.g. `/api/product/*`),
+     * so the product proxy returns HTML instead of JSON.
+     * We allow all requests through; each app’s middleware enforces access (admin studio, etc.).
+     */
+    authorized() {
+      return true;
+    },
     jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
