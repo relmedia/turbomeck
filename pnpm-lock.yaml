@@ -497,9 +497,6 @@ importers:
         specifier: ^3.4.5
         version: 3.4.8
     devDependencies:
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.6.1
       drizzle-kit:
         specifier: ^0.30.0
         version: 0.30.6
@@ -3086,10 +3083,6 @@ packages:
 
   dotenv@16.0.3:
     resolution: {integrity: sha512-7GO6HghkA5fYG9TYnNxi14/7K9f5occMlp3zXAuSxn7CKCxt9xbNWG7yF8hTCSUchlfWSe3uLmlPfigevRItzQ==}
-    engines: {node: '>=12'}
-
-  dotenv@16.6.1:
-    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
   drizzle-kit@0.30.6:
@@ -7909,8 +7902,6 @@ snapshots:
       '@types/trusted-types': 2.0.7
 
   dotenv@16.0.3: {}
-
-  dotenv@16.6.1: {}
 
   drizzle-kit@0.30.6:
     dependencies:
