@@ -78,7 +78,7 @@ const EditCategory = ({
     });
   }, [category.id, category.name, category.nameEn, category.parentId, form]);
 
-  const parentCategories = categories.filter(
+  const parentCategories = (categories ?? []).filter(
     (c) => !c.parentId && c.id !== category.id
   );
 

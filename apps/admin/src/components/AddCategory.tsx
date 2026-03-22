@@ -55,7 +55,7 @@ const AddCategory = ({ onSuccess }: AddCategoryProps) => {
   useEffect(() => {
     fetch(`${PRODUCT_API}/categories`)
       .then((r) => r.json())
-      .then(setCategories)
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
       .catch(() => setCategories([]));
   }, []);
 
