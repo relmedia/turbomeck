@@ -15,7 +15,7 @@ export default function AccessDeniedPage() {
         Kontakta en administratör för att få rollen &quot;admin&quot; tilldelad.
       </p>
       <div className="flex gap-4">
-        <Button variant="outline" onClick={() => signOut({ callbackUrl: "/studio/logga-in" })}>
+        <Button variant="outline" onClick={() => signOut({ callbackUrl: "/studio" })}>
           Logga ut
         </Button>
         <Button asChild>

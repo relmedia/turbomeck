@@ -1,3 +1,5 @@
+import { auth } from "@repo/auth";
+import { redirect } from "next/navigation";
 import { db } from "@repo/database";
 import { orders, users } from "@repo/database/schema";
 import { desc, sql } from "drizzle-orm";
@@ -9,6 +11,14 @@ import { OrdersAndProductsTabs } from "@/components/OrdersAndProductsTabs";
 import { SalesByLocation } from "@/components/SalesByLocation";
 import { SectionCards, type DashboardStats } from "@/components/SectionCards";
 import type { OrderRow } from "@/components/RecentOrders";
+import { StudioLogin } from "@/components/StudioLogin";
+
+function isAdmin(userId: string, email: string | undefined, role: string | undefined): boolean {
+  const allowlist = process.env.ADMIN_ALLOWLIST?.split(",").map((id) => id.trim()) ?? [];
+  if (allowlist.includes(userId)) return true;
+  if (email && allowlist.includes(email)) return true;
+  return role === "admin";
+}
 
 async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -122,12 +132,26 @@ async function getFirstUserId(): Promise<string | null> {
   }
 }
 
-const Homepage = async () => {
+export default async function StudioPage() {
+  const session = await auth();
+
+  // Not logged in → show login form
+  if (!session?.user) {
+    return <StudioLogin />;
+  }
+
+  // Logged in but not admin → access denied
+  if (!isAdmin(session.user.id, session.user.email ?? undefined, session.user.role)) {
+    redirect("/access-denied");
+  }
+
+  // Admin → show dashboard
   const [recentOrders, firstUserId, stats] = await Promise.all([
     getRecentOrders(),
     getFirstUserId(),
     getDashboardStats(),
   ]);
+
   return (
     <div className="flex flex-col gap-4 md:gap-6">
       <SectionCards stats={stats} />
@@ -153,6 +177,4 @@ const Homepage = async () => {
       </div>
     </div>
   );
-};
-
-export default Homepage;
+}

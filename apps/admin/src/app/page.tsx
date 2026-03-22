@@ -6,5 +6,5 @@ export default async function RootPage() {
   if (session?.user) {
     redirect("/studio");
   }
-  redirect("/studio/logga-in");
+  redirect("/studio");
 }

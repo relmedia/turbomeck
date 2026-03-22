@@ -5,7 +5,8 @@ import type { NextMiddleware } from "next/server";
 const isPublicRoute = (pathname: string) =>
   pathname === "/" ||
   pathname === "/login" ||
-  pathname.startsWith("/studio/logga-in") ||
+  pathname === "/studio" ||
+  pathname === "/studio/verify" ||
   pathname.startsWith("/sign-up") ||
   pathname.startsWith("/access-denied") ||
   pathname.startsWith("/api/auth");
@@ -26,7 +27,7 @@ export default auth((req) => {
 
   const session = req.auth;
   if (!session?.user) {
-    return NextResponse.redirect(new URL("/studio/logga-in", req.url));
+    return NextResponse.redirect(new URL("/studio", req.url));
   }
 
   if (isAdminRoute(pathname)) {

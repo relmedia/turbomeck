@@ -7,5 +7,5 @@ export default async function LoginAliasPage() {
   if (session?.user) {
     redirect("/studio");
   }
-  redirect("/studio/logga-in");
+  redirect("/studio");
 }

@@ -22,10 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Field,
-  FieldGroup,
-} from "@/components/ui/field";
+import { Field, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 
@@ -53,13 +50,14 @@ function SignInContent() {
     resolver: zodResolver(emailLinkSchema),
     defaultValues: { email: "" },
   });
+
   const formatDateTime = () => {
-      const now = new Date();
-      return {
-        date: now.toLocaleDateString("sv-SE", { dateStyle: "medium" }),
-        time: now.toLocaleTimeString("sv-SE", { timeStyle: "medium" }),
-      };
+    const now = new Date();
+    return {
+      date: now.toLocaleDateString("sv-SE", { dateStyle: "medium" }),
+      time: now.toLocaleTimeString("sv-SE", { timeStyle: "medium" }),
     };
+  };
 
   const [dateTime, setDateTime] = useState(() => formatDateTime());
 
@@ -106,17 +104,23 @@ function SignInContent() {
           errCode ? decodeURIComponent(errCode) : "Inloggningen misslyckades"
         );
       }
-      const targetUrl = res.redirected && res.url ? res.url : "/logga-in/verify";
+      const targetUrl = res.redirected && res.url ? res.url : "/studio/verify";
       window.location.href = targetUrl;
     } catch (err) {
-      form.setError("root", { message: err instanceof Error ? err.message : "Något gick fel" });
+      form.setError("root", {
+        message: err instanceof Error ? err.message : "Något gick fel",
+      });
     } finally {
       setLoading(false);
     }
   });
 
   return (
-    <div className={cn("flex flex-col gap-6 min-h-screen items-center justify-center bg-background py-12 px-4")}>
+    <div
+      className={cn(
+        "flex flex-col gap-6 min-h-screen items-center justify-center bg-background py-12 px-4"
+      )}
+    >
       <div className="flex items-center justify-center gap-3">
         <Image
           src="/logo.svg"
@@ -162,24 +166,24 @@ function SignInContent() {
                     </FormItem>
                   )}
                 />
-              {(error || form.formState.errors.root?.message) && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.root?.message || error}
-                </p>
-              )}
-              <Field>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
-                </Button>
-              </Field>
-              <Field>
-                <div className="text-muted-foreground text-sm text-center flex items-center justify-center gap-2 pt-2">
-                  <span>{dateTime.date}</span>
-                  <span>{dateTime.time}</span>
-                </div>
-              </Field>
-            </FieldGroup>
-          </form>
+                {(error || form.formState.errors.root?.message) && (
+                  <p className="text-sm text-destructive">
+                    {form.formState.errors.root?.message || error}
+                  </p>
+                )}
+                <Field>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
+                  </Button>
+                </Field>
+                <Field>
+                  <div className="text-muted-foreground text-sm text-center flex items-center justify-center gap-2 pt-2">
+                    <span>{dateTime.date}</span>
+                    <span>{dateTime.time}</span>
+                  </div>
+                </Field>
+              </FieldGroup>
+            </form>
           </Form>
         </CardContent>
       </Card>
@@ -187,9 +191,15 @@ function SignInContent() {
   );
 }
 
-export default function LoggaInPage() {
+export function StudioLogin() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">Laddar...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
+          Laddar...
+        </div>
+      }
+    >
       <SignInContent />
     </Suspense>
   );
