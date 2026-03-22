@@ -1,9 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { loadRootEnv } from "./loadRootEnv";
-
-loadRootEnv();
 
 // Default only when unset (local dev). Docker Compose often uses 5433 — set DATABASE_URL in root `.env`.
 const connectionString =
