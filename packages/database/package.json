@@ -15,6 +15,8 @@
     "db:push": "drizzle-kit push --config=drizzle.config.cjs",
     "db:studio": "drizzle-kit studio --config=drizzle.config.cjs",
     "db:seed": "tsx src/seed.ts",
+    "db:export": "tsx scripts/export-db.ts",
+    "db:import": "tsx scripts/import-db.ts",
     "db:check": "tsx src/check.ts",
     "db:migrate-categories": "tsx scripts/migrate-to-product-categories.ts",
     "db:set-admin": "tsx scripts/set-admin-role.ts"

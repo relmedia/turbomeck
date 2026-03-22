@@ -1,15 +1,14 @@
 /**
- * Seed the database with initial data.
- * Usage: pnpm db:seed  (from repo root) or pnpm --filter @repo/database db:seed
+ * Minimal seed: root category only (for admin breadcrumbs).
+ * Your real catalog lives in PostgreSQL — copy it with `pnpm db:export` / `pnpm db:import`.
  *
- * Requires: DATABASE_URL env or postgresql://postgres:postgres@127.0.0.1:5433/turbodb
- * Run db:push or db:migrate first to ensure schema exists.
+ * Usage: pnpm db:seed  (from repo root)
+ * Requires: DATABASE_URL, schema applied (pnpm db:push).
  */
 import { db, categories } from "./index";
 import { eq } from "drizzle-orm";
 
 async function seed() {
-  // Root category for product hierarchy (used in admin breadcrumbs)
   const existing = await db
     .select()
     .from(categories)

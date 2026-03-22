@@ -5,6 +5,9 @@
  * Requires: DATABASE_URL env or postgresql://postgres:postgres@127.0.0.1:5433/turbodb
  */
 import postgres from "postgres";
+import { loadRootEnv } from "./loadRootEnv";
+
+loadRootEnv();
 
 const EXPECTED_TABLES = [
   "user",
