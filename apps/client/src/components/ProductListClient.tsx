@@ -66,6 +66,7 @@ export function ProductListClient({
   const [products, setProducts] = useState<ProductType[]>([]);
   const [categoriesState, setCategoriesState] = useState<CategoryItem[]>(categories);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +175,7 @@ export function ProductListClient({
       <ProductListContent
         products={paginatedProducts}
         hasSearch={hasSearch}
+        loadFailed={loadFailed}
         currentPage={currentPage}
         totalPages={totalPages}
         showViewAllLink={sortedProducts.length > 0 && params === "products"}

@@ -65,6 +65,8 @@
     "sortPriceDesc": "Pris: Högst till lågt",
     "noProductsMatch": "Inga produkter matchade din sökning",
     "noProducts": "Inga produkter att visa",
+    "loadFailed": "Produkterna kunde inte laddas",
+    "loadFailedHint": "Kontrollera nätverksfliken (fel på /api/product/products eller 404 på /_next/static). Bygg om klienten (pnpm build), starta om PM2 och säkerställ att nginx skickar /api och /_next till Next.js.",
     "tryDifferentSearch": "Prova ett annat sökord eller bläddra bland kategorierna",
     "browseCategories": "Bläddra bland kategorierna för att hitta produkter",
     "viewAllProducts": "Visa alla produkter"

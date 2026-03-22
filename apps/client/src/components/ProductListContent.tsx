@@ -18,6 +18,8 @@ import { useTranslation } from "@/i18n/context";
 type Props = {
   products: ProductType[];
   hasSearch: boolean;
+  /** True when the product API request failed (network or 5xx), not an empty catalog */
+  loadFailed?: boolean;
   currentPage: number;
   totalPages: number;
   showViewAllLink: boolean;
@@ -36,6 +38,7 @@ function buildPath(
 export function ProductListContent({
   products,
   hasSearch,
+  loadFailed = false,
   currentPage,
   totalPages,
   showViewAllLink,
@@ -56,14 +59,18 @@ export function ProductListContent({
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-border bg-muted/20">
             <p className="text-base font-medium text-foreground">
-              {hasSearch
-                ? t("products.noProductsMatch")
-                : t("products.noProducts")}
+              {loadFailed
+                ? t("products.loadFailed")
+                : hasSearch
+                  ? t("products.noProductsMatch")
+                  : t("products.noProducts")}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {hasSearch
-                ? t("products.tryDifferentSearch")
-                : t("products.browseCategories")}
+            <p className="text-sm text-muted-foreground mt-1 max-w-lg text-center">
+              {loadFailed
+                ? t("products.loadFailedHint")
+                : hasSearch
+                  ? t("products.tryDifferentSearch")
+                  : t("products.browseCategories")}
             </p>
           </div>
         )}

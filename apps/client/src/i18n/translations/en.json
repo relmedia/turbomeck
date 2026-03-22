@@ -65,6 +65,8 @@
     "sortPriceDesc": "Price: High to low",
     "noProductsMatch": "No products matched your search",
     "noProducts": "No products to show",
+    "loadFailed": "Could not load products",
+    "loadFailedHint": "Check the Network tab for failed requests to /api/product/products or 404s on /_next/static. Rebuild the client (pnpm build), restart PM2, and ensure nginx proxies /api and /_next to Next.js.",
     "tryDifferentSearch": "Try a different search term or browse the categories",
     "browseCategories": "Browse the categories to find products",
     "viewAllProducts": "View all products"
