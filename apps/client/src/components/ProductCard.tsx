@@ -8,6 +8,7 @@ import useCartStore from "@/stores/cartStore";
 import type { ProductType } from "@/types";
 import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +37,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
+  const { isSweden } = useGeoCountry();
   const { addToCart } = useCartStore();
   const [reviewStats, setReviewStats] = useState<{
     averageRating: number;
@@ -120,7 +122,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
       <Card className="h-full w-full max-w-sm overflow-hidden group bg-background text-foreground shadow-none rounded-md flex flex-col pt-0 pb-4 gap-3">
         {/* Image carousel */}
         <div className="relative aspect-square overflow-hidden bg-muted">
-          {product.depositAmount != null && product.depositAmount > 0 && (
+          {isSweden && product.depositAmount != null && product.depositAmount > 0 && (
             <span className="absolute top-3 left-3 z-20 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-md">
               Utbytes
             </span>

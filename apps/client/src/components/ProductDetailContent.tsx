@@ -13,6 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { categorySlug } from "@/lib/utils";
 import { useTranslation } from "@/i18n/context";
+import { useGeoCountry } from "@/hooks/useGeoCountry";
 
 type Category = {
   id: number;
@@ -35,6 +36,7 @@ export function ProductDetailContent({
   firstCategory,
 }: Props) {
   const t = useTranslation();
+  const { isSweden } = useGeoCountry();
 
   const breadcrumbItems = [
     { label: t("product.home"), href: "/" },
@@ -59,7 +61,7 @@ export function ProductDetailContent({
         <h1 className="text-2xl font-medium">{product.name}</h1>
         <ProductReviewsSummary />
         <RichTextContent html={product.description} />
-        {product.depositAmount != null && product.depositAmount > 0 && (
+        {isSweden && product.depositAmount != null && product.depositAmount > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4">
             <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
               {t("product.utbyteTitle")}
