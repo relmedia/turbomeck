@@ -160,7 +160,11 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
     (selectedCategory ?? "alla-produkter") === slug;
 
   const parentCategories = categories
-    .filter((c) => !c.parentId && categorySlug(c) !== "alla-produkter")
+    .filter((c) => {
+      if (c.parentId) return false;
+      const slug = categorySlug(c);
+      return slug !== "alla-produkter" && slug !== "all-products";
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const getChildren = (parentId: number) =>
