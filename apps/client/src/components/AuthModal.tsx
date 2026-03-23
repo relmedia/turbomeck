@@ -92,6 +92,7 @@ export function AuthModal({
     setForgotSuccess(false);
     setDevResetUrl(null);
     setAcceptTerms(false);
+    setRegisterSuccess(false);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -148,6 +149,8 @@ export function AuthModal({
     }
   };
 
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!acceptTerms) {
@@ -157,21 +160,24 @@ export function AuthModal({
     setError("");
     setLoading(true);
     try {
+      // First create the user account
       const res = await fetch("/api/auth/sign-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name: name || undefined }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), name: name || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Kunde inte skapa konto");
         return;
       }
-      switchMode("login");
-      setError("");
-      setEmail("");
-      setPassword("");
-      setName("");
+      // Then send magic link to verify and log them in
+      await signIn("email", {
+        email: email.trim().toLowerCase(),
+        callbackUrl,
+        redirect: false,
+      });
+      setRegisterSuccess(true);
     } catch {
       setError("Något gick fel");
     } finally {
@@ -310,6 +316,28 @@ export function AuthModal({
                 {loading ? "Skickar länk..." : "Skicka inloggningslänk"}
               </Button>
             </form>
+          ) : registerSuccess ? (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Vi har skickat en verifieringslänk till din e-post. Klicka på länken för att aktivera ditt konto och logga in.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full cursor-pointer"
+                onClick={() => {
+                  setRegisterSuccess(false);
+                  switchMode("login");
+                }}
+              >
+                {t("auth.backToLogin")}
+              </Button>
+            </div>
           ) : (
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
@@ -342,36 +370,9 @@ export function AuthModal({
                   className="h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="modal-reg-password" className="text-sm font-medium">
-                  {t("auth.password")} <span className="text-destructive">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="modal-reg-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder={t("auth.passwordMinLength")}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    className="h-10 pr-10"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showPassword ? "Dölj lösenord" : "Visa lösenord"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Vi skickar en verifieringslänk till din e-post. Klicka på länken för att aktivera ditt konto.
+              </p>
               <label className="flex items-start gap-2 cursor-pointer">
                 <Checkbox
                   checked={acceptTerms}
