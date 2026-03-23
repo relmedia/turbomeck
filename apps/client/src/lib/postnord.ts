@@ -420,9 +420,13 @@ export function getHomeDeliveryInternationalPrice(
   return base + premium;
 }
 
+/** Swedish VAT rate (25%) */
+const VAT_RATE = 0.25;
+
 /**
  * Get shipping cost (SEK) for a given weight, country and delivery type.
  * Sweden uses domestic Postpaket/Hemleverans; other European countries use international tiers.
+ * Prices include 25% VAT (moms).
  */
 export function getShippingPrice(
   weightKg: number,
@@ -432,15 +436,19 @@ export function getShippingPrice(
   const cc = countryCode?.toUpperCase().trim() || "SE";
   const isServicePoint = deliveryOption === "servicepoint";
 
+  let basePrice: number;
   if (cc === "SE") {
-    return isServicePoint
+    basePrice = isServicePoint
       ? getPostpaketPrice(weightKg)
       : getHomeDeliveryPrice(weightKg);
+  } else {
+    basePrice = isServicePoint
+      ? getPostpaketInternationalPrice(weightKg, cc)
+      : getHomeDeliveryInternationalPrice(weightKg, cc);
   }
 
-  return isServicePoint
-    ? getPostpaketInternationalPrice(weightKg, cc)
-    : getHomeDeliveryInternationalPrice(weightKg, cc);
+  // Add 25% VAT and round to nearest whole number
+  return Math.round(basePrice * (1 + VAT_RATE));
 }
 
 const COUNTRY_NAMES: Record<string, string> = {
