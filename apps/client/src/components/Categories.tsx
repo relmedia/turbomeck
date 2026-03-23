@@ -1,6 +1,6 @@
 "use client";
 
-import { Tag, ChevronDown, CarFront } from "lucide-react";
+import { ChevronDown, LayoutGrid, Car, Gauge, Wrench, CircleDot } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +18,20 @@ type CategoryItem = {
   parentName?: string | null;
 };
 
+function getCategoryIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("saab") || lower.includes("volvo") || lower.includes("bil")) {
+    return Car;
+  }
+  if (lower.includes("turbo") || lower.includes("kompressor")) {
+    return Gauge;
+  }
+  if (lower.includes("verktyg") || lower.includes("tool")) {
+    return Wrench;
+  }
+  return CircleDot;
+}
+
 const Categories = ({ categories }: { categories: CategoryItem[] }) => {
   const t = useTranslation();
   const searchParams = useSearchParams();
@@ -34,7 +48,11 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
     (selectedCategory ?? "alla-produkter") === slug;
 
   const apiParentCategories = categories
-    .filter((c) => !c.parentId && categorySlug(c) !== "alla-produkter")
+    .filter((c) => {
+      if (c.parentId) return false;
+      const slug = categorySlug(c);
+      return slug !== "alla-produkter" && slug !== "all-products";
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
   const getChildren = (parentId: number) =>
     categories.filter((c) => c.parentId === parentId);
@@ -53,7 +71,7 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
           isSelected("alla-produkter") ? "bg-white" : "text-gray-500",
         )}
       >
-        <Tag className="w-4 h-4 shrink-0" />
+        <LayoutGrid className="w-4 h-4 shrink-0" />
         {t("products.allProducts")}
       </Link>
       {/* Main categories - with dropdown if they have subcategories */}
@@ -61,16 +79,11 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
         const children = getChildren(parent.id);
         const parentSlug = categorySlug(parent);
         const hasChildren = children.length > 0;
+        const Icon = getCategoryIcon(parent.name);
 
         const linkContent = (
           <>
-            {parent.name.toLowerCase().startsWith("saab") ? (
-              <CarFront className="w-4 h-4 shrink-0" />
-            ) : parent.name.toLowerCase().startsWith("volvo") ? (
-              <CarFront className="w-4 h-4 shrink-0" />
-            ) : (
-              <Tag className="w-4 h-4 shrink-0" />
-            )}
+            <Icon className="w-4 h-4 shrink-0" />
             {parent.name}
             {hasChildren && (
               <ChevronDown className="w-4 h-4 ml-0.5 opacity-70" />
