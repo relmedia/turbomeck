@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, X, Tag, ChevronRight, User, LogOut, MapPin, Key } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -24,7 +24,7 @@ type MobileMenuProps = {
   onAuthClick?: () => void;
 };
 
-export function MobileMenu({ onAuthClick }: MobileMenuProps) {
+function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
   const { locale } = useLanguage();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const t = useTranslation();
@@ -360,5 +360,13 @@ export function MobileMenu({ onAuthClick }: MobileMenuProps) {
         </>
       )}
     </>
+  );
+}
+
+export function MobileMenu({ onAuthClick }: MobileMenuProps) {
+  return (
+    <Suspense fallback={<Menu className="w-5 h-5 text-gray-600 sm:hidden" />}>
+      <MobileMenuContent onAuthClick={onAuthClick} />
+    </Suspense>
   );
 }

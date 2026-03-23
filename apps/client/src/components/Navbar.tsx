@@ -36,14 +36,12 @@ const Navbar = () => {
     <nav className="w-full flex items-center justify-between border-b border-gray-200 pb-4">
       {/*LEFT*/}
       <div className="flex items-center gap-2">
-        <Suspense fallback={null}>
-          <MobileMenu
-            onAuthClick={() => {
-              setAuthMode("login");
-              setAuthOpen(true);
-            }}
-          />
-        </Suspense>
+        <MobileMenu
+          onAuthClick={() => {
+            setAuthMode("login");
+            setAuthOpen(true);
+          }}
+        />
         <Link href={"/"} className="flex items-center">
           <Image src="/logo.svg" alt="Turbomeck" width={35} height={35} />
           <p className="text-xl font-semibold tracking-wider italic lightGreen ms-2">
