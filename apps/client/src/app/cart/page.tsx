@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslation } from "@/i18n/context";
+import { useTranslation, useLanguage } from "@/i18n/context";
 import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
@@ -28,6 +28,7 @@ import type { SavedAddress } from "@/types";
 const CartPage: React.FC = () => {
   const router = useRouter();
   const t = useTranslation();
+  const { locale } = useLanguage();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
   const [shippingPreview, setShippingPreview] = useState<{
     deliveryOption?: "home" | "servicepoint";
@@ -228,6 +229,7 @@ const CartPage: React.FC = () => {
             depositAmount: isDepositOrder ? orderDeposit : undefined,
             balanceDue: isDepositOrder ? balanceDue : undefined,
             postNordTrackingId: undefined,
+            locale: locale as "sv" | "en",
             items: cart.map((item) => ({
               productId: typeof item.id === "number" ? item.id : undefined,
               productName: item.name,
@@ -288,6 +290,7 @@ const CartPage: React.FC = () => {
                 balanceDue: isDepositOrder ? balanceDue : undefined,
                 stripePaymentId: result.stripePaymentId,
                 postNordTrackingId: postNordTrackingId ?? undefined,
+                locale: locale as "sv" | "en",
                 items: cart.map((item) => ({
                   productId: typeof item.id === "number" ? item.id : undefined,
                   productName: item.name,

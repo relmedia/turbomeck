@@ -827,6 +827,7 @@ app.post("/api/orders", async (req, res) => {
       balanceDue?: number;
       stripePaymentId?: string;
       postNordTrackingId?: string;
+      locale?: "sv" | "en";
       items: Array<{
         productId?: number;
         productName: string;
@@ -910,6 +911,7 @@ app.post("/api/orders", async (req, res) => {
       discount: body.discount ?? 0,
       total: body.total,
       trackingId: body.postNordTrackingId,
+      locale: body.locale,
       items: body.items,
     }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
 

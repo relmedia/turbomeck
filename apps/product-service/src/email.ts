@@ -58,6 +58,7 @@ type OrderEmailData = {
   discount: number;
   total: number;
   trackingId?: string | null;
+  locale?: "sv" | "en";
   items: Array<{
     productName: string;
     productImage?: string | null;
@@ -67,10 +68,75 @@ type OrderEmailData = {
   }>;
 };
 
+const translations = {
+  sv: {
+    title: "Orderbekräftelse",
+    thankYou: "Tack för din beställning!",
+    orderReceived: "Vi har mottagit din order och börjar behandla den direkt.",
+    orderNumber: "Ordernummer",
+    date: "Datum",
+    trackDelivery: "Spåra din leverans",
+    trackingNumber: "Spårningsnummer",
+    trackAtPostNord: "Spåra hos PostNord",
+    orderedProducts: "Beställda produkter",
+    quantity: "Antal",
+    subtotal: "Delsumma",
+    shipping: "Frakt",
+    free: "Gratis",
+    discount: "Rabatt",
+    vatIncluded: "Varav moms (25%)",
+    total: "Totalt",
+    shippingAddress: "Leveransadress",
+    servicePoint: "Utlämningsställe",
+    questions: "Har du frågor? Kontakta oss på",
+    rights: "Alla rättigheter förbehållna.",
+    sweden: "Sverige",
+    norway: "Norge",
+  },
+  en: {
+    title: "Order Confirmation",
+    thankYou: "Thank you for your order!",
+    orderReceived: "We have received your order and will start processing it immediately.",
+    orderNumber: "Order Number",
+    date: "Date",
+    trackDelivery: "Track your delivery",
+    trackingNumber: "Tracking number",
+    trackAtPostNord: "Track at PostNord",
+    orderedProducts: "Ordered Products",
+    quantity: "Qty",
+    subtotal: "Subtotal",
+    shipping: "Shipping",
+    free: "Free",
+    discount: "Discount",
+    vatIncluded: "Incl. VAT (25%)",
+    total: "Total",
+    shippingAddress: "Shipping Address",
+    servicePoint: "Pickup Point",
+    questions: "Questions? Contact us at",
+    rights: "All rights reserved.",
+    sweden: "Sweden",
+    norway: "Norway",
+  },
+};
+
+function getCountryName(code: string, locale: "sv" | "en"): string {
+  const t = translations[locale];
+  if (code === "SE") return t.sweden;
+  if (code === "NO") return t.norway;
+  return code;
+}
+
 function renderOrderConfirmationEmail(data: OrderEmailData): string {
+  const locale = data.locale || "sv";
+  const t = translations[locale];
+  const dateLocale = locale === "en" ? "en-GB" : "sv-SE";
+  
   const trackingUrl = data.trackingId
     ? `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`
     : null;
+
+  // Calculate VAT (25% included in total)
+  const vatAmount = data.total * 0.2; // 25% VAT = 20% of gross
 
   const itemsHtml = data.items
     .map(
@@ -82,17 +148,17 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
               <td width="80" style="vertical-align: top;">
                 ${
                   item.productImage
-                    ? `<img src="${item.productImage}" alt="${item.productName}" width="64" height="64" style="border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
+                    ? `<img src="${item.productImage}" alt="${item.productName}" width="64" height="64" style="display: block; border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
                     : `<div style="width: 64px; height: 64px; background: #f3f4f6; border-radius: 8px;"></div>`
                 }
               </td>
               <td style="vertical-align: top; padding-left: 12px;">
                 <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">${item.productName}</p>
                 ${item.variant ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">${item.variant}</p>` : ""}
-                <p style="margin: 0; font-size: 13px; color: #6b7280;">Antal: ${item.quantity}</p>
+                <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.quantity}: ${item.quantity}</p>
               </td>
               <td style="vertical-align: top; text-align: right; white-space: nowrap;">
-                <p style="margin: 0; font-weight: 600; color: #111827;">${(item.price * item.quantity).toLocaleString("sv-SE")} kr</p>
+                <p style="margin: 0; font-weight: 600; color: #111827;">${(item.price * item.quantity).toLocaleString(dateLocale)} kr</p>
               </td>
             </tr>
           </table>
@@ -104,11 +170,11 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
 
   return `
 <!DOCTYPE html>
-<html lang="sv">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orderbekräftelse - Turbomeck</title>
+  <title>${t.title} - Turbomeck</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
@@ -119,38 +185,46 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px 40px; text-align: center;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px;">
-                <span style="color: #6ec900;">TURBO</span><span style="color: #ffffff;">MECK</span>
-              </h1>
+              <table cellpadding="0" cellspacing="0" border="0" align="center">
+                <tr>
+                  <td style="font-size: 28px; font-weight: 700; letter-spacing: 3px; font-style: italic;">
+                    <span style="color: #6ec900;">TURBO</span><span style="color: #ffffff;">MECK</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           
           <!-- Success Banner -->
           <tr>
             <td style="padding: 40px 40px 24px 40px; text-align: center;">
-              <div style="display: inline-block; width: 64px; height: 64px; background-color: #dcfce7; border-radius: 50%; line-height: 64px; margin-bottom: 16px;">
-                <span style="font-size: 28px;">✓</span>
-              </div>
-              <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #111827;">Tack för din beställning!</h2>
-              <p style="margin: 0; color: #6b7280; font-size: 15px;">Vi har mottagit din order och börjar behandla den direkt.</p>
+              <table cellpadding="0" cellspacing="0" border="0" align="center">
+                <tr>
+                  <td style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 32px; text-align: center; vertical-align: middle;">
+                    <span style="font-size: 32px; color: #16a34a; line-height: 64px;">✓</span>
+                  </td>
+                </tr>
+              </table>
+              <h2 style="margin: 20px 0 8px 0; font-size: 24px; font-weight: 700; color: #111827;">${t.thankYou}</h2>
+              <p style="margin: 0; color: #6b7280; font-size: 15px;">${t.orderReceived}</p>
             </td>
           </tr>
           
           <!-- Order Info -->
           <tr>
             <td style="padding: 0 40px 24px 40px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; padding: 20px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
                 <tr>
-                  <td>
+                  <td style="padding: 20px;">
                     <table cellpadding="0" cellspacing="0" border="0" width="100%">
                       <tr>
-                        <td style="padding: 8px 16px;">
-                          <p style="margin: 0; font-size: 13px; color: #6b7280;">Ordernummer</p>
-                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827;">${data.orderNumber}</p>
+                        <td style="padding: 0;">
+                          <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.orderNumber}</p>
+                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 16px;">${data.orderNumber}</p>
                         </td>
-                        <td style="padding: 8px 16px; text-align: right;">
-                          <p style="margin: 0; font-size: 13px; color: #6b7280;">Datum</p>
-                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827;">${new Date().toLocaleDateString("sv-SE")}</p>
+                        <td style="padding: 0; text-align: right;">
+                          <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.date}</p>
+                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827;">${new Date().toLocaleDateString(dateLocale)}</p>
                         </td>
                       </tr>
                     </table>
@@ -166,12 +240,12 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <!-- Tracking -->
           <tr>
             <td style="padding: 0 40px 24px 40px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #eff6ff; border-radius: 8px; padding: 20px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #eff6ff; border-radius: 8px;">
                 <tr>
-                  <td>
-                    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📦 Spåra din leverans</p>
-                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #3b82f6;">Spårningsnummer: ${data.trackingId}</p>
-                    <a href="${trackingUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">Spåra hos PostNord →</a>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📦 ${t.trackDelivery}</p>
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #3b82f6;">${t.trackingNumber}: ${data.trackingId}</p>
+                    <a href="${trackingUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">${t.trackAtPostNord} →</a>
                   </td>
                 </tr>
               </table>
@@ -184,7 +258,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <!-- Items -->
           <tr>
             <td style="padding: 0 40px;">
-              <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #111827;">Beställda produkter</h3>
+              <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #111827;">${t.orderedProducts}</h3>
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 ${itemsHtml}
               </table>
@@ -196,26 +270,33 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
             <td style="padding: 24px 40px;">
               <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top: 2px solid #e5e7eb; padding-top: 16px;">
                 <tr>
-                  <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Delsumma</td>
-                  <td style="padding: 6px 0; text-align: right; color: #111827; font-size: 14px;">${data.subtotal.toLocaleString("sv-SE")} kr</td>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">${t.subtotal}</td>
+                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${data.subtotal.toLocaleString(dateLocale)} kr</td>
                 </tr>
                 <tr>
-                  <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Frakt</td>
-                  <td style="padding: 6px 0; text-align: right; color: #111827; font-size: 14px;">${data.shippingCost > 0 ? `${data.shippingCost.toLocaleString("sv-SE")} kr` : "Gratis"}</td>
+                  <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">${t.shipping}</td>
+                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${data.shippingCost > 0 ? `${data.shippingCost.toLocaleString(dateLocale)} kr` : t.free}</td>
                 </tr>
                 ${
                   data.discount > 0
                     ? `
                 <tr>
-                  <td style="padding: 6px 0; color: #16a34a; font-size: 14px;">Rabatt</td>
-                  <td style="padding: 6px 0; text-align: right; color: #16a34a; font-size: 14px;">-${data.discount.toLocaleString("sv-SE")} kr</td>
+                  <td style="padding: 8px 0; color: #16a34a; font-size: 14px;">${t.discount}</td>
+                  <td style="padding: 8px 0; text-align: right; color: #16a34a; font-size: 14px;">-${data.discount.toLocaleString(dateLocale)} kr</td>
                 </tr>
                 `
                     : ""
                 }
                 <tr>
-                  <td style="padding: 12px 0 0 0; font-weight: 700; font-size: 18px; color: #111827;">Totalt</td>
-                  <td style="padding: 12px 0 0 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${data.total.toLocaleString("sv-SE")} kr</td>
+                  <td colspan="2" style="padding: 12px 0 0 0; border-top: 1px solid #e5e7eb;"></td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; font-weight: 700; font-size: 18px; color: #111827;">${t.total}</td>
+                  <td style="padding: 4px 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${data.total.toLocaleString(dateLocale)} kr</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #6b7280; font-size: 12px;">${t.vatIncluded}</td>
+                  <td style="padding: 4px 0; text-align: right; color: #6b7280; font-size: 12px;">${vatAmount.toLocaleString(dateLocale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr</td>
                 </tr>
               </table>
             </td>
@@ -224,16 +305,16 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <!-- Shipping Address -->
           <tr>
             <td style="padding: 0 40px 32px 40px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; padding: 20px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
                 <tr>
-                  <td>
-                    <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #111827;">Leveransadress</h4>
+                  <td style="padding: 20px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #111827;">${t.shippingAddress}</h4>
                     <p style="margin: 0; font-size: 14px; color: #374151; line-height: 1.6;">
                       ${data.firstName} ${data.lastName}<br>
                       ${data.address}<br>
                       ${data.postalCode} ${data.city}<br>
-                      ${data.country === "SE" ? "Sverige" : data.country}
-                      ${data.servicePointName ? `<br><br><strong>Utlämningsställe:</strong> ${data.servicePointName}` : ""}
+                      ${getCountryName(data.country, locale)}
+                      ${data.servicePointName ? `<br><br><strong>${t.servicePoint}:</strong> ${data.servicePointName}` : ""}
                     </p>
                   </td>
                 </tr>
@@ -245,10 +326,10 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <tr>
             <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
-                Har du frågor? Kontakta oss på <a href="mailto:info@turbomeck.se" style="color: #6ec900; text-decoration: none;">info@turbomeck.se</a>
+                ${t.questions} <a href="mailto:info@turbomeck.se" style="color: #6ec900; text-decoration: none;">info@turbomeck.se</a>
               </p>
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                © ${new Date().getFullYear()} Turbomeck. Alla rättigheter förbehållna.
+                © ${new Date().getFullYear()} Turbomeck. ${t.rights}
               </p>
             </td>
           </tr>
@@ -281,13 +362,15 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
       : {},
   });
 
+  const locale = data.locale || "sv";
+  const t = translations[locale];
   const html = renderOrderConfirmationEmail(data);
 
   try {
     await transporter.sendMail({
       from: `"Turbomeck" <${config.from}>`,
       to: data.email,
-      subject: `Orderbekräftelse ${data.orderNumber} - Turbomeck`,
+      subject: `${t.title} ${data.orderNumber} - Turbomeck`,
       html,
     });
     console.log(`[email] Order confirmation sent to ${data.email} for ${data.orderNumber}`);

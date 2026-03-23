@@ -178,6 +178,7 @@ export async function createOrder(orderData: {
   balanceDue?: number;
   stripePaymentId?: string;
   postNordTrackingId?: string;
+  locale?: "sv" | "en";
   items: Array<{
     productId?: number;
     productName: string;
