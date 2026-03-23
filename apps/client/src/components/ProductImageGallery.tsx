@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,13 +21,50 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const displayImages = images.length > 0 ? images : ["/products/1g.png"];
 
+  // Touch swipe support
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const minSwipeDistance = 50;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = null;
+    touchStartX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && displayImages.length > 1) {
+      setSelectedIndex((i) => (i === displayImages.length - 1 ? 0 : i + 1));
+    }
+    if (isRightSwipe && displayImages.length > 1) {
+      setSelectedIndex((i) => (i === 0 ? displayImages.length - 1 : i - 1));
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  }, [displayImages.length]);
+
   return (
     <>
     <Card className="p-0 gap-0 overflow-hidden border-0 border-none bg-transparent shadow-none">
       <CardContent className="p-0">
         <div className="flex flex-col gap-3">
           {/* Main image */}
-          <div className="group/image relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-200">
+          <div
+            className="group/image relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-200 touch-pan-y"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div
               className="flex h-full transition-transform duration-300 ease-out"
               style={{
@@ -87,6 +124,22 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
+                {/* Dot indicators for mobile */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 sm:hidden">
+                  {displayImages.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSelectedIndex(i)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        i === selectedIndex
+                          ? "bg-white w-4"
+                          : "bg-white/50"
+                      }`}
+                      aria-label={`Visa bild ${i + 1}`}
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -136,7 +189,12 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
         <DialogTitle className="sr-only">
           Bildgalleri: {alt}
         </DialogTitle>
-        <div className="relative flex items-center justify-center w-full h-full min-h-0">
+        <div
+          className="relative flex items-center justify-center w-full h-full min-h-0"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <span className="inline-block bg-neutral-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
