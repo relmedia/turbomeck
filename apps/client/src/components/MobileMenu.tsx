@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, X, Tag, ChevronRight, User, LogOut, MapPin, Key } from "lucide-react";
+import { Menu, X, ChevronRight, User, LogOut, MapPin, LayoutGrid, Car, Gauge, Wrench, Box, CircleDot } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -19,6 +19,20 @@ type CategoryItem = {
   parentId?: number | null;
   parentName?: string | null;
 };
+
+function getCategoryIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("saab") || lower.includes("volvo") || lower.includes("bil")) {
+    return Car;
+  }
+  if (lower.includes("turbo") || lower.includes("kompressor")) {
+    return Gauge;
+  }
+  if (lower.includes("verktyg") || lower.includes("tool")) {
+    return Wrench;
+  }
+  return CircleDot;
+}
 
 type MobileMenuProps = {
   onAuthClick?: () => void;
@@ -226,7 +240,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
                     : "text-gray-600 hover:bg-gray-50 active:scale-[0.98]"
                 )}
               >
-                <Tag className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
                 {t("products.allProducts")}
               </Link>
 
@@ -236,6 +250,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
                 const parentSlug = categorySlug(parent);
                 const hasChildren = children.length > 0;
                 const isExpanded = expandedCategory === parent.id;
+                const Icon = getCategoryIcon(parent.name);
 
                 return (
                   <div key={parent.id} className="menu-item">
@@ -250,7 +265,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
                             : "text-gray-600 hover:bg-gray-50 active:scale-[0.98]"
                         )}
                       >
-                        <Tag className="w-4 h-4" />
+                        <Icon className="w-4 h-4" />
                         {parent.name}
                       </Link>
                       {hasChildren && (
