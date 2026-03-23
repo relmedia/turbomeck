@@ -28,11 +28,11 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchEndX.current = null;
-    touchStartX.current = e.targetTouches[0].clientX;
+    touchStartX.current = e.targetTouches[0]?.clientX ?? null;
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0].clientX;
+    touchEndX.current = e.targetTouches[0]?.clientX ?? null;
   }, []);
 
   const handleTouchEnd = useCallback(() => {
