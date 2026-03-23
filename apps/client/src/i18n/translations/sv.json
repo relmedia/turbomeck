@@ -21,7 +21,8 @@
     "changePassword": "Byt lösenord",
     "logout": "Logga ut",
     "login": "Logga in",
-    "home": "Start"
+    "home": "Start",
+    "language": "Språk"
   },
   "auth": {
     "login": "Logga in",
@@ -55,6 +56,7 @@
     "viewAllResults": "Visa alla resultat"
   },
   "products": {
+    "categories": "Kategorier",
     "allProducts": "Alla produkter",
     "latestProducts": "Senaste produkter",
     "sort": "Sortera",

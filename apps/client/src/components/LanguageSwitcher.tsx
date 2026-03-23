@@ -16,7 +16,7 @@ const LOCALES = [
   { code: "en" as const, Flag: GB, name: "EN" },
 ] as const;
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ className }: { className?: string }) {
   const { locale, setLocale } = useLanguage();
 
   return (
@@ -24,7 +24,7 @@ export function LanguageSwitcher() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="cursor-pointer"
+          className={cn("cursor-pointer", className)}
           aria-label={locale === "sv" ? "Byt språk" : "Change language"}
         >
           <Globe className="w-4 h-4 text-gray-600" />

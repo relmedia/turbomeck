@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import SearchBar from "./SearchBar";
+import { MobileSearch } from "./MobileSearch";
+import { MobileMenu } from "./MobileMenu";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { User, LogOut, MapPin, Key } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
@@ -33,17 +35,27 @@ const Navbar = () => {
   return (
     <nav className="w-full flex items-center justify-between border-b border-gray-200 pb-4">
       {/*LEFT*/}
-      <Link href={"/"} className="flex items-center">
-        <Image src="/logo.svg" alt="Turbomeck" width={35} height={35} />
-        <p className="hidden md:block text-xl font-semibold tracking-wider italic lightGreen ms-2">
-          TURBO
-        </p>
-        <p className="hidden md:block text-xl font-semibold text-gray-700 tracking-wider italic">
-          MECK
-        </p>
-      </Link>
+      <div className="flex items-center gap-2">
+        <Suspense fallback={null}>
+          <MobileMenu
+            onAuthClick={() => {
+              setAuthMode("login");
+              setAuthOpen(true);
+            }}
+          />
+        </Suspense>
+        <Link href={"/"} className="flex items-center">
+          <Image src="/logo.svg" alt="Turbomeck" width={35} height={35} />
+          <p className="text-xl font-semibold tracking-wider italic lightGreen ms-2">
+            TURBO
+          </p>
+          <p className="text-xl font-semibold text-gray-700 tracking-wider italic">
+            MECK
+          </p>
+        </Link>
+      </div>
       {/*RIGHT*/}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 sm:gap-6">
         <Suspense
           fallback={
             <div
@@ -54,6 +66,7 @@ const Navbar = () => {
         >
           <SearchBar />
         </Suspense>
+        <MobileSearch />
         <WishlistIcon />
         <ShoppingCartIcon />
         <LanguageSwitcher />

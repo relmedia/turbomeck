@@ -44,7 +44,7 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
   );
 
   return (
-    <div className="bg-gray-100 p-2 rounded-lg mb-4 text-sm flex flex-wrap items-center gap-1">
+    <div className="hidden sm:flex bg-gray-100 p-2 rounded-lg mb-4 text-sm flex-wrap items-center gap-1">
       {/* Alla produkter - always first, link to startpage */}
       <Link
         href={pathname}

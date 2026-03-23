@@ -21,7 +21,8 @@
     "changePassword": "Change password",
     "logout": "Log out",
     "login": "Log in",
-    "home": "Home"
+    "home": "Home",
+    "language": "Language"
   },
   "auth": {
     "login": "Log in",
@@ -55,6 +56,7 @@
     "viewAllResults": "View all results"
   },
   "products": {
+    "categories": "Categories",
     "allProducts": "All products",
     "latestProducts": "Latest products",
     "sort": "Sort",
