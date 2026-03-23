@@ -282,18 +282,19 @@ function parseServicePointResponse(text: string): PostNordServicePoint[] {
 }
 
 /**
- * Official PostNord Postpaket inrikes pricing (Sverige, hos ombud).
- * @see https://www.postnord.se/privat/priser-och-villkor/portotabeller/portotabell-paket/
+ * PostNord Postpaket inrikes pricing (Sverige, hos ombud) - BUSINESS rates.
+ * @see https://www.postnord.se/kop-frakt/tjanster?customerType=BUSINESS
  * Prices in SEK. Weight in kg. For weights between tiers, rounds up to next tier.
+ * Last updated: 2026-03-19
  */
 const POSTPAKET_PRICE_TIERS: Array<{ maxKg: number; price: number }> = [
-  { maxKg: 1, price: 115 },
-  { maxKg: 2, price: 154 },
-  { maxKg: 3, price: 170 },
-  { maxKg: 5, price: 201 },
-  { maxKg: 10, price: 257 },
-  { maxKg: 15, price: 304 },
-  { maxKg: 20, price: 355 },
+  { maxKg: 1, price: 84 },
+  { maxKg: 2, price: 116 },
+  { maxKg: 3, price: 128 },
+  { maxKg: 5, price: 152 },
+  { maxKg: 10, price: 196 },
+  { maxKg: 15, price: 236 },
+  { maxKg: 20, price: 276 },
 ];
 
 /** Extra fee for parcels over 1.2m length (SEK) */
@@ -317,24 +318,42 @@ export function getPostpaketPrice(
 }
 
 /**
+ * PostNord Home Delivery pricing (Sverige, hemleverans) - BUSINESS rates.
+ * For light packages (1-2 kg): "Skicka Hem" service (cheaper)
+ * For heavier packages (3+ kg): "Home" service
+ * @see https://www.postnord.se/kop-frakt/tjanster?customerType=BUSINESS
+ * Last updated: 2026-03-19
+ */
+const HOME_DELIVERY_PRICE_TIERS: Array<{ maxKg: number; price: number }> = [
+  { maxKg: 1, price: 67 },
+  { maxKg: 2, price: 99 },
+  { maxKg: 3, price: 224 },
+  { maxKg: 5, price: 272 },
+  { maxKg: 10, price: 352 },
+  { maxKg: 15, price: 424 },
+  { maxKg: 20, price: 480 },
+];
+
+/**
  * Get home delivery price (Hemleverans) - domestic Sweden only.
- * PostNord hemleverans typically costs ~20-40 kr more than Postpaket.
+ * Uses PostNord business rates.
  */
 export function getHomeDeliveryPrice(
   weightKg: number,
   oversize = false
 ): number {
-  const postpaket = getPostpaketPrice(weightKg, oversize);
   const w = Math.max(0.1, Math.ceil(weightKg));
-  const premium = w <= 5 ? 40 : w <= 10 ? 50 : 60;
-  return postpaket + premium;
+  const tier = HOME_DELIVERY_PRICE_TIERS.find((t) => w <= t.maxKg);
+  const lastTier = HOME_DELIVERY_PRICE_TIERS[HOME_DELIVERY_PRICE_TIERS.length - 1];
+  const base = tier?.price ?? lastTier?.price ?? 480;
+  return base + (oversize ? POSTPAKET_OVERSIZE_FEE : 0);
 }
 
 /**
  * PostNord Postpaket utrikes - EU countries.
+ * NOTE: These are retail/private prices. Business rates may be lower.
  * @see https://www.postnord.se/privat/skicka/brev-och-paket/postpaket-utrikes/
- * @see https://www.postnord.se/privat/priser-och-villkor/portotabeller/
- * Prices in SEK. Weight in kg. Online/Skicka Direkt prices.
+ * Prices in SEK. Weight in kg.
  */
 const POSTPAKET_EU_TIERS: Array<{ maxKg: number; price: number }> = [
   { maxKg: 1, price: 358 },
