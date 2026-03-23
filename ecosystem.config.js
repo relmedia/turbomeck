@@ -12,6 +12,17 @@ module.exports = {
       watch: false,
     },
     {
+      name: "payment-service",
+      cwd: "./apps/payment-service",
+      script: "pnpm",
+      args: "start",
+      env: { PORT: 8002 },
+      env_file: ".env",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+    },
+    {
       name: "client",
       cwd: "./apps/client",
       script: "pnpm",
