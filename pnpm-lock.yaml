@@ -440,6 +440,9 @@ importers:
       multer:
         specifier: ^2.0.2
         version: 2.0.2
+      nodemailer:
+        specifier: ^8.0.2
+        version: 8.0.2
       sharp:
         specifier: 0.32.6
         version: 0.32.6
@@ -490,6 +493,9 @@ importers:
 
   packages/database:
     dependencies:
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       drizzle-orm:
         specifier: ^0.39.0
         version: 0.39.3(postgres@3.4.8)

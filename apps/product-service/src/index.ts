@@ -9,6 +9,7 @@ import { db, products, categories, productCategories, orders, orderItems, review
 import { eq, inArray, desc, asc, sql } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
+import { sendOrderConfirmationEmail } from "./email.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -891,6 +892,26 @@ app.post("/api/orders", async (req, res) => {
         quantity: item.quantity,
       }))
     );
+
+    // Send order confirmation email (async, don't block response)
+    sendOrderConfirmationEmail({
+      orderNumber: order.orderNumber,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      email: body.email,
+      address: body.address,
+      city: body.city,
+      postalCode: body.postalCode,
+      country: body.country ?? "SE",
+      servicePointName: body.servicePointName,
+      deliveryOption: body.deliveryOption,
+      subtotal: body.subtotal,
+      shippingCost: body.shippingCost,
+      discount: body.discount ?? 0,
+      total: body.total,
+      trackingId: body.postNordTrackingId,
+      items: body.items,
+    }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
 
     res.status(201).json({
       id: order.id,
