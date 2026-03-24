@@ -1,17 +1,25 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
+
+/** Default: Claude Opus 4.5 — override with ANTHROPIC_MODEL if needed. */
+const DEFAULT_CLAUDE_MODEL = "claude-opus-4-5-20251101";
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured. Add it to your .env.local." },
+      {
+        error:
+          "ANTHROPIC_API_KEY is not configured. Add it to apps/admin .env or .env.local.",
+      },
       { status: 503 },
     );
   }
+
+  const model = process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
 
   try {
     const body = await req.json();
@@ -28,27 +36,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const openai = new OpenAI({ apiKey });
+    const anthropic = new Anthropic({ apiKey: apiKey });
+
     const prompt = `Translate the following Swedish product fields to English. Keep the same tone and meaning. For the description, it may contain HTML - translate only the text content inside tags, preserve the HTML structure exactly (e.g. <p>, <ul>, <li>, <strong>). Return valid JSON only, no markdown code block, with keys: nameEn, shortDescriptionEn, descriptionEn. Use empty string for any field that was empty in the input.
 
 Swedish name: ${name || ""}
 Swedish short description: ${shortDescription || ""}
 Swedish description (may have HTML): ${description || ""}`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a professional translator. Translate Swedish e-commerce product text to natural English. Return only valid JSON with keys nameEn, shortDescriptionEn, descriptionEn. No other text.",
-        },
-        { role: "user", content: prompt },
-      ],
+    const message = await anthropic.messages.create({
+      model,
+      max_tokens: 8192,
       temperature: 0.3,
+      system:
+        "You are a professional translator. Translate Swedish e-commerce product text to natural English. Return only valid JSON with keys nameEn, shortDescriptionEn, descriptionEn. No other text.",
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const text = completion.choices[0]?.message?.content?.trim();
+    const text = message.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
+
     if (!text) {
       return NextResponse.json(
         { error: "No translation returned from AI." },
@@ -56,7 +66,6 @@ Swedish description (may have HTML): ${description || ""}`;
       );
     }
 
-    // Parse JSON (strip potential markdown code block)
     const jsonStr = text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
     const parsed = JSON.parse(jsonStr) as {
       nameEn?: string;
