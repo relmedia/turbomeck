@@ -205,8 +205,15 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
         }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Kunde inte skapa förslag");
+        const text = await res.text();
+        let msg = "Kunde inte skapa förslag";
+        try {
+          const data = JSON.parse(text) as { error?: string };
+          if (data.error) msg = data.error;
+        } catch {
+          if (text && text.length < 500) msg = text;
+        }
+        throw new Error(msg);
       }
       const data = await res.json();
       form.setValue("description", data.description || "");
