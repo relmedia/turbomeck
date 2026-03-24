@@ -16,7 +16,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { RichTextEditor } from "./ui/rich-text-editor";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Plus, Languages } from "lucide-react";
+import { Loader2, Plus, Languages, Sparkles } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { ThumbnailsUpload } from "./ThumbnailsUpload";
 import {
@@ -88,6 +88,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isSuggestingDescription, setIsSuggestingDescription] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -182,6 +183,37 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       setError(err instanceof Error ? err.message : "Ett fel uppstod");
     } finally {
       setIsTranslating(false);
+    }
+  };
+
+  const handleSuggestDescription = async () => {
+    const name = form.getValues("name");
+    const shortDescription = form.getValues("shortDescription");
+    if (!shortDescription?.trim()) {
+      setError("Fyll i kort beskrivning först — AI använder den som underlag.");
+      return;
+    }
+    setIsSuggestingDescription(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/suggest-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name || "",
+          shortDescription: shortDescription || "",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Kunde inte skapa förslag");
+      }
+      const data = await res.json();
+      form.setValue("description", data.description || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setIsSuggestingDescription(false);
     }
   };
 
@@ -304,7 +336,28 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Beskrivning</FormLabel>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <FormLabel className="mb-0">Fullständig beskrivning</FormLabel>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSuggestDescription}
+                  disabled={isSubmitting || isSuggestingDescription}
+                >
+                  {isSuggestingDescription ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  {isSuggestingDescription
+                    ? "Skapar förslag..."
+                    : "Förslag från kort beskrivning"}
+                </Button>
+              </div>
+              <FormDescription>
+                AI kan fylla i en utökad text utifrån namn och kort beskrivning — granska alltid innan publicering.
+              </FormDescription>
               <FormControl>
                 <RichTextEditor
                   value={field.value}

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, RefreshCw, Trash2, Plus, Languages, Loader2 } from "lucide-react";
+import { Save, RefreshCw, Trash2, Plus, Languages, Loader2, Sparkles } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -95,6 +95,7 @@ export default function ProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isSuggestingDescription, setIsSuggestingDescription] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -258,6 +259,40 @@ export default function ProductDetailPage() {
       toast.error(msg);
     } finally {
       setIsTranslating(false);
+    }
+  };
+
+  const handleSuggestDescription = async () => {
+    const name = formData.name?.trim();
+    const shortDescription = formData.shortDescription?.trim();
+    if (!shortDescription) {
+      toast.error("Fyll i kort beskrivning först — AI använder den som underlag.");
+      return;
+    }
+    setIsSuggestingDescription(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/suggest-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name || "",
+          shortDescription,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Kunde inte skapa förslag");
+      }
+      const data = await res.json();
+      setFormData((prev) => ({ ...prev, description: data.description || "" }));
+      toast.success("Förslag infogat — granska texten innan du sparar.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ett fel uppstod";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSuggestingDescription(false);
     }
   };
 
@@ -473,7 +508,30 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Fullständig beskrivning</Label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Label htmlFor="description" className="mb-0">
+                    Fullständig beskrivning
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSuggestDescription}
+                    disabled={saving || isSuggestingDescription}
+                  >
+                    {isSuggestingDescription ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    {isSuggestingDescription
+                      ? "Skapar förslag..."
+                      : "Förslag från kort beskrivning"}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  AI kan fylla i en utökad text utifrån namn och kort beskrivning — granska alltid innan publicering.
+                </p>
                 <RichTextEditor
                   id="description"
                   value={formData.description}
