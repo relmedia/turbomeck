@@ -17,6 +17,16 @@
   background-color: rgb(110 201 0);
 }
 
+/* Homepage slider: vertical timeline fill on active dot */
+@keyframes homepage-slider-timeline-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

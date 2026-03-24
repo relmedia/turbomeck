@@ -45,8 +45,6 @@ function useReducedMotion(): boolean {
 }
 
 const AUTO_ADVANCE_MS = 6000;
-const SLIDER_DOT_W_ACTIVE = 18;
-const SLIDER_DOT_W_IDLE = 6;
 
 export function HomepageSlider() {
   const { locale, t } = useLanguage();
@@ -60,6 +58,8 @@ export function HomepageSlider() {
   const prevIndexRef = useRef(0);
   const isFirstRenderRef = useRef(true);
   const smokeRef = useRef<HTMLDivElement>(null);
+  const sliderContainerRef = useRef<HTMLElement>(null);
+  const floatTweenRef = useRef<gsap.core.Tween | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +123,115 @@ export function HomepageSlider() {
     return () => tweens.forEach((tw) => tw.kill());
   }, [products.length, reducedMotion]);
 
+  // Floating animation for active product image
+  useEffect(() => {
+    if (reducedMotion || products.length === 0) return;
+    
+    const slideEl = slideRefs.current[index];
+    if (!slideEl) return;
+    
+    const imgEl = slideEl.querySelector("[data-slide-image]");
+    if (!imgEl) return;
+
+    // Kill previous floating animation
+    if (floatTweenRef.current) {
+      floatTweenRef.current.kill();
+    }
+
+    // Create subtle floating animation
+    floatTweenRef.current = gsap.to(imgEl, {
+      y: -8,
+      duration: 2.5,
+      ease: "sine.inOut",
+      repeat: -1,
+      yoyo: true,
+    });
+
+    return () => {
+      if (floatTweenRef.current) {
+        floatTweenRef.current.kill();
+      }
+    };
+  }, [index, products.length, reducedMotion]);
+
+  // Mouse parallax effect
+  useEffect(() => {
+    if (reducedMotion || !sliderContainerRef.current || products.length === 0) return;
+
+    const container = sliderContainerRef.current;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const mouseX = (e.clientX - centerX) / (rect.width / 2);
+      const mouseY = (e.clientY - centerY) / (rect.height / 2);
+
+      const slideEl = slideRefs.current[index];
+      if (!slideEl) return;
+
+      const imgEl = slideEl.querySelector("[data-slide-image]");
+      const textEls = slideEl.querySelectorAll("[data-slide-text]");
+
+      if (imgEl) {
+        gsap.to(imgEl, {
+          x: mouseX * 15,
+          rotateY: mouseX * 3,
+          rotateX: -mouseY * 2,
+          duration: 0.6,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      }
+
+      textEls.forEach((el, i) => {
+        gsap.to(el, {
+          x: mouseX * (4 + i * 2),
+          duration: 0.8,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      });
+    };
+
+    const handleMouseLeave = () => {
+      const slideEl = slideRefs.current[index];
+      if (!slideEl) return;
+
+      const imgEl = slideEl.querySelector("[data-slide-image]");
+      const textEls = slideEl.querySelectorAll("[data-slide-text]");
+
+      if (imgEl) {
+        gsap.to(imgEl, {
+          x: 0,
+          rotateY: 0,
+          rotateX: 0,
+          duration: 0.8,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      }
+
+      textEls.forEach((el) => {
+        gsap.to(el, {
+          x: 0,
+          duration: 0.8,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      });
+    };
+
+    container.addEventListener("mousemove", handleMouseMove);
+    container.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      container.removeEventListener("mousemove", handleMouseMove);
+      container.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [index, products.length, reducedMotion]);
+
   useEffect(() => {
     if (!trackRef.current || products.length === 0) return;
 
@@ -144,10 +253,9 @@ export function HomepageSlider() {
       });
       dotRefs.current.forEach((dot, i) => {
         if (!dot) return;
-        const inner = dot.querySelector("[data-dot-inner]") as HTMLElement | null;
-        if (inner) {
-          inner.style.width = i === index ? `${SLIDER_DOT_W_ACTIVE}px` : `${SLIDER_DOT_W_IDLE}px`;
-          inner.style.backgroundColor = i === index ? "rgb(245 158 11)" : "rgb(82 82 91)";
+        const track = dot.querySelector("[data-dot-track]") as HTMLElement | null;
+        if (track) {
+          track.style.height = i === index ? "32px" : "16px";
         }
       });
       prevIndexRef.current = index;
@@ -164,23 +272,37 @@ export function HomepageSlider() {
 
         gsap.to(prevTextEls, {
           opacity: 0,
-          y: -24,
+          y: -16,
           x: -10,
-          scale: 0.99,
-          duration: 0.32,
+          scale: 0.98,
+          duration: 0.55,
           stagger: 0.04,
-          ease: "power2.in",
+          ease: "power2.inOut",
           overwrite: "auto",
         });
-        gsap.to(prevImgEl, { opacity: 0, scale: 0.97, duration: 0.28, ease: "power2.in", overwrite: "auto" });
-        gsap.to(prevCtaEl, { opacity: 0, x: -8, duration: 0.2, ease: "power2.in", overwrite: "auto" });
+        gsap.to(prevImgEl, {
+          opacity: 0,
+          scale: 0.92,
+          rotateY: -8,
+          x: -22,
+          duration: 0.6,
+          ease: "power2.inOut",
+          overwrite: "auto",
+        });
+        gsap.to(prevCtaEl, {
+          opacity: 0,
+          y: 12,
+          duration: 0.45,
+          ease: "power2.inOut",
+          overwrite: "auto",
+        });
       }
     }
 
     gsap.to(trackRef.current, {
       xPercent,
-      duration: 0.65,
-      ease: "power3.inOut",
+      duration: 0.95,
+      ease: "power2.inOut",
       overwrite: "auto",
     });
 
@@ -190,49 +312,52 @@ export function HomepageSlider() {
       const imgEl = slideEl.querySelector("[data-slide-image]");
       const ctaEl = slideEl.querySelector("[data-slide-cta]");
 
-      gsap.set(textEls, { opacity: 0, y: 28, x: -16 });
-      gsap.set(imgEl, { opacity: 0, scale: 0.96 });
-      gsap.set(ctaEl, { opacity: 0, x: -16 });
+      gsap.set(textEls, { opacity: 0, y: 28, x: -18, scale: 0.98 });
+      gsap.set(imgEl, { opacity: 0, scale: 0.92, rotateY: 10, x: 28 });
+      gsap.set(ctaEl, { opacity: 0, y: 18, scale: 0.98 });
 
-      const delay = isTransition ? 0.22 : 0.08;
+      const delay = isTransition ? 0.14 : 0.06;
 
       gsap.to(textEls, {
         opacity: 1,
         y: 0,
         x: 0,
-        duration: 0.58,
-        stagger: 0.08,
-        ease: "power3.out",
+        scale: 1,
+        duration: 0.88,
+        stagger: 0.07,
+        ease: "power2.out",
         delay,
         overwrite: "auto",
       });
       gsap.to(imgEl, {
         opacity: 1,
         scale: 1,
-        duration: 0.62,
-        ease: "power2.out",
-        delay: delay - 0.04,
+        rotateY: 0,
+        x: 0,
+        duration: 1,
+        ease: "sine.out",
+        delay: delay + 0.04,
         overwrite: "auto",
       });
       gsap.to(ctaEl, {
         opacity: 1,
-        x: 0,
-        duration: 0.48,
+        y: 0,
+        scale: 1,
+        duration: 0.72,
         ease: "power2.out",
-        delay: delay + 0.28,
+        delay: delay + 0.22,
         overwrite: "auto",
       });
     }
 
     dotRefs.current.forEach((dot, i) => {
       if (!dot) return;
-      const inner = dot.querySelector("[data-dot-inner]") as HTMLElement | null;
-      if (!inner) return;
-      gsap.to(inner, {
-        width: i === index ? SLIDER_DOT_W_ACTIVE : SLIDER_DOT_W_IDLE,
-        backgroundColor: i === index ? "rgb(245 158 11)" : "rgb(82 82 91)",
-        duration: 0.32,
-        ease: "power2.out",
+      const track = dot.querySelector("[data-dot-track]") as HTMLElement | null;
+      if (!track) return;
+      gsap.to(track, {
+        height: i === index ? 32 : 16,
+        duration: 0.55,
+        ease: "power2.inOut",
       });
     });
 
@@ -242,10 +367,12 @@ export function HomepageSlider() {
 
   if (loading) {
     return (
-      <div className="relative mb-12 flex min-h-[320px] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-xl">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:24px_24px]" />
+      <div
+        className="relative mb-12 flex min-h-[300px] w-full overflow-hidden shadow-lg md:min-h-[400px]"
+        style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
+      >
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-400" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-gray-600" />
         </div>
       </div>
     );
@@ -253,8 +380,10 @@ export function HomepageSlider() {
 
   if (products.length === 0) {
     return (
-      <div className="relative mb-12 flex min-h-[320px] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-xl">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:24px_24px]" />
+      <div 
+        className="relative mb-12 flex min-h-[300px] w-full overflow-hidden shadow-lg md:min-h-[400px]"
+        style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
+      >
         <div className="relative flex flex-1 items-center justify-center p-8">
           <Image
             src="/featured.png"
@@ -270,88 +399,178 @@ export function HomepageSlider() {
 
   return (
     <section
-      className="group/slider relative mb-12 w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl ring-1 ring-white/[0.07]"
+      ref={sliderContainerRef}
+      className="group/slider relative mb-12 w-full overflow-hidden shadow-lg border border-gray-200"
+      style={{ perspective: "1000px" }}
       aria-roledescription="carousel"
       aria-label={t("slider.regionLabel")}
     >
-      <div className="relative min-h-[320px] md:min-h-[400px] overflow-hidden">
-        {/* Autoplay progress */}
-        {products.length > 1 && !reducedMotion && (
+      <div className="relative min-h-[320px] md:min-h-[420px] overflow-hidden">
+
+        {/* Light textured background */}
+        <div className="absolute inset-0 z-0">
+          {/* Base light gradient */}
           <div
-            className="absolute left-0 right-0 top-0 z-30 h-0.5 bg-white/10"
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
+          />
+          {/* Abstract diagonal lines */}
+          <div
+            className="absolute inset-0 overflow-hidden"
             aria-hidden
           >
+            {/* Long diagonal line - top */}
+            <div 
+              className="absolute h-[2px] w-[600px] bg-gradient-to-r from-transparent via-gray-300 to-transparent"
+              style={{ top: "15%", left: "-5%", transform: "rotate(-25deg)" }}
+            />
+            {/* Short accent line */}
+            <div 
+              className="absolute h-[3px] w-[150px] bg-gradient-to-r from-gray-400 to-transparent"
+              style={{ top: "25%", left: "8%", transform: "rotate(-25deg)" }}
+            />
+            {/* Curved arc - right side */}
+            <div 
+              className="absolute h-[400px] w-[400px] rounded-full border-2 border-gray-200"
+              style={{ top: "-20%", right: "-15%", opacity: 0.5 }}
+            />
+            {/* Small circle accent */}
+            <div 
+              className="absolute h-[80px] w-[80px] rounded-full border border-gray-300"
+              style={{ bottom: "20%", left: "5%", opacity: 0.4 }}
+            />
+            {/* Horizontal thin line */}
+            <div 
+              className="absolute h-[1px] w-[200px] bg-gradient-to-r from-transparent via-gray-400 to-transparent"
+              style={{ bottom: "35%", left: "15%" }}
+            />
+            {/* Dotted vertical accent */}
+            <div 
+              className="absolute w-[2px] h-[100px]"
+              style={{ 
+                top: "30%", 
+                right: "25%",
+                backgroundImage: "linear-gradient(to bottom, transparent 50%, rgba(150,150,150,0.3) 50%)",
+                backgroundSize: "2px 8px"
+              }}
+            />
+            {/* Opposing diagonal - bottom right */}
+            <div 
+              className="absolute h-[1px] w-[480px] bg-gradient-to-r from-transparent via-gray-400/60 to-transparent"
+              style={{ bottom: "12%", right: "-8%", transform: "rotate(18deg)" }}
+            />
+            {/* Zigzag band */}
             <div
-              key={index}
-              className="homepage-slider-progress-fill h-full origin-left rounded-full bg-gradient-to-r from-amber-400 to-amber-500"
+              className="absolute left-[12%] top-[55%] h-12 w-40 opacity-30"
               style={{
-                animation: `homepage-slider-progress ${AUTO_ADVANCE_MS}ms linear forwards`,
+                backgroundImage: `repeating-linear-gradient(
+                  135deg,
+                  transparent,
+                  transparent 6px,
+                  rgba(120,120,120,0.35) 6px,
+                  rgba(120,120,120,0.35) 7px
+                )`,
+              }}
+            />
+            {/* Ellipse outline */}
+            <div
+              className="absolute rounded-[100%] border border-gray-300/50"
+              style={{ width: "280px", height: "120px", bottom: "8%", right: "12%", transform: "rotate(-8deg)" }}
+            />
+            {/* Parallel hatch - left */}
+            <div
+              className="absolute left-0 top-[40%] h-32 w-24 opacity-25"
+              style={{
+                backgroundImage: `repeating-linear-gradient(
+                  90deg,
+                  transparent,
+                  transparent 11px,
+                  rgba(100,100,100,0.25) 11px,
+                  rgba(100,100,100,0.25) 12px
+                )`,
+              }}
+            />
+            {/* Short perpendicular L-shape */}
+            <div
+              className="absolute border-l-2 border-b-2 border-gray-300/60"
+              style={{ width: "48px", height: "48px", top: "18%", right: "35%" }}
+            />
+            {/* Dashed arc segment (quarter circle stroke) */}
+            <div
+              className="absolute rounded-full border border-dashed border-gray-300/70"
+              style={{ width: "180px", height: "180px", bottom: "-8%", left: "22%", clipPath: "polygon(0 0, 50% 0, 50% 50%, 0 50%)" }}
+            />
+            {/* Thin crossing lines */}
+            <div
+              className="absolute h-[120px] w-[1px] bg-gradient-to-b from-transparent via-gray-400/40 to-transparent"
+              style={{ left: "42%", top: "8%" }}
+            />
+            <div
+              className="absolute h-[1px] w-[160px] bg-gradient-to-r from-gray-400/30 to-transparent"
+              style={{ left: "38%", top: "22%" }}
+            />
+            {/* Stepped / broken line */}
+            <div
+              className="absolute opacity-35"
+              style={{
+                top: "65%",
+                right: "8%",
+                width: "120px",
+                height: "3px",
+                background: `repeating-linear-gradient(
+                  90deg,
+                  rgba(90,90,90,0.45) 0px,
+                  rgba(90,90,90,0.45) 14px,
+                  transparent 14px,
+                  transparent 22px
+                )`,
+                transform: "rotate(-12deg)",
+              }}
+            />
+            {/* Soft grid fragment */}
+            <div
+              className="absolute right-[5%] top-[12%] h-24 w-24 opacity-20"
+              style={{
+                backgroundImage: `
+                  linear-gradient(0deg, rgba(130,130,130,0.4) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(130,130,130,0.4) 1px, transparent 1px)
+                `,
+                backgroundSize: "10px 10px",
               }}
             />
           </div>
-        )}
+        </div>
 
-        <div
-          className="absolute inset-0 z-0"
-          style={{
-            background:
-              "linear-gradient(160deg, #18181b 0%, #27272a 42%, #3f3f46 100%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 z-0 opacity-90"
-          style={{
-            backgroundImage:
-              "radial-gradient(ellipse 85% 65% at 85% 20%, rgba(251,191,36,0.07) 0%, transparent 45%), radial-gradient(ellipse 70% 70% at 10% 80%, rgba(99,102,241,0.06) 0%, transparent 50%)",
-          }}
-        />
-        <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:28px_28px] [mask-image:radial-gradient(ellipse_85%_85%_at_50%_45%,black_25%,transparent_72%)]" />
-
+        {/* Subtle ambient shadows */}
         <div
           ref={smokeRef}
-          className="pointer-events-none absolute inset-0 z-[1] overflow-hidden opacity-80"
+          className="pointer-events-none absolute inset-0 z-[2] overflow-hidden"
           aria-hidden
         >
           <div
             data-smoke
-            className="absolute left-[10%] top-[15%] h-64 w-80 rounded-full will-change-transform"
+            className="absolute left-[10%] top-[40%] h-48 w-64 rounded-full will-change-transform opacity-20"
             style={{
-              background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,255,255,0.08) 0%, rgba(200,210,220,0.04) 40%, transparent 70%)",
-              filter: "blur(44px)",
+              background: "radial-gradient(ellipse at center, rgba(0,0,0,0.08) 0%, transparent 70%)",
+              filter: "blur(40px)",
             }}
           />
           <div
             data-smoke
-            className="absolute right-[5%] top-[25%] h-80 w-96 rounded-full will-change-transform"
+            className="absolute right-[20%] bottom-[30%] h-56 w-72 rounded-full will-change-transform opacity-15"
             style={{
-              background: "radial-gradient(ellipse 70% 70% at 50% 50%, rgba(255,255,255,0.06) 0%, rgba(180,190,200,0.03) 45%, transparent 75%)",
-              filter: "blur(52px)",
-            }}
-          />
-          <div
-            data-smoke
-            className="absolute bottom-[18%] left-[18%] h-56 w-72 rounded-full will-change-transform"
-            style={{
-              background: "radial-gradient(ellipse 75% 65% at 50% 50%, rgba(255,255,255,0.05) 0%, rgba(190,200,210,0.02) 50%, transparent 75%)",
-              filter: "blur(48px)",
-            }}
-          />
-          <div
-            data-smoke
-            className="absolute right-[22%] bottom-[12%] h-72 w-80 rounded-full will-change-transform"
-            style={{
-              background: "radial-gradient(ellipse 65% 80% at 50% 50%, rgba(255,255,255,0.06) 0%, rgba(200,210,220,0.03) 40%, transparent 70%)",
-              filter: "blur(46px)",
+              background: "radial-gradient(ellipse at center, rgba(0,0,0,0.06) 0%, transparent 70%)",
+              filter: "blur(50px)",
             }}
           />
         </div>
 
         {products.length > 1 && (
           <p
-            className="pointer-events-none absolute right-4 top-4 z-30 rounded-md bg-black/35 px-2.5 py-1 text-[11px] font-medium tabular-nums tracking-wide text-white/80 backdrop-blur-md md:right-5 md:top-5"
+            className="pointer-events-none absolute left-14 top-5 z-30 text-[11px] font-medium tabular-nums tracking-wider text-gray-400 md:left-20 md:top-6"
             aria-live="polite"
           >
-            {t("slider.position", { current: index + 1, total: products.length })}
+            {String(index + 1).padStart(2, "0")} / {String(products.length).padStart(2, "0")}
           </p>
         )}
 
@@ -376,77 +595,84 @@ export function HomepageSlider() {
               >
                 <Link
                   href={href}
-                  className="flex min-h-[320px] w-full rounded-2xl focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 md:min-h-[400px]"
+                  className="flex min-h-[320px] w-full focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 md:min-h-[420px]"
                 >
                   <div className="relative flex w-full flex-col md:flex-row">
-                    <div className="relative flex flex-1 flex-col justify-center px-6 py-8 pl-8 pr-5 md:max-w-[52%] md:px-12 md:py-10 md:pl-14">
-                      <div
-                        className="pointer-events-none absolute inset-y-6 left-3 w-px bg-gradient-to-b from-transparent via-white/12 to-transparent md:left-4"
-                        aria-hidden
-                      />
-                      <p
-                        data-slide-text
-                        className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400/90"
-                      >
-                        {t("slider.featured")}
-                      </p>
-                      <h2
-                        data-slide-text
-                        className="mt-3 text-balance text-2xl font-semibold leading-[1.15] tracking-tight text-white md:text-3xl lg:text-[2rem]"
-                      >
-                        {product.name}
+                    {/* Left content */}
+                    <div className="relative flex flex-1 flex-col justify-center px-6 py-8 md:max-w-[55%] md:pl-10 md:pr-0 md:py-10 lg:pl-14">
+                      <h2 data-slide-text className="flex flex-col gap-1">
+                        <span 
+                          className="text-3xl font-black uppercase italic leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl"
+                          style={{
+                            textShadow: "3px 3px 0 rgba(0,0,0,0.15), 5px 5px 0 rgba(0,0,0,0.08)",
+                          }}
+                        >
+                          {product.name.split(" ").slice(0, 2).join(" ")}
+                        </span>
+                        <span 
+                          className="text-2xl font-black uppercase italic leading-none tracking-tight md:text-4xl lg:text-5xl"
+                          style={{
+                            WebkitTextStroke: "1.5px #1a1a1a",
+                            WebkitTextFillColor: "transparent",
+                            textShadow: "2px 2px 0 rgba(0,0,0,0.05)",
+                          }}
+                        >
+                          {product.name.split(" ").slice(2).join(" ") || "TURBO"}
+                        </span>
                       </h2>
+                      
                       {shortDesc && (
                         <p
                           data-slide-text
-                          className="mt-3 max-w-xl text-pretty text-sm leading-relaxed text-zinc-400 md:text-base"
+                          className="mt-5 max-w-sm text-xs italic leading-relaxed text-gray-500 md:mt-6 md:text-sm"
                         >
                           {shortDesc}
                         </p>
                       )}
-                      <div data-slide-text className="mt-6 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <span className="text-sm font-medium text-zinc-500">{t("slider.from")}</span>
-                        <span className="text-2xl font-semibold tabular-nums tracking-tight text-white md:text-3xl">
+                      
+                      <div data-slide-text className="mt-6 flex flex-wrap items-center gap-5 md:mt-8">
+                        <span
+                          data-slide-cta
+                          className="group/btn relative isolate inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gray-900 px-7 py-3 text-sm font-semibold uppercase tracking-wider text-white ring-1 ring-white/0 transition-all duration-300 ring-offset-2 ring-offset-gray-100 hover:-translate-y-0.5 hover:ring-white/15 hover:shadow-lg hover:shadow-gray-900/25 active:translate-y-0 active:scale-[0.99] md:px-8 md:py-3.5"
+                        >
+                          {/* Brand tint */}
+                          <span
+                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-[rgb(110,201,0)]/0 via-[rgb(110,201,0)]/12 to-[rgb(110,201,0)]/0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100"
+                            aria-hidden
+                          />
+                          {/* Shimmer sweep */}
+                          <span className="pointer-events-none absolute inset-0 z-[1] overflow-hidden rounded-full" aria-hidden>
+                            <span className="absolute inset-y-0 -left-1/3 w-1/2 -translate-x-full skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-[320%]" />
+                          </span>
+                          <span className="relative z-[2]">{t("account.shopNow")}</span>
+                          <ArrowRight
+                            className="relative z-[2] h-4 w-4 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover/btn:translate-x-1"
+                            strokeWidth={2.5}
+                            aria-hidden
+                          />
+                        </span>
+                        <span className="text-xl font-bold tabular-nums tracking-tight text-gray-900 md:text-2xl">
                           {priceStr}
                         </span>
                       </div>
-                      <span
-                        data-slide-cta
-                        className="mt-6 inline-flex w-fit items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 shadow-lg shadow-black/25 transition-[transform,box-shadow,background-color] duration-200 hover:bg-zinc-100 hover:shadow-black/30 active:scale-[0.98] md:px-6 md:py-3 md:text-[0.95rem]"
-                      >
-                        {t("account.shopNow")}
-                        <ArrowRight className="h-4 w-4 shrink-0 opacity-80 md:h-[1.05rem] md:w-[1.05rem]" strokeWidth={2.25} />
-                      </span>
                     </div>
 
-                    <div className="relative flex min-h-[220px] flex-1 items-center justify-center px-5 pb-8 pt-2 md:min-h-0 md:px-10 md:pb-10 md:pt-8">
+                    {/* Right image */}
+                    <div className="relative flex min-h-[240px] flex-1 items-center justify-start px-2 pb-6 pt-0 md:min-h-0 md:pl-0 md:pr-8 md:py-4" style={{ perspective: "800px" }}>
                       <div
                         data-slide-image
-                        className="relative h-full w-full min-h-[200px] md:min-h-[280px]"
+                        className="relative z-10 h-full w-full min-h-[220px] md:min-h-[380px]"
+                        style={{ transformStyle: "preserve-3d" }}
                       >
-                        <div
-                          className="absolute inset-0 -m-6 rounded-[1.75rem] md:-m-8"
-                          style={{
-                            background:
-                              "radial-gradient(ellipse 72% 72% at 50% 55%, rgba(0,0,0,0.22) 0%, transparent 62%), radial-gradient(ellipse 55% 55% at 50% 75%, rgba(251,191,36,0.06) 0%, transparent 70%)",
-                            filter: "blur(24px)",
-                          }}
-                          aria-hidden
-                        />
-                        <div
-                          className="absolute inset-2 rounded-2xl ring-1 ring-white/[0.06] md:inset-4"
-                          aria-hidden
-                        />
                         <ImageWithFallback
                           src={imgSrc}
                           alt=""
                           fill
-                          className="relative z-10 object-contain object-center transition-transform duration-500 ease-out group-hover/slider:scale-[1.02]"
+                          className="relative z-10 object-contain object-center transition-transform duration-700 ease-out group-hover/slider:scale-[1.04]"
                           style={{
-                            filter:
-                              "drop-shadow(0 4px 6px rgba(0,0,0,0.15)) drop-shadow(0 12px 24px rgba(0,0,0,0.2))",
+                            filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.6)) drop-shadow(0 30px 60px rgba(0,0,0,0.4))",
                           }}
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 45vw, 520px"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 600px"
                         />
                       </div>
                     </div>
@@ -460,52 +686,94 @@ export function HomepageSlider() {
 
       {products.length > 1 && (
         <>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              goTo(index - 1);
-            }}
-            className="absolute left-2 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-zinc-950/75 text-white shadow-lg shadow-black/40 backdrop-blur-md transition-[transform,background-color,border-color,opacity] duration-200 hover:border-amber-400/35 hover:bg-zinc-900/90 hover:text-white active:scale-95 md:left-4 md:h-12 md:w-12 md:opacity-0 md:shadow-xl md:group-hover/slider:opacity-100 md:focus-visible:opacity-100"
-            aria-label={t("slider.prevSlide")}
-          >
-            <ChevronLeft className="h-5 w-5" aria-hidden strokeWidth={2.25} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              goTo(index + 1);
-            }}
-            className="absolute right-2 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-zinc-950/75 text-white shadow-lg shadow-black/40 backdrop-blur-md transition-[transform,background-color,border-color,opacity] duration-200 hover:border-amber-400/35 hover:bg-zinc-900/90 hover:text-white active:scale-95 md:right-4 md:h-12 md:w-12 md:opacity-0 md:shadow-xl md:group-hover/slider:opacity-100 md:focus-visible:opacity-100"
-            aria-label={t("slider.nextSlide")}
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden strokeWidth={2.25} />
-          </button>
-          <div className="absolute bottom-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-px rounded-full border border-white/6 bg-zinc-950/30 px-1 py-1 backdrop-blur-sm md:bottom-4">
+          {/* Arrow navigation - bottom right, appears on hover */}
+          <div className="absolute bottom-6 right-16 z-40 flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/slider:opacity-100 md:bottom-8 md:right-20">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                goTo(index - 1);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-all duration-200 hover:bg-gray-900 hover:text-white hover:border-gray-900 active:scale-95"
+              aria-label={t("slider.prevSlide")}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                goTo(index + 1);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-all duration-200 hover:bg-gray-900 hover:text-white hover:border-gray-900 active:scale-95"
+              aria-label={t("slider.nextSlide")}
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden strokeWidth={2.5} />
+            </button>
+          </div>
+          {/* Vertical timeline + slide indicators */}
+          <div className="absolute right-4 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center md:right-6">
             {products.map((_, i) => (
-              <button
-                key={i}
-                ref={(el) => { dotRefs.current[i] = el; }}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  goTo(i);
-                }}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-white transition-colors hover:bg-white/5"
-                aria-label={t("slider.goToSlide", { n: i + 1 })}
-                aria-current={i === index ? "true" : undefined}
-              >
-                <span
-                  data-dot-inner
-                  className="block h-1.5 rounded-full bg-zinc-600"
-                  style={{ width: i === index ? SLIDER_DOT_W_ACTIVE : SLIDER_DOT_W_IDLE }}
-                />
-              </button>
+              <div key={i} className="flex flex-col items-center">
+                {i > 0 && (
+                  <div
+                    className="h-3 w-px bg-gradient-to-b from-gray-300/50 to-gray-300/80"
+                    aria-hidden
+                  />
+                )}
+                <button
+                  ref={(el) => { dotRefs.current[i] = el; }}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    goTo(i);
+                  }}
+                  className="group/dot flex items-center gap-2 py-0.5"
+                  aria-label={t("slider.goToSlide", { n: i + 1 })}
+                  aria-current={i === index ? "true" : undefined}
+                >
+                  <span
+                    className="text-xs font-medium tabular-nums transition-all duration-300"
+                    style={{
+                      color: i === index ? "rgb(110, 201, 0)" : "rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span
+                    data-dot-track
+                    className="relative block w-[3px] overflow-hidden rounded-full bg-black/12"
+                    style={{ height: i === index ? 32 : 16 }}
+                  >
+                    {i === index && reducedMotion && (
+                      <span
+                        className="absolute inset-0 rounded-full bg-[rgb(110,201,0)]"
+                        style={{ boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)" }}
+                      />
+                    )}
+                    {i === index && !reducedMotion && (
+                      <span
+                        key={index}
+                        className="absolute inset-0 origin-top rounded-full bg-[rgb(110,201,0)]"
+                        style={{
+                          animation: `homepage-slider-timeline-fill ${AUTO_ADVANCE_MS}ms linear forwards`,
+                          boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)",
+                        }}
+                      />
+                    )}
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         </>
       )}
+
+      {/* Bottom dark accent bar */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-2 md:h-3 bg-gray-900"
+        aria-hidden
+      />
     </section>
   );
 }

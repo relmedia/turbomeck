@@ -7,10 +7,11 @@ const Homepage = async ({
   searchParams: Promise<{ category?: string; page?: string; search?: string }>;
 }) => {
   const { category, page, search } = await searchParams;
+  const isStartPage = !category && !search;
 
   return (
     <div className="">
-      <HomepageSlider />
+      {isStartPage && <HomepageSlider />}
       <ProductList category={category} params="homepage" page={page} search={search} />
     </div>
   );
