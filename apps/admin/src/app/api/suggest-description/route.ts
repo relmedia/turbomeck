@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -10,11 +10,9 @@ const DEFAULT_CLAUDE_MODEL = "claude-opus-4-5-20251101";
 function extractHtmlFromModelOutput(raw: string): string {
   let s = raw.trim();
 
-  // ```html ... ``` or ``` ... ``` (anywhere in reply)
   const fenceMatch = s.match(/```(?:html)?\s*\n?([\s\S]*?)\n?```/);
   if (fenceMatch?.[1]) s = fenceMatch[1].trim();
 
-  // Drop leading "Här är..." lines before first tag
   const tagStart = s.search(/<[a-z!]/i);
   if (tagStart > 0 && tagStart < 500) {
     s = s.slice(tagStart);
@@ -37,12 +35,18 @@ export async function POST(req: NextRequest) {
 
   const model = process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
 
+  let body: { name?: string; shortDescription?: string };
   try {
-    const body = await req.json();
-    const { name, shortDescription } = body as {
-      name?: string;
-      shortDescription?: string;
-    };
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Ogiltig JSON i begäran." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const { name, shortDescription } = body;
 
     if (!shortDescription?.trim()) {
       return NextResponse.json(
@@ -87,7 +91,10 @@ Kort beskrivning: ${shortDescription.trim()}`;
 
     let description = extractHtmlFromModelOutput(text);
 
-    // Fallback: try JSON if model still returned JSON (older clients / cached behavior)
+    if (!description.trim()) {
+      description = text.trim();
+    }
+
     if (!description.includes("<") && (text.includes('"description"') || text.trim().startsWith("{"))) {
       try {
         const jsonStr = text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
@@ -97,7 +104,7 @@ Kort beskrivning: ${shortDescription.trim()}`;
           description = String(parsed.description).trim();
         }
       } catch {
-        /* use plain text below */
+        /* ignore */
       }
     }
 
@@ -108,7 +115,6 @@ Kort beskrivning: ${shortDescription.trim()}`;
       );
     }
 
-    // Plain text fallback: wrap in <p> if no tags at all
     if (!/<[a-z][\s\S]*>/i.test(description)) {
       description = `<p>${description.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
     }
@@ -117,30 +123,36 @@ Kort beskrivning: ${shortDescription.trim()}`;
   } catch (err) {
     console.error("Suggest description API error:", err);
 
-    if (err && typeof err === "object" && "status" in err) {
-      const status = (err as { status?: number }).status;
-      const msg = err instanceof Error ? err.message : String(err);
-      if (status === 404) {
+    if (err instanceof APIError) {
+      const detail = err.message || String(err.error ?? "");
+      if (err.status === 404) {
         return NextResponse.json(
           {
-            error: `Modellen hittades inte. Kontrollera ANTHROPIC_MODEL i .env (nu: ${model}).`,
+            error: `Modellen finns inte eller saknar åtkomst. Sätt ANTHROPIC_MODEL i .env till en modell du har (nu: ${model}). Exempel: claude-sonnet-4-20250514`,
           },
           { status: 502 },
         );
       }
-      if (status === 401 || status === 403) {
+      if (err.status === 401 || err.status === 403) {
         return NextResponse.json(
-          { error: "Ogiltig eller saknad ANTHROPIC_API_KEY." },
+          { error: `Anthropic nekade anropet (${err.status}). Kontrollera ANTHROPIC_API_KEY. ${detail}` },
           { status: 503 },
         );
       }
+      if (err.status === 429) {
+        return NextResponse.json(
+          { error: "För många anrop mot Anthropic. Försök igen om en stund." },
+          { status: 429 },
+        );
+      }
       return NextResponse.json(
-        { error: msg || "AI-anrop misslyckades." },
+        { error: `Anthropic (${err.status ?? "?"}): ${detail}` },
         { status: 502 },
       );
     }
 
-    const message = err instanceof Error ? err.message : "Kunde inte skapa förslag";
+    const message =
+      err instanceof Error ? err.message : "Okänt fel vid AI-anrop.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

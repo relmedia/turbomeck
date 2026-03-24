@@ -206,12 +206,18 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       });
       if (!res.ok) {
         const text = await res.text();
-        let msg = "Kunde inte skapa förslag";
+        let msg: string;
         try {
           const data = JSON.parse(text) as { error?: string };
-          if (data.error) msg = data.error;
+          msg = data.error?.trim() || "";
         } catch {
-          if (text && text.length < 500) msg = text;
+          msg = "";
+        }
+        if (!msg) {
+          const preview = text.replace(/\s+/g, " ").trim().slice(0, 400);
+          msg = preview
+            ? `HTTP ${res.status}: ${preview}`
+            : `HTTP ${res.status} — inget felmeddelande från servern. Kolla terminalen där admin körs.`;
         }
         throw new Error(msg);
       }
