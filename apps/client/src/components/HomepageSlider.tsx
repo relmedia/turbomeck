@@ -46,11 +46,17 @@ function useReducedMotion(): boolean {
 
 const AUTO_ADVANCE_MS = 6000;
 
-export function HomepageSlider() {
+type HomepageSliderProps = {
+  /** Server-fetched slider products (same locale as cookie) — avoids client waterfall for LCP */
+  initialProducts?: ProductType[];
+};
+
+export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const { locale, t } = useLanguage();
   const reducedMotion = useReducedMotion();
-  const [products, setProducts] = useState<ProductType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ProductType[]>(initialProducts);
+  const [loading, setLoading] = useState(initialProducts.length === 0);
+  const skipHydrationRefetchRef = useRef(initialProducts.length > 0);
   const [index, setIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -63,6 +69,12 @@ export function HomepageSlider() {
 
   useEffect(() => {
     let cancelled = false;
+    if (skipHydrationRefetchRef.current) {
+      skipHydrationRefetchRef.current = false;
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     fetchSliderProducts(locale)
       .then((data) => {
@@ -666,8 +678,10 @@ export function HomepageSlider() {
                       >
                         <ImageWithFallback
                           src={imgSrc}
-                          alt=""
+                          alt={product.name}
                           fill
+                          priority={i === 0}
+                          fetchPriority={i === 0 ? "high" : "low"}
                           className="relative z-10 object-contain object-center transition-transform duration-700 ease-out group-hover/slider:scale-[1.04]"
                           style={{
                             filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.6)) drop-shadow(0 30px 60px rgba(0,0,0,0.4))",

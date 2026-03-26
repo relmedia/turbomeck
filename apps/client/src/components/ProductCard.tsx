@@ -26,7 +26,10 @@ import { ImageWithFallback } from "./ImageWithFallback";
 import { toast } from "react-toastify";
 import { useTranslation } from "@/i18n/context";
 
-const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
+const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
+  product,
+  priority = false,
+}) => {
   const t = useTranslation();
   const router = useRouter();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -141,6 +144,7 @@ const ProductCard: React.FC<{ product: ProductType }> = ({ product }) => {
               src={cardImageSrc}
               alt={`${product.name} - View ${currentImageIndex + 1}`}
               fill
+              priority={priority}
               className="object-cover"
               onLoad={() => setImageLoaded(true)}
             />

@@ -53,8 +53,12 @@ export function ProductListContent({
     <>
       <div className="grid grid-cols-1 gap-y-10 gap-x-4 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
         {products.length > 0 ? (
-          products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+          products.map((product, i) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              priority={i < 4}
+            />
           ))
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-border bg-muted/20">
