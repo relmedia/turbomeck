@@ -1,4 +1,5 @@
 import express, { type Request } from "express";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import cors from "cors";
 import multer from "multer";
 import path from "path";
@@ -10,11 +11,44 @@ import { eq, inArray, desc, asc, sql } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 import { sendOrderConfirmationEmail } from "./email.js";
+import { internalProductApiAuth } from "./internal-auth-middleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /** Set EXPOSE_DB_ERRORS=1 temporarily on the server to see Postgres messages in JSON (debug only). */
+function generateOrderViewToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+function timingSafeTokenEqual(received: string, expected: string): boolean {
+  const a = Buffer.from(received, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * User-owned orders: matching `userId` (query/body) or matching `viewToken` (magic link).
+ * Guest orders: matching `viewToken` only (legacy rows without token are inaccessible).
+ */
+function canReadOrderWithSecret(
+  order: { userId: string | null; viewToken: string | null },
+  queryUserId: string | undefined,
+  secretToken: string | undefined,
+): boolean {
+  const tokenOk =
+    !!secretToken &&
+    !!order.viewToken &&
+    timingSafeTokenEqual(secretToken, order.viewToken);
+
+  if (order.userId) {
+    if (queryUserId === order.userId) return true;
+    return tokenOk;
+  }
+  return tokenOk;
+}
+
 function jsonDbError(err: unknown, publicMessage: string) {
   const code = (err as { code?: string })?.code;
   const msg = err instanceof Error ? err.message : String(err);
@@ -77,6 +111,9 @@ app.use(
     credentials: true,
   })
 );
+
+/** Shared secret (Bearer) — required for all /api routes except GET /api/health/db (localhost-gated). */
+app.use("/api", internalProductApiAuth);
 
 /** Only loopback — safe to return Postgres error text (no password). */
 function isLocalRequest(req: Request): boolean {
@@ -864,11 +901,13 @@ app.post("/api/orders", async (req, res) => {
     );
     const isDepositOrder = body.depositAmount != null && body.depositAmount > 0 && (body.balanceDue ?? 0) >= 0;
     const initialStatus = hasTrackingId ? "shipped" : isDepositOrder ? "deposit_paid" : "confirmed";
+    const viewToken = generateOrderViewToken();
     const [order] = await db
       .insert(orders)
       .values({
         orderNumber,
         userId: body.userId ?? null,
+        viewToken,
         email: body.email,
         firstName: body.firstName,
         lastName: body.lastName,
@@ -1004,16 +1043,17 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-// GET single order by id (for detail view) - requires userId when order belongs to a user
+// GET single order by id — user orders: matching userId; guest orders: matching viewToken (query `token`)
 app.get("/api/orders/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const userId = req.query.userId as string | undefined;
+    const token = req.query.token as string | undefined;
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
-    if (order.userId && userId !== order.userId) {
+    if (!canReadOrderWithSecret(order, userId, token)) {
       return res.status(403).json({ error: "Forbidden" });
     }
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
@@ -1058,13 +1098,18 @@ app.get("/api/orders/:id", async (req, res) => {
   }
 });
 
-// GET order balance (for pay-balance page - no auth, link is shared by admin)
+// GET order balance — same access rule as order detail (userId or view token)
 app.get("/api/orders/:id/balance", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const userId = req.query.userId as string | undefined;
+    const token = req.query.token as string | undefined;
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
+    }
+    if (!canReadOrderWithSecret(order, userId, token)) {
+      return res.status(403).json({ error: "Forbidden" });
     }
     const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
     const stripeBalancePaymentId = (order as { stripeBalancePaymentId?: string | null }).stripeBalancePaymentId;
@@ -1090,14 +1135,18 @@ app.get("/api/orders/:id/balance", async (req, res) => {
 app.patch("/api/orders/:id/balance-paid", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const body = req.body as { stripePaymentId?: string };
+    const body = req.body as { stripePaymentId?: string; token?: string };
     const stripePaymentId = body?.stripePaymentId;
+    const token = typeof body?.token === "string" ? body.token : undefined;
     if (!stripePaymentId || !stripePaymentId.startsWith("pi_")) {
       return res.status(400).json({ error: "Invalid stripePaymentId" });
     }
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
+    }
+    if (!canReadOrderWithSecret(order, undefined, token)) {
+      return res.status(403).json({ error: "Forbidden" });
     }
     const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
     const existing = (order as { stripeBalancePaymentId?: string | null }).stripeBalancePaymentId;

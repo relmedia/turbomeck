@@ -17,6 +17,7 @@ function OrderSuccessContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const orderIdParam = searchParams.get("orderId");
+  const orderTokenParam = searchParams.get("token");
   const trackingId = searchParams.get("tracking");
   const totalParam = searchParams.get("total");
   const [paymentIntent, setPaymentIntent] = useState<string | null>(null);
@@ -87,6 +88,7 @@ function OrderSuccessContent() {
         params.set("orderId", String(order.id));
         if (order.postNordTrackingId) params.set("tracking", order.postNordTrackingId);
         params.set("total", String(totalNum));
+        if (order.viewToken) params.set("token", order.viewToken);
         router.replace(`/order/success?${params.toString()}`);
         setPendingCreate(false);
       })
@@ -109,7 +111,7 @@ function OrderSuccessContent() {
         }
       })
       .catch(() => { /* ignore - use fallbacks */ });
-  }, [orderIdParam, session?.user?.id, pendingCreate, createError]);
+  }, [orderIdParam, orderTokenParam, session?.user?.id, pendingCreate, createError]);
 
   // Read total from window/sessionStorage on client (runs after hydration)
   useEffect(() => {

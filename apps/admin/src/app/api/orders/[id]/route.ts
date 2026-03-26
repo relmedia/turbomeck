@@ -149,6 +149,7 @@ export async function GET(
     return NextResponse.json({
       id: String(order.id),
       orderId: order.id,
+      viewToken: order.viewToken ?? null,
       orderNumber: order.orderNumber,
       placedDate: order.createdAt?.toISOString?.()?.slice(0, 10) ?? "",
       customerName: `${order.firstName} ${order.lastName}`.trim(),

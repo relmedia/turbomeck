@@ -10,8 +10,8 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/i18n/context";
 
-const PRODUCT_API =
-  typeof window !== "undefined" ? "/api/product" : "http://localhost:8000/api";
+/** Always use Next.js proxy (adds INTERNAL_PRODUCT_API_SECRET server-side). */
+const PRODUCT_API = "/api/product";
 
 type BalanceInfo = {
   orderId: number;
@@ -25,6 +25,7 @@ export default function PayBalancePage() {
   const router = useRouter();
   const t = useTranslation();
   const orderId = searchParams.get("orderId");
+  const orderToken = searchParams.get("token");
   const [balance, setBalance] = useState<BalanceInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function PayBalancePage() {
         setBalance(null);
       })
       .finally(() => setLoading(false));
-  }, [orderId]);
+  }, [orderId, orderToken]);
 
   if (loading) {
     return (
@@ -75,7 +76,9 @@ export default function PayBalancePage() {
             <p className="text-destructive">
               {error === "Order not found"
                 ? "Ordern hittades inte."
-                : error === "Balance already paid"
+                : error === "Forbidden"
+                  ? "Ogiltig eller utgången länk. Be om en ny betalningslänk från butiken."
+                  : error === "Balance already paid"
                   ? "Återstoden är redan betald."
                   : error === "No balance due for this order"
                     ? "Denna order har ingen återstod att betala."
@@ -151,12 +154,17 @@ export default function PayBalancePage() {
                 if (!res.ok) {
                   throw new Error(data.error ?? "Kunde inte registrera betalning");
                 }
-                router.push(
-                  `/order/success?orderId=${balance.orderId}&balancePaid=1`
-                );
+                const ok = new URLSearchParams({
+                  orderId: String(balance.orderId),
+                  balancePaid: "1",
+                });
+                if (orderToken) ok.set("token", orderToken);
+                router.push(`/order/success?${ok.toString()}`);
               } catch (err) {
                 console.error("Failed to record balance payment:", err);
-                router.push(`/order/success?orderId=${balance.orderId}`);
+                const fail = new URLSearchParams({ orderId: String(balance.orderId) });
+                if (orderToken) fail.set("token", orderToken);
+                router.push(`/order/success?${fail.toString()}`);
               }
             }}
           />

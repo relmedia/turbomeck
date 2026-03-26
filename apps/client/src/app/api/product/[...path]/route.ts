@@ -2,14 +2,69 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { LOCALE_COOKIE_NAME } from "@/i18n/context";
+import {
+  internalProductApiAuthHeaders,
+  requireInternalProductApiSecret,
+} from "@/lib/internal-product-api";
 
 const PRODUCT_SERVICE =
-  process.env.PRODUCT_SERVICE_URL || process.env.NEXT_PUBLIC_PRODUCT_API_URL || "http://localhost:8000";
+  process.env.PRODUCT_SERVICE_URL ||
+  process.env.NEXT_PUBLIC_PRODUCT_API_URL ||
+  "http://localhost:8000";
+
+/** Storefront may only mutate catalog via admin; checkout uses these paths. */
+function assertStorefrontMutationAllowed(
+  method: string,
+  pathStr: string,
+): NextResponse | null {
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return null;
+  }
+  const ok =
+    (method === "POST" && pathStr === "orders") ||
+    (method === "PATCH" && /^orders\/\d+\/balance-paid$/.test(pathStr));
+  if (!ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
+function withInternalAuth(init: RequestInit = {}): RequestInit {
+  const auth = internalProductApiAuthHeaders();
+  const h = new Headers(init.headers);
+  h.set("Authorization", auth.Authorization);
+  return { ...init, headers: h };
+}
+
+function parseUpstreamJson(text: string, pathStr: string): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    console.error("Product proxy: invalid JSON from upstream", pathStr);
+    return { error: "Invalid upstream response" };
+  }
+}
+
+function misconfiguredResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "Produkt-API är inte konfigurerat (INTERNAL_PRODUCT_API_SECRET). Kontakta administratören.",
+    },
+    { status: 503 },
+  );
+}
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
+  try {
+    requireInternalProductApiSecret();
+  } catch {
+    return misconfiguredResponse();
+  }
   const { path } = await params;
   const pathStr = path.join("/");
   const searchParams = new URLSearchParams(req.nextUrl.searchParams);
@@ -20,18 +75,16 @@ export async function GET(
   const search = searchParams.toString();
   const url = `${PRODUCT_SERVICE}/api/${pathStr}${search ? `?${search}` : ""}`;
   try {
-    const res = await fetch(url, {
-      cache: "no-store",
-    });
+    const res = await fetch(url, withInternalAuth({ cache: "no-store" }));
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = parseUpstreamJson(text, pathStr);
     // #region agent log
     if (process.env.NODE_ENV === "development") {
       try {
         const logPath = join(process.cwd(), "..", "..", "debug-e93869.log");
         const arrLen = Array.isArray(data) ? data.length : null;
         const errKey =
-          data && typeof data === "object" && "error" in data
+          data && typeof data === "object" && data !== null && "error" in data
             ? String((data as { error: unknown }).error)
             : null;
         appendFileSync(
@@ -59,7 +112,6 @@ export async function GET(
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy GET error:", err);
-    // #region agent log
     if (process.env.NODE_ENV === "development") {
       try {
         const logPath = join(process.cwd(), "..", "..", "debug-e93869.log");
@@ -81,20 +133,29 @@ export async function GET(
         /* ignore */
       }
     }
-    // #endregion
     return NextResponse.json(
-      { error: "Kunde inte ansluta till produkt-tjänsten. Kontrollera att den körs på port 8000." },
-      { status: 502 }
+      {
+        error:
+          "Kunde inte ansluta till produkt-tjänsten. Kontrollera att den körs på port 8000.",
+      },
+      { status: 502 },
     );
   }
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
+  try {
+    requireInternalProductApiSecret();
+  } catch {
+    return misconfiguredResponse();
+  }
   const { path } = await params;
   const pathStr = path.join("/");
+  const forbidden = assertStorefrontMutationAllowed("POST", pathStr);
+  if (forbidden) return forbidden;
   try {
     const contentType = req.headers.get("content-type") || "";
     let body: FormData | string;
@@ -108,89 +169,124 @@ export async function POST(
       body: body || undefined,
     };
     if (typeof body === "string") {
-      (fetchInit as Record<string, unknown>).headers = { "Content-Type": contentType || "application/json" };
+      fetchInit.headers = { "Content-Type": contentType || "application/json" };
     }
-    const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, fetchInit);
+    const res = await fetch(
+      `${PRODUCT_SERVICE}/api/${pathStr}`,
+      withInternalAuth(fetchInit),
+    );
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = parseUpstreamJson(text, pathStr);
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy POST error:", err);
     return NextResponse.json(
       { error: "Kunde inte ansluta till produkt-tjänsten." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
+  try {
+    requireInternalProductApiSecret();
+  } catch {
+    return misconfiguredResponse();
+  }
   const { path } = await params;
   const pathStr = path.join("/");
+  const forbidden = assertStorefrontMutationAllowed("PATCH", pathStr);
+  if (forbidden) return forbidden;
   try {
     const body = await req.text();
-    const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, {
-      method: "PATCH",
-      headers: { "Content-Type": req.headers.get("content-type") || "application/json" },
-      body: body || undefined,
-    });
+    const res = await fetch(
+      `${PRODUCT_SERVICE}/api/${pathStr}`,
+      withInternalAuth({
+        method: "PATCH",
+        headers: {
+          "Content-Type": req.headers.get("content-type") || "application/json",
+        },
+        body: body || undefined,
+      }),
+    );
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = parseUpstreamJson(text, pathStr);
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy PATCH error:", err);
     return NextResponse.json(
       { error: "Kunde inte ansluta till produkt-tjänsten." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
+  try {
+    requireInternalProductApiSecret();
+  } catch {
+    return misconfiguredResponse();
+  }
   const { path } = await params;
   const pathStr = path.join("/");
+  const forbidden = assertStorefrontMutationAllowed("PUT", pathStr);
+  if (forbidden) return forbidden;
   try {
     const body = await req.text();
-    const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, {
-      method: "PUT",
-      headers: { "Content-Type": req.headers.get("content-type") || "application/json" },
-      body: body || undefined,
-    });
+    const res = await fetch(
+      `${PRODUCT_SERVICE}/api/${pathStr}`,
+      withInternalAuth({
+        method: "PUT",
+        headers: {
+          "Content-Type": req.headers.get("content-type") || "application/json",
+        },
+        body: body || undefined,
+      }),
+    );
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = parseUpstreamJson(text, pathStr);
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy PUT error:", err);
     return NextResponse.json(
       { error: "Kunde inte ansluta till produkt-tjänsten." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
+  try {
+    requireInternalProductApiSecret();
+  } catch {
+    return misconfiguredResponse();
+  }
   const { path } = await params;
   const pathStr = path.join("/");
+  const forbidden = assertStorefrontMutationAllowed("DELETE", pathStr);
+  if (forbidden) return forbidden;
   try {
-    const res = await fetch(`${PRODUCT_SERVICE}/api/${pathStr}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `${PRODUCT_SERVICE}/api/${pathStr}`,
+      withInternalAuth({ method: "DELETE" }),
+    );
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    const data = parseUpstreamJson(text, pathStr);
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
     console.error("Product proxy DELETE error:", err);
     return NextResponse.json(
       { error: "Kunde inte ansluta till produkt-tjänsten." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }

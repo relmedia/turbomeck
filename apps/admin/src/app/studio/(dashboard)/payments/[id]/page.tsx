@@ -37,6 +37,7 @@ type OrderItem = {
 type OrderDetail = {
   id: string;
   orderId: number;
+  viewToken?: string | null;
   orderNumber?: string;
   placedDate: string;
   customerName: string;
@@ -129,6 +130,16 @@ function TrackingEvents({ data }: { data: Record<string, unknown> }) {
       ))}
     </div>
   );
+}
+
+function payBalanceStorefrontUrl(order: Pick<OrderDetail, "orderId" | "viewToken">): string {
+  const base =
+    typeof window !== "undefined"
+      ? process.env.NEXT_PUBLIC_CLIENT_URL || window.location.origin.replace("3002", "3000")
+      : "";
+  const q = new URLSearchParams({ orderId: String(order.orderId) });
+  if (order.viewToken) q.set("token", order.viewToken);
+  return `${base}/order/pay-balance?${q.toString()}`;
 }
 
 export default function OrderDetailPage() {
@@ -349,16 +360,17 @@ export default function OrderDetailPage() {
                       </p>
                       <div className="flex items-center gap-2">
                         <code className="text-xs bg-white dark:bg-muted px-2 py-1 rounded truncate max-w-[240px]">
-                          {typeof window !== "undefined"
-                            ? `${process.env.NEXT_PUBLIC_CLIENT_URL || window.location.origin.replace("3002", "3000")}/order/pay-balance?orderId=${order.orderId}`
-                            : ""}
+                          {typeof window !== "undefined" ? payBalanceStorefrontUrl(order) : ""}
                         </code>
                         <Button
                           size="sm"
                           variant="secondary"
                           onClick={() => {
-                            const base = process.env.NEXT_PUBLIC_CLIENT_URL || (typeof window !== "undefined" ? window.location.origin.replace("3002", "3000") : "");
-                            const url = `${base}/order/pay-balance?orderId=${order.orderId}`;
+                            const url = payBalanceStorefrontUrl(order);
+                            if (!order.viewToken) {
+                              toast.error("Order saknar säkerhetstoken — spara om ordern eller kör DB-migration.");
+                              return;
+                            }
                             navigator.clipboard.writeText(url);
                             toast.success("Länk kopierad");
                           }}

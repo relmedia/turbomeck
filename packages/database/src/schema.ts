@@ -155,6 +155,8 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: text("order_number").notNull(), // Human-readable, e.g. TM-2025-0001
   userId: text("user_id"), // Auth.js user ID when signed in
+  /** Opaque secret for guest order links (detail, pay-balance). Required to read guest orders without userId. */
+  viewToken: text("view_token"),
   email: text("email").notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),

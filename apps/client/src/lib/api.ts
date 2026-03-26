@@ -1,5 +1,6 @@
 import { ProductType } from "@/types";
 import { PRODUCT_API } from "./product-api";
+import { productApiRequestInit } from "./internal-product-api";
 const UPLOADS_BASE =
   process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
 /** Public R2 base URL (e.g. https://pub-xxx.r2.dev) – used to rewrite S3 endpoint URLs which return 400 for unauthenticated requests */
@@ -187,12 +188,20 @@ export async function createOrder(orderData: {
     price: number;
     quantity: number;
   }>;
-}): Promise<{ id: number; orderNumber: string; postNordTrackingId?: string | null }> {
-  const res = await fetch(`${PRODUCT_API}/orders`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(orderData),
-  });
+}): Promise<{
+  id: number;
+  orderNumber: string;
+  postNordTrackingId?: string | null;
+  viewToken?: string | null;
+}> {
+  const res = await fetch(
+    `${PRODUCT_API}/orders`,
+    productApiRequestInit({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderData),
+    }),
+  );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Failed to create order");
@@ -208,10 +217,18 @@ export async function fetchOrders(userId: string): Promise<Order[]> {
   return res.json();
 }
 
-export async function fetchOrder(orderId: number, userId: string): Promise<Order | null> {
+export async function fetchOrder(
+  orderId: number,
+  userId: string,
+  viewToken?: string | null,
+): Promise<Order | null> {
+  const q = new URLSearchParams();
+  if (userId) q.set("userId", userId);
+  if (viewToken) q.set("token", viewToken);
+  const qs = q.toString();
   const res = await fetch(
-    `${PRODUCT_API}/orders/${orderId}?userId=${encodeURIComponent(userId)}`,
-    { cache: "no-store" }
+    `${PRODUCT_API}/orders/${orderId}${qs ? `?${qs}` : ""}`,
+    productApiRequestInit({ cache: "no-store" }),
   );
   if (!res.ok) return null;
   return res.json();
@@ -236,7 +253,7 @@ export async function fetchProduct(idOrSlug: string, locale?: "sv" | "en"): Prom
     ? `${PRODUCT_API}/products/${idOrSlug}`
     : `${PRODUCT_API}/products/slug/${idOrSlug}`;
   const url = locale ? `${base}?locale=${locale}` : base;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, productApiRequestInit({ cache: "no-store" }));
   if (!res.ok) return null;
   const data: ApiProduct = await res.json();
   return apiProductToProductType(data);

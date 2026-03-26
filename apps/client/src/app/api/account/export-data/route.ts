@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { PRODUCT_API } from "@/lib/product-api";
+import { internalProductApiAuthHeaders } from "@/lib/internal-product-api";
 
 const MARGIN = 50;
 const LINE_HEIGHT = 14;
@@ -55,7 +56,7 @@ export async function GET() {
   try {
     const ordersRes = await fetch(
       `${PRODUCT_API}/orders?userId=${encodeURIComponent(session.user.id)}`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: internalProductApiAuthHeaders() },
     );
     if (ordersRes.ok) orders = await ordersRes.json();
   } catch {

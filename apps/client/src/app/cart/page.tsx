@@ -305,6 +305,7 @@ const CartPage: React.FC = () => {
               if (order.postNordTrackingId) params.set("tracking", order.postNordTrackingId);
               params.set("orderId", String(order.id));
               params.set("total", String(total));
+              if (!userId && order.viewToken) params.set("token", order.viewToken);
               router.push(`/order/success?${params.toString()}`);
             } catch (err) {
               console.error("Failed to create order:", err);
