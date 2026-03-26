@@ -33,9 +33,9 @@ const Navbar = () => {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   return (
-    <nav className="w-full flex items-center justify-between border-b border-gray-200 pb-4">
+    <nav className="mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 pb-4 sm:mb-6">
       {/*LEFT*/}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 shrink items-center gap-3">
         <Suspense fallback={null}>
           <MobileMenu
             onAuthClick={() => {
@@ -55,7 +55,7 @@ const Navbar = () => {
         </Link>
       </div>
       {/*RIGHT*/}
-      <div className="flex items-center gap-3 sm:gap-6">
+      <div className="flex shrink-0 items-center gap-4 sm:gap-5 md:gap-6">
         <Suspense
           fallback={
             <div
@@ -71,7 +71,7 @@ const Navbar = () => {
         </Suspense>
         <WishlistIcon />
         <ShoppingCartIcon />
-        <LanguageSwitcher />
+        <LanguageSwitcher className="hidden sm:inline-flex" />
         {status !== "loading" && (
           <>
             {!session ? (

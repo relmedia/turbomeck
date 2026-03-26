@@ -55,13 +55,19 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
   const menuItemsRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch categories when menu opens
+  // Fetch categories when menu opens or locale changes (do not cache across languages)
   useEffect(() => {
-    if (!isOpen || categories.length > 0) return;
+    if (!isOpen) return;
+    let cancelled = false;
     fetchCategories(locale)
-      .then(setCategories)
+      .then((data) => {
+        if (!cancelled) setCategories(data);
+      })
       .catch(() => {});
-  }, [isOpen, locale, categories.length]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, locale]);
 
   // GSAP animations
   const animateOpen = useCallback(() => {
