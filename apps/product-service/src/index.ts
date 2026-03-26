@@ -51,11 +51,21 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/avif",
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed."));
+      cb(
+        new Error(
+          "Invalid file type. Only JPEG, PNG, GIF, WebP, and AVIF are allowed."
+        )
+      );
     }
   },
 });
@@ -119,7 +129,7 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
     if (!result.buffer) {
       return res.status(500).json({ error: "Failed to process image" });
     }
-    const imageUrl = await uploadToR2(result.filename, result.buffer, "image/png");
+    const imageUrl = await uploadToR2(result.filename, result.buffer, "image/avif");
     try {
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
     } catch {
@@ -176,7 +186,7 @@ app.post("/api/remove-background", async (req, res) => {
       return res.status(503).json({ error: "R2 not configured" });
     }
     const { filename, buffer } = await removeBackgroundFromImageUrl(url);
-    const imageUrl = await uploadToR2(filename, buffer, "image/png");
+    const imageUrl = await uploadToR2(filename, buffer, "image/avif");
     // Add cache-bust so browser loads the updated image
     const separator = imageUrl.includes("?") ? "&" : "?";
     res.json({ url: `${imageUrl}${separator}v=${Date.now()}` });

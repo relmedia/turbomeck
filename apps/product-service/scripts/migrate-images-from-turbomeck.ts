@@ -19,6 +19,7 @@
 import { db } from "@repo/database";
 import { products } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
+import { encodeProductImageToAvif } from "../src/image-utils.js";
 import { isR2Configured, uploadToR2, deleteAllFromR2 } from "../src/r2-storage.js";
 
 const WOOCOMMERCE_API =
@@ -243,9 +244,9 @@ async function main() {
 
     for (let j = 0; j < allBuffers.length; j++) {
       try {
-        const resized = await resizeToSquare(allBuffers[j]);
+        const resized = await resizeToProductAvif(allBuffers[j]);
         const filename = uniqueFilename(product.id, j);
-        const r2Url = await uploadToR2(filename, resized, "image/png");
+        const r2Url = await uploadToR2(filename, resized, "image/avif");
         newUrls.push(r2Url);
       } catch (err) {
         console.warn(`\n  Failed to upload image ${j}: ${err}`);

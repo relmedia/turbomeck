@@ -30,9 +30,15 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
     if (!file) return;
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/avif",
+    ];
     if (!allowedTypes.includes(file.type)) {
-      setError("Endast JPEG, PNG, GIF och WebP är tillåtna.");
+      setError("Endast JPEG, PNG, GIF, WebP och AVIF är tillåtna.");
       return;
     }
 

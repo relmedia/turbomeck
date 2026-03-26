@@ -13,7 +13,8 @@
     "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts",
     "set-r2-cors": "tsx --env-file=.env scripts/set-r2-cors.ts",
     "upload-logo": "tsx --env-file=.env scripts/upload-logo-to-r2.ts",
-    "reprocess-r2-images": "tsx --env-file=.env scripts/reprocess-r2-images.ts"
+    "reprocess-r2-images": "tsx --env-file=.env scripts/reprocess-r2-images.ts",
+    "migrate-products-to-avif": "tsx --env-file=.env scripts/migrate-products-to-avif.ts"
   },
   "keywords": [],
   "author": "",

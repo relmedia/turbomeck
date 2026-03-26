@@ -4,19 +4,22 @@ import { removeBackground } from "@imgly/background-removal-node";
 
 const TARGET_SIZE = 1200;
 
+/** AVIF output tuned for product photos (good compression, acceptable CPU). */
+const AVIF_OPTIONS = { quality: 62, effort: 4 } as const;
+
 /** Result of processing a product image - either file path or buffer for R2 upload. */
 export type ProcessProductImageResult =
   | { outputPath: string; filename: string; buffer?: undefined }
   | { outputPath?: undefined; filename: string; buffer: Buffer };
 
 /**
- * Resize buffer with Sharp.
+ * Resize and encode product image as AVIF (supports alpha for cut-outs).
  */
-async function resizeWithSharp(buffer: Buffer): Promise<Buffer> {
+export async function encodeProductImageToAvif(buffer: Buffer): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
   return sharp(buffer)
     .resize(TARGET_SIZE, TARGET_SIZE, { fit: "inside" })
-    .png({ compressionLevel: 6 })
+    .avif(AVIF_OPTIONS)
     .toBuffer();
 }
 
@@ -31,14 +34,14 @@ export async function processProductImage(
   const ext = path.extname(inputPath);
   const baseName = path.basename(inputPath, ext);
   const dir = path.dirname(inputPath);
-  const outputFilename = `${baseName}.png`;
+  const outputFilename = `${baseName}.avif`;
   const outputPath = path.join(dir, outputFilename);
 
   const imageBuffer = fs.readFileSync(inputPath);
 
   let finalBuffer: Buffer;
   try {
-    finalBuffer = await resizeWithSharp(imageBuffer);
+    finalBuffer = await encodeProductImageToAvif(imageBuffer);
   } catch (sharpErr) {
     throw sharpErr;
   }
@@ -76,7 +79,7 @@ export function extractFilenameFromImageUrl(url: string): string | null {
     const pathname = parsed.pathname;
     const segments = pathname.split("/").filter(Boolean);
     const last = segments[segments.length - 1];
-    if (last && /\.(png|jpg|jpeg|gif|webp)$/i.test(last)) {
+    if (last && /\.(png|jpg|jpeg|gif|webp|avif)$/i.test(last)) {
       return last;
     }
   } catch {
@@ -137,8 +140,8 @@ export async function removeBackgroundFromImageUrl(imageUrl: string): Promise<{
     });
   }
   const noBgBuffer = Buffer.from(await blob.arrayBuffer());
-  const finalBuffer = await resizeWithSharp(noBgBuffer);
-  const outputFilename = filename.replace(/\.[^.]+$/, ".png");
+  const finalBuffer = await encodeProductImageToAvif(noBgBuffer);
+  const outputFilename = filename.replace(/\.[^.]+$/, ".avif");
 
   return { filename: outputFilename, buffer: finalBuffer as Buffer };
 }
@@ -163,8 +166,8 @@ export async function processProductImageFromUrl(imageUrl: string): Promise<{
     throw new Error(`Failed to fetch image: HTTP ${res.status}`);
   }
   const imageBuffer = Buffer.from(await res.arrayBuffer());
-  const finalBuffer = await resizeWithSharp(imageBuffer);
-  const outputFilename = filename.replace(/\.[^.]+$/, ".png");
+  const finalBuffer = await encodeProductImageToAvif(imageBuffer);
+  const outputFilename = filename.replace(/\.[^.]+$/, ".avif");
 
   return { filename: outputFilename, buffer: finalBuffer as Buffer };
 }

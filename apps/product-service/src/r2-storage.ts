@@ -18,7 +18,7 @@ const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "turbomeck";
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // e.g. https://pub-xxx.r2.dev or https://images.yoursite.com
 
 const PRODUCTS_PREFIX = "products/";
-const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif"];
 
 function getR2Client(): S3Client {
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
