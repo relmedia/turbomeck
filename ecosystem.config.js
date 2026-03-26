@@ -1,3 +1,8 @@
+/**
+ * Each app loads `apps/<name>/.env` via `tsx --env-file=.env` (see package.json "start").
+ * Required for product-service: INTERNAL_PRODUCT_API_SECRET (same value as apps/client + apps/admin).
+ * PM2 `env_file` (5.3+) is optional extras; the secret must exist in apps/product-service/.env
+ */
 module.exports = {
   apps: [
     {

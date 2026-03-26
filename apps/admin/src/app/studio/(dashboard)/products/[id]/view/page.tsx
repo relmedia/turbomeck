@@ -1,5 +1,6 @@
 "use client";
 
+import DOMPurify from "isomorphic-dompurify";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -435,7 +436,12 @@ export default function ProductViewPage() {
                   {product.description ? (
                     <div
                       className="prose prose-sm max-w-none text-muted-foreground"
-                      dangerouslySetInnerHTML={{ __html: product.description }}
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(product.description, {
+                          ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "h1", "h2", "h3", "ul", "ol", "li", "a"],
+                          ALLOWED_ATTR: ["href", "target"],
+                        }),
+                      }}
                     />
                   ) : (
                     !product.shortDescription && (

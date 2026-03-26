@@ -151,6 +151,7 @@ const CartPage: React.FC = () => {
         if (data.valid && data.discount != null) {
           setAppliedCoupon(true);
           setCouponDiscount(data.discount);
+          setLastValidatedCode(code);
           setCouponError("");
         } else {
           setAppliedCoupon(false);
@@ -282,6 +283,10 @@ const CartPage: React.FC = () => {
                 servicePointName: shippingForm!.servicePoint?.name,
                 servicePointId: shippingForm!.servicePoint?.servicePointId,
                 deliveryOption: deliveryOption,
+                couponCode:
+                  appliedCoupon && lastValidatedCode
+                    ? lastValidatedCode
+                    : undefined,
                 subtotal,
                 shippingCost: shipping,
                 discount,

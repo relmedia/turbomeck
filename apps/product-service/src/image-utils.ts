@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { removeBackground } from "@imgly/background-removal-node";
+import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
 
 const TARGET_SIZE = 1200;
 
@@ -113,7 +114,9 @@ export async function removeBackgroundFromImageUrl(imageUrl: string): Promise<{
   filename: string;
   buffer: Buffer;
 }> {
+  assertAllowedRemoveBackgroundUrl(imageUrl);
   const normalizedUrl = normalizeImageUrlForFetch(imageUrl);
+  assertAllowedRemoveBackgroundUrl(normalizedUrl);
   const filename = extractFilenameFromImageUrl(normalizedUrl);
   if (!filename) {
     throw new Error(`Invalid image URL, could not extract filename: ${imageUrl}`);

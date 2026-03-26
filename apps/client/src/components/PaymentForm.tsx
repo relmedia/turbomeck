@@ -28,15 +28,20 @@ export type PendingOrderPayload = {
   servicePointName?: string;
   servicePointId?: string;
   deliveryOption?: string;
+  couponCode?: string;
   subtotal: number;
   shippingCost: number;
   discount: number;
   total: number;
+  depositAmount?: number;
+  balanceDue?: number;
   postNordTrackingId?: string;
+  locale?: "sv" | "en";
   items: Array<{
     productId?: number;
     productName: string;
     productImage?: string;
+    variant?: string;
     price: number;
     quantity: number;
   }>;

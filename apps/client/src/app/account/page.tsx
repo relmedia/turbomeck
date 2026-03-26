@@ -213,7 +213,7 @@ export default function AccountPage() {
     }
     Promise.all([
       fetch(`/api/user/me`).then((r) => r.json()),
-      fetchOrders(session.user.id),
+      fetchOrders(),
     ])
       .then(([profileData, ordersData]) => {
         setProfile(profileData);

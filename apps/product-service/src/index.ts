@@ -1,5 +1,6 @@
 import express, { type Request } from "express";
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import Stripe from "stripe";
 import cors from "cors";
 import multer from "multer";
 import path from "path";
@@ -7,11 +8,12 @@ import fs from "fs";
 import os from "os";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
-import { eq, inArray, desc, asc, sql } from "drizzle-orm";
+import { eq, inArray, desc, asc, sql, or } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 import { sendOrderConfirmationEmail } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
+import { resolveCheckoutOrder } from "./order-pricing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,6 +58,74 @@ function jsonDbError(err: unknown, publicMessage: string) {
     return { error: publicMessage, detail: msg, code: code ?? undefined };
   }
   return { error: publicMessage };
+}
+
+function canAccessBalanceWithViewToken(
+  order: { viewToken: string | null },
+  token: string | undefined,
+): boolean {
+  if (!order.viewToken || !token) return false;
+  return timingSafeTokenEqual(token, order.viewToken);
+}
+
+const stripeClient =
+  process.env.STRIPE_SECRET_KEY?.trim() &&
+  !process.env.STRIPE_SECRET_KEY.includes("placeholder")
+    ? new Stripe(process.env.STRIPE_SECRET_KEY)
+    : null;
+
+async function verifySucceededBalancePaymentIntent(
+  paymentIntentId: string,
+  expectedBalanceSek: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!stripeClient) {
+    return { ok: false, error: "Stripe is not configured on product-service" };
+  }
+  try {
+    const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+    if (pi.status !== "succeeded") {
+      return { ok: false, error: "Payment has not succeeded" };
+    }
+    if (String(pi.currency || "").toLowerCase() !== "sek") {
+      return { ok: false, error: "Invalid currency" };
+    }
+    const expectedOre = Math.round(Number(expectedBalanceSek) * 100);
+    if (pi.amount !== expectedOre) {
+      return { ok: false, error: "Amount mismatch" };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Could not verify payment with Stripe" };
+  }
+}
+
+/** Checkout: charge must match server-computed SEK total (after pricing resolution). */
+async function verifyCheckoutPaymentIntent(
+  paymentIntentId: string,
+  expectedChargeSek: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!paymentIntentId.startsWith("pi_")) {
+    return { ok: false, error: "Invalid payment intent" };
+  }
+  if (!stripeClient) {
+    return { ok: false, error: "Stripe is not configured on product-service" };
+  }
+  try {
+    const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+    if (pi.status !== "succeeded") {
+      return { ok: false, error: "Payment has not succeeded" };
+    }
+    if (String(pi.currency || "").toLowerCase() !== "sek") {
+      return { ok: false, error: "Invalid currency" };
+    }
+    const expectedOre = Math.round(expectedChargeSek * 100);
+    if (pi.amount !== expectedOre) {
+      return { ok: false, error: "Payment amount does not match order" };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Could not verify payment with Stripe" };
+  }
 }
 
 const app = express();
@@ -850,7 +920,7 @@ async function generateOrderNumber(): Promise<string> {
   return `#${num}`;
 }
 
-// POST create order (checkout)
+// POST create order (checkout) — line prices and totals computed from DB + Stripe verification
 app.post("/api/orders", async (req, res) => {
   try {
     const body = req.body as {
@@ -866,12 +936,7 @@ app.post("/api/orders", async (req, res) => {
       servicePointName?: string;
       servicePointId?: string;
       deliveryOption?: string;
-      subtotal: number;
-      shippingCost: number;
-      discount?: number;
-      total: number;
-      depositAmount?: number;
-      balanceDue?: number;
+      couponCode?: string;
       stripePaymentId?: string;
       postNordTrackingId?: string;
       locale?: "sv" | "en";
@@ -888,8 +953,26 @@ app.post("/api/orders", async (req, res) => {
     if (!body.email || !body.firstName || !body.lastName || !body.address || !body.city || !body.postalCode) {
       return res.status(400).json({ error: "Missing required shipping fields" });
     }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      return res.status(400).json({ error: "Order must have at least one item" });
+
+    const priced = await resolveCheckoutOrder({
+      items: body.items,
+      couponCode: body.couponCode,
+      country: body.country,
+      deliveryOption: body.deliveryOption,
+    });
+    if (!priced.ok) {
+      return res.status(priced.status).json({ error: priced.error });
+    }
+
+    const stripePaymentId = body.stripePaymentId?.trim() ?? "";
+    let payVerify: { ok: true } | { ok: false; error: string } = { ok: true };
+    if (priced.stripeChargeSek > 0) {
+      payVerify = await verifyCheckoutPaymentIntent(stripePaymentId, priced.stripeChargeSek);
+    } else if (stripePaymentId) {
+      payVerify = { ok: false, error: "Payment not expected for zero-total order" };
+    }
+    if (!payVerify.ok) {
+      return res.status(400).json({ error: payVerify.error });
     }
 
     const orderNumber = await generateOrderNumber();
@@ -899,8 +982,12 @@ app.post("/api/orders", async (req, res) => {
       String(body.postNordTrackingId).trim() &&
       String(body.postNordTrackingId).toLowerCase() !== "null"
     );
-    const isDepositOrder = body.depositAmount != null && body.depositAmount > 0 && (body.balanceDue ?? 0) >= 0;
-    const initialStatus = hasTrackingId ? "shipped" : isDepositOrder ? "deposit_paid" : "confirmed";
+    const initialStatus = hasTrackingId
+      ? "shipped"
+      : priced.isDepositCheckout
+        ? "deposit_paid"
+        : "confirmed";
+
     const viewToken = generateOrderViewToken();
     const [order] = await db
       .insert(orders)
@@ -919,31 +1006,39 @@ app.post("/api/orders", async (req, res) => {
         servicePointName: body.servicePointName ?? null,
         servicePointId: body.servicePointId ?? null,
         deliveryOption: body.deliveryOption ?? "servicepoint",
-        subtotal: String(body.subtotal),
-        shippingCost: String(body.shippingCost),
-        discount: String(body.discount ?? 0),
-        total: String(body.total),
-        depositAmount: body.depositAmount != null ? String(body.depositAmount) : null,
-        balanceDue: body.balanceDue != null ? String(body.balanceDue) : null,
-        stripePaymentId: body.stripePaymentId ?? null,
+        subtotal: String(priced.subtotal),
+        shippingCost: String(priced.shipping),
+        discount: String(priced.discount),
+        total: String(priced.total),
+        depositAmount: priced.isDepositCheckout ? String(priced.depositSum) : null,
+        balanceDue:
+          priced.balanceDue != null && priced.balanceDue > 0 ? String(priced.balanceDue) : null,
+        stripePaymentId: stripePaymentId || null,
         postNordTrackingId: body.postNordTrackingId ?? null,
         status: initialStatus,
       })
       .returning();
 
     await db.insert(orderItems).values(
-      body.items.map((item) => ({
+      priced.lines.map((item) => ({
         orderId: order.id,
-        productId: item.productId ?? null,
+        productId: item.productId,
         productName: item.productName,
         productImage: item.productImage ?? null,
         variant: item.variant ?? null,
-        price: String(item.price),
+        price: String(item.unitPrice),
         quantity: item.quantity,
-      }))
+      })),
     );
 
-    // Send order confirmation email (async, don't block response)
+    const emailItems = priced.lines.map((item) => ({
+      productName: item.productName,
+      productImage: item.productImage,
+      variant: item.variant,
+      price: item.unitPrice,
+      quantity: item.quantity,
+    }));
+
     sendOrderConfirmationEmail({
       orderNumber: order.orderNumber,
       firstName: body.firstName,
@@ -955,19 +1050,20 @@ app.post("/api/orders", async (req, res) => {
       country: body.country ?? "SE",
       servicePointName: body.servicePointName,
       deliveryOption: body.deliveryOption,
-      subtotal: body.subtotal,
-      shippingCost: body.shippingCost,
-      discount: body.discount ?? 0,
-      total: body.total,
+      subtotal: priced.subtotal,
+      shippingCost: priced.shipping,
+      discount: priced.discount,
+      total: priced.total,
       trackingId: body.postNordTrackingId,
       locale: body.locale,
-      items: body.items,
+      items: emailItems,
     }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
 
     res.status(201).json({
       id: order.id,
       orderNumber: order.orderNumber,
       postNordTrackingId: order.postNordTrackingId,
+      viewToken: order.viewToken,
     });
   } catch (error) {
     console.error("Error creating order:", error);
@@ -975,18 +1071,20 @@ app.post("/api/orders", async (req, res) => {
   }
 });
 
-// GET orders for user (by userId or email)
+// GET orders for user (userId only — email is not proof of ownership)
 app.get("/api/orders", async (req, res) => {
   try {
     const { userId, email } = req.query as { userId?: string; email?: string };
 
-    if (!userId && !email) {
-      return res.status(400).json({ error: "Provide userId or email" });
+    if (email !== undefined && String(email).trim() !== "") {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
-    const conditions = userId
-      ? eq(orders.userId, userId)
-      : eq(orders.email, String(email));
+    if (!userId || typeof userId !== "string" || !userId.trim()) {
+      return res.status(400).json({ error: "Provide userId" });
+    }
+
+    const conditions = eq(orders.userId, userId.trim());
 
     const userOrders = await db
       .select()
@@ -1098,17 +1196,16 @@ app.get("/api/orders/:id", async (req, res) => {
   }
 });
 
-// GET order balance — same access rule as order detail (userId or view token)
+// GET order balance — requires `token` (= view_token) in query; never trust userId alone
 app.get("/api/orders/:id/balance", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const userId = req.query.userId as string | undefined;
     const token = req.query.token as string | undefined;
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
-    if (!canReadOrderWithSecret(order, userId, token)) {
+    if (!canAccessBalanceWithViewToken(order, token)) {
       return res.status(403).json({ error: "Forbidden" });
     }
     const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
@@ -1145,13 +1242,28 @@ app.patch("/api/orders/:id/balance-paid", async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
-    if (!canReadOrderWithSecret(order, undefined, token)) {
+    if (!canAccessBalanceWithViewToken(order, token)) {
       return res.status(403).json({ error: "Forbidden" });
     }
     const balanceDue = (order as { balanceDue?: string | null }).balanceDue;
     const existing = (order as { stripeBalancePaymentId?: string | null }).stripeBalancePaymentId;
     if (!balanceDue || parseFloat(balanceDue) <= 0 || existing) {
       return res.status(400).json({ error: "Order has no balance due or already paid" });
+    }
+    const balanceNum = parseFloat(balanceDue);
+    const [piUsed] = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        or(eq(orders.stripeBalancePaymentId, stripePaymentId), eq(orders.stripePaymentId, stripePaymentId)),
+      )
+      .limit(1);
+    if (piUsed && piUsed.id !== id) {
+      return res.status(400).json({ error: "Payment intent already used" });
+    }
+    const verified = await verifySucceededBalancePaymentIntent(stripePaymentId, balanceNum);
+    if (!verified.ok) {
+      return res.status(400).json({ error: verified.error });
     }
     await db
       .update(orders)

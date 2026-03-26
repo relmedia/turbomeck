@@ -171,6 +171,8 @@ export async function createOrder(orderData: {
   servicePointName?: string;
   servicePointId?: string;
   deliveryOption?: string;
+  /** Applied discount code — server recomputes discount from DB rules; do not trust client totals. */
+  couponCode?: string;
   subtotal: number;
   shippingCost: number;
   discount?: number;
@@ -209,10 +211,9 @@ export async function createOrder(orderData: {
   return res.json();
 }
 
-export async function fetchOrders(userId: string): Promise<Order[]> {
-  const res = await fetch(`${PRODUCT_API}/orders?userId=${encodeURIComponent(userId)}`, {
-    cache: "no-store",
-  });
+/** Uses `/api/orders` — server attaches session userId; do not pass userId from the client. */
+export async function fetchOrders(): Promise<Order[]> {
+  const res = await fetch("/api/orders", { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 }
