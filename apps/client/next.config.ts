@@ -12,6 +12,18 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/account",
+        headers: [{ key: "Cache-Control", value: "no-store, private, must-revalidate" }],
+      },
+      {
+        source: "/account/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, private, must-revalidate" }],
+      },
+    ];
+  },
   env: {
     // Pin next-auth/react to this app’s origin (avoid redirects to admin :3001 in dev).
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
