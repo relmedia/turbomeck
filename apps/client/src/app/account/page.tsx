@@ -291,7 +291,7 @@ export default function AccountPage() {
     );
   }
 
-  const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);
+  const totalSpent = orders.reduce((sum, o) => sum + Number(o.total ?? 0), 0);
   const deliveredCount = orders.filter(
     (o) => o.status === "delivered" || o.status === "shipped"
   ).length;
@@ -444,7 +444,7 @@ export default function AccountPage() {
                           </p>
                         </Link>
                         <p className="text-sm text-muted-foreground">
-                          {product.price.toLocaleString("sv-SE")} kr
+                          {Number(product.price ?? 0).toLocaleString("sv-SE")} kr
                         </p>
                       </div>
                       <button
@@ -570,7 +570,7 @@ export default function AccountPage() {
                               {t("account.order")} #{order.orderNumber}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {order.total.toLocaleString("sv-SE")} kr ·{" "}
+                              {Number(order.total ?? 0).toLocaleString("sv-SE")} kr ·{" "}
                               {statusLabel}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -690,18 +690,18 @@ export default function AccountPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
-                                {Number(order.subtotal).toLocaleString("sv-SE")} kr
+                                {Number(order.subtotal ?? 0).toLocaleString("sv-SE")} kr
                               </td>
                               <td className="px-4 py-3 text-right">
-                                {Number(order.shippingCost).toLocaleString("sv-SE")} kr
+                                {Number(order.shippingCost ?? 0).toLocaleString("sv-SE")} kr
                               </td>
                               <td className="px-4 py-3 text-right">
-                                {Number(order.discount) > 0
-                                  ? `-${Number(order.discount).toLocaleString("sv-SE")} kr`
+                                {Number(order.discount ?? 0) > 0
+                                  ? `-${Number(order.discount ?? 0).toLocaleString("sv-SE")} kr`
                                   : "—"}
                               </td>
                               <td className="px-4 py-3 text-right font-medium">
-                                {Number(order.total).toLocaleString("sv-SE")} kr
+                                {Number(order.total ?? 0).toLocaleString("sv-SE")} kr
                               </td>
                               <td className="px-4 py-3">
                                 <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs">
