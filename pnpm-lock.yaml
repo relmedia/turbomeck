@@ -91,6 +91,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/sanitize-html':
+        specifier: workspace:*
+        version: link:../../packages/sanitize-html
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
@@ -118,9 +121,6 @@ importers:
       drizzle-orm:
         specifier: ^0.39.0
         version: 0.39.3(postgres@3.4.8)
-      isomorphic-dompurify:
-        specifier: ^3.0.0
-        version: 3.0.0
       jspdf:
         specifier: ^4.2.0
         version: 4.2.0
@@ -257,6 +257,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/sanitize-html':
+        specifier: workspace:*
+        version: link:../../packages/sanitize-html
       '@stripe/react-stripe-js':
         specifier: ^3.6.0
         version: 3.10.0(@stripe/stripe-js@7.9.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
@@ -290,9 +293,6 @@ importers:
       gsap:
         specifier: ^3.14.2
         version: 3.14.2
-      isomorphic-dompurify:
-        specifier: ^3.0.0
-        version: 3.0.0
       jsdom:
         specifier: ^28.1.0
         version: 28.1.0
@@ -554,6 +554,16 @@ importers:
       typescript-eslint:
         specifier: ^8.40.0
         version: 8.40.0(eslint@9.38.0(jiti@2.6.1))(typescript@5.9.2)
+
+  packages/sanitize-html:
+    dependencies:
+      isomorphic-dompurify:
+        specifier: ^3.0.0
+        version: 3.0.0
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
   packages/types:
     devDependencies:

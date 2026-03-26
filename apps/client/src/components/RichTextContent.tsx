@@ -1,6 +1,6 @@
 "use client";
 
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeRichTextHtml } from "@repo/sanitize-html";
 
 type RichTextContentProps = {
   html: string;
@@ -14,10 +14,7 @@ type RichTextContentProps = {
 export default function RichTextContent({ html, className = "" }: RichTextContentProps) {
   if (!html || html.trim() === "") return null;
 
-  const sanitized = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "h1", "h2", "h3", "ul", "ol", "li", "a"],
-    ALLOWED_ATTR: ["href", "target"],
-  });
+  const sanitized = sanitizeRichTextHtml(html);
 
   return (
     <div
