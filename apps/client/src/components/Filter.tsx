@@ -22,7 +22,7 @@ const Filter = () => {
         className="ring-1 ring-gray-200 shadow-md p-1 rounded-sm"
         onChange={(e) => handleFilter(e.target.value)}
       >
-        <option value="newest">Nyaste</option>
+        <option value="newest">Senaste</option>
         <option value="oldest">Äldst</option>
         <option value="asc">Pris: Låg till hög</option>
         <option value="desc">Pris: Högst till lågt</option>
