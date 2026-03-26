@@ -1,8 +1,62 @@
 /**
- * Each app loads `apps/<name>/.env` via `tsx --env-file=.env` (see package.json "start").
- * Required for product-service: INTERNAL_PRODUCT_API_SECRET (same value as apps/client + apps/admin).
- * PM2 `env_file` (5.3+) is optional extras; the secret must exist in apps/product-service/.env
+ * PM2 loads this file with Node — it does NOT automatically load each app’s `.env`.
+ * Older PM2 ignores `env_file`; Next `next start` loads .env from cwd, but SSR still
+ * needs DATABASE_URL etc. for @repo/auth/@repo/database in some code paths.
+ *
+ * We merge each app’s `.env` into `env` so production always has
+ * INTERNAL_PRODUCT_API_SECRET, DATABASE_URL, PRODUCT_SERVICE_URL, …
  */
+const fs = require("fs");
+const path = require("path");
+
+function loadDotenv(relDirFromRepoRoot) {
+  const full = path.join(__dirname, relDirFromRepoRoot, ".env");
+  if (!fs.existsSync(full)) {
+    console.warn(`[ecosystem.config] Missing ${full} — add it on the server (not in git).`);
+    return {};
+  }
+  const env = {};
+  const raw = fs.readFileSync(full, "utf8").replace(/^\uFEFF/, "");
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key) continue;
+    let val = trimmed.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    env[key] = val;
+  }
+  return env;
+}
+
+const productServiceEnv = loadDotenv("apps/product-service");
+const clientEnv = loadDotenv("apps/client");
+const adminEnv = loadDotenv("apps/admin");
+const paymentEnv = loadDotenv("apps/payment-service");
+
+if (!productServiceEnv.INTERNAL_PRODUCT_API_SECRET) {
+  console.warn(
+    "[ecosystem.config] apps/product-service/.env should set INTERNAL_PRODUCT_API_SECRET",
+  );
+}
+if (!clientEnv.INTERNAL_PRODUCT_API_SECRET) {
+  console.warn(
+    "[ecosystem.config] apps/client/.env should set INTERNAL_PRODUCT_API_SECRET (same value as product-service) or /api/product returns 503",
+  );
+}
+if (!productServiceEnv.DATABASE_URL) {
+  console.warn(
+    "[ecosystem.config] apps/product-service/.env should set DATABASE_URL — without it @repo/database uses a dev default and /api/categories may 500",
+  );
+}
+
 module.exports = {
   apps: [
     {
@@ -10,8 +64,7 @@ module.exports = {
       cwd: "./apps/product-service",
       script: "pnpm",
       args: "start",
-      env: { PORT: 8000 },
-      env_file: ".env",
+      env: { ...productServiceEnv, PORT: "8000" },
       instances: 1,
       autorestart: true,
       watch: false,
@@ -21,8 +74,7 @@ module.exports = {
       cwd: "./apps/payment-service",
       script: "pnpm",
       args: "start",
-      env: { PORT: 8002 },
-      env_file: ".env",
+      env: { ...paymentEnv, PORT: "8002" },
       instances: 1,
       autorestart: true,
       watch: false,
@@ -32,8 +84,12 @@ module.exports = {
       cwd: "./apps/client",
       script: "pnpm",
       args: "start",
-      env: { PORT: 3000 },
-      env_file: ".env",
+      env: {
+        ...clientEnv,
+        PORT: "3000",
+        // SSR catalog fetches talk to product-service on the same host if unset:
+        PRODUCT_SERVICE_URL: clientEnv.PRODUCT_SERVICE_URL || "http://127.0.0.1:8000",
+      },
       instances: 1,
       autorestart: true,
       watch: false,
@@ -43,8 +99,7 @@ module.exports = {
       cwd: "./apps/admin",
       script: "pnpm",
       args: "start",
-      env: { PORT: 3001 },
-      env_file: ".env",
+      env: { ...adminEnv, PORT: "3001" },
       instances: 1,
       autorestart: true,
       watch: false,

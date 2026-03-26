@@ -101,18 +101,31 @@ async function fetchWithRetry(
   throw new Error("Failed after retries");
 }
 
+async function readProductApiJson<T>(res: Response, url: string, label: string): Promise<T> {
+  const text = await res.text();
+  if (!res.ok) {
+    const preview = text.replace(/\s+/g, " ").slice(0, 500);
+    console.error(`[catalog] ${label}: HTTP ${res.status} ${url} — ${preview || "(empty body)"}`);
+    throw new Error(`${label} (${res.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    console.error(`[catalog] ${label}: invalid JSON from ${url}`, text.slice(0, 200));
+    throw new Error(`${label} (invalid JSON)`);
+  }
+}
+
 export async function fetchCategories(locale?: "sv" | "en"): Promise<ApiCategory[]> {
   const url = locale ? `${PRODUCT_API}/categories?locale=${locale}` : `${PRODUCT_API}/categories`;
   const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
-  if (!res.ok) throw new Error("Failed to fetch categories");
-  return res.json();
+  return readProductApiJson<ApiCategory[]>(res, url, "Failed to fetch categories");
 }
 
 export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
   const url = locale ? `${PRODUCT_API}/products?locale=${locale}` : `${PRODUCT_API}/products`;
   const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
-  if (!res.ok) throw new Error("Failed to fetch products");
-  const data: ApiProduct[] = await res.json();
+  const data = await readProductApiJson<ApiProduct[]>(res, url, "Failed to fetch products");
   return data.map(apiProductToProductType);
 }
 
@@ -120,13 +133,22 @@ export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]
 export async function fetchSliderProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
   const params = new URLSearchParams({ featuredInSlider: "1" });
   if (locale) params.set("locale", locale);
-  const res = await fetchWithRetry(
-    `${PRODUCT_API}/products?${params}`,
-    productApiRequestInit({ cache: "no-store" }),
-  );
-  if (!res.ok) return [];
-  const data: ApiProduct[] = await res.json();
-  return data.map(apiProductToProductType);
+  const url = `${PRODUCT_API}/products?${params}`;
+  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
+  const text = await res.text();
+  if (!res.ok) {
+    console.error(
+      `[catalog] fetchSliderProducts: HTTP ${res.status} ${url}`,
+      text.replace(/\s+/g, " ").slice(0, 400),
+    );
+    return [];
+  }
+  try {
+    const data = JSON.parse(text) as ApiProduct[];
+    return data.map(apiProductToProductType);
+  } catch {
+    return [];
+  }
 }
 
 export type OrderItem = {
