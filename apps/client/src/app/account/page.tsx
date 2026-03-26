@@ -18,7 +18,6 @@ import {
   Camera,
   Loader2,
   AlertTriangle,
-  ChevronRight,
   FileText,
   Download,
   MessageSquare,
@@ -39,6 +38,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AccountToolbar } from "@/app/account/AccountToolbar";
 import AddressEditForm from "@/components/AddressEditForm";
 import { fetchOrders, fetchProductsByIds, type Order } from "@/lib/api";
 import OrderDetailModal from "@/components/OrderDetailModal";
@@ -319,42 +319,18 @@ export default function AccountPage() {
     <div className="w-full mt-8 mb-16">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">{t("account.profile")}</h1>
-        <nav className="inline-flex rounded-lg bg-muted p-1 gap-0.5 ml-auto [&_button]:cursor-pointer">
-          <button
-            type="button"
-            onClick={() => setAddressModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
-          >
-            <MapPin className="w-4 h-4" />
-            {t("nav.deliveryAddress")}
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setExportModalOpen(true);
-              setExportError(null);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            {t("account.exportData")}
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteModalOpen(true);
-              setDeleteError(null);
-              setDeleteForm({ password: "", confirmText: "" });
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-destructive/90 hover:text-destructive hover:bg-background transition-colors"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            {t("account.deleteAccount")}
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </nav>
+        <AccountToolbar
+          onOpenAddress={() => setAddressModalOpen(true)}
+          onOpenExport={() => {
+            setExportModalOpen(true);
+            setExportError(null);
+          }}
+          onOpenDelete={() => {
+            setDeleteModalOpen(true);
+            setDeleteError(null);
+            setDeleteForm({ password: "", confirmText: "" });
+          }}
+        />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
