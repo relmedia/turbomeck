@@ -12,6 +12,7 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@repo/sanitize-html"],
   async headers() {
     return [
       {
