@@ -17,7 +17,6 @@ import {
   Trash2,
   Camera,
   Loader2,
-  Key,
   AlertTriangle,
   ChevronRight,
   FileText,
@@ -92,7 +91,6 @@ export default function AccountPage() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [receiptUrls, setReceiptUrls] = useState<Record<string, string | null>>({});
   const [addressModalOpen, setAddressModalOpen] = useState(false);
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
@@ -135,42 +133,6 @@ export default function AccountPage() {
       setExportError(err instanceof Error ? err.message : "Något gick fel");
     } finally {
       setExportLoading(false);
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(false);
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError(t("account.passwordsDontMatch"));
-      return;
-    }
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError(t("account.passwordMinLength"));
-      return;
-    }
-    setPasswordSubmitting(true);
-    try {
-      const res = await fetch("/api/account/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setPasswordError(data.error ?? t("account.changePasswordError"));
-        return;
-      }
-      setPasswordSuccess(true);
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    } catch {
-      setPasswordError(t("account.networkError"));
-    } finally {
-      setPasswordSubmitting(false);
     }
   };
 
@@ -243,12 +205,6 @@ export default function AccountPage() {
     const section = searchParams.get("section");
     if (section === "address") {
       setAddressModalOpen(true);
-      window.history.replaceState({}, "", "/account");
-    }
-    if (section === "password") {
-      setPasswordModalOpen(true);
-      setPasswordError(null);
-      setPasswordSuccess(false);
       window.history.replaceState({}, "", "/account");
     }
   }, [searchParams, loading]);
@@ -375,19 +331,6 @@ export default function AccountPage() {
           >
             <MapPin className="w-4 h-4" />
             {t("nav.deliveryAddress")}
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPasswordModalOpen(true);
-              setPasswordError(null);
-              setPasswordSuccess(false);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
-          >
-            <Key className="w-4 h-4" />
-            {t("nav.changePassword")}
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
@@ -858,87 +801,6 @@ export default function AccountPage() {
             }}
             onCancel={() => setAddressModalOpen(false)}
           />
-        </DialogContent>
-      </Dialog>
-
-        <Dialog
-          open={passwordModalOpen}
-          onOpenChange={(open) => {
-            setPasswordModalOpen(open);
-            if (!open) {
-              setPasswordError(null);
-              setPasswordSuccess(false);
-            }
-          }}
-        >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              {t("account.changePasswordTitle")}
-            </DialogTitle>
-            {profile?.hasPassword !== false && (
-              <DialogDescription>
-                {t("account.changePasswordDesc")}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          {profile?.hasPassword === false ? (
-            <p className="text-sm text-muted-foreground">
-              {t("account.externalAccountNote")}
-            </p>
-          ) : (
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div>
-                <Label htmlFor="currentPassword">Nuvarande lösenord</Label>
-                <Input
-                  id="currentPassword"
-                  type="password"
-                  autoComplete="current-password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) =>
-                    setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="newPassword">{t("account.newPassword")}</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwordForm.newPassword}
-                  onChange={(e) =>
-                    setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="confirmPassword">{t("account.confirmNewPassword")}</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))
-                  }
-                  className="mt-1"
-                />
-              </div>
-              {passwordError && (
-                <p className="text-sm text-destructive">{passwordError}</p>
-              )}
-              {passwordSuccess && (
-                <p className="text-sm text-emerald-600">{t("account.passwordChanged")}</p>
-              )}
-              <Button type="submit" disabled={passwordSubmitting}>
-                {passwordSubmitting ? t("account.saving") : t("nav.changePassword")}
-              </Button>
-            </form>
-          )}
         </DialogContent>
       </Dialog>
 

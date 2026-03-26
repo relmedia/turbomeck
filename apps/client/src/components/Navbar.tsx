@@ -7,7 +7,7 @@ import SearchBar from "./SearchBar";
 import { MobileSearch } from "./MobileSearch";
 import { MobileMenu } from "./MobileMenu";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { User, LogOut, MapPin, Key } from "lucide-react";
+import { User, LogOut, MapPin } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import {
   Avatar,
@@ -125,12 +125,6 @@ const Navbar = () => {
                     <Link href="/account?section=address">
                       <MapPin className="w-4 h-4 mr-2" />
                       {t("nav.deliveryAddress")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/account?section=password">
-                      <Key className="w-4 h-4 mr-2" />
-                      {t("nav.changePassword")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
