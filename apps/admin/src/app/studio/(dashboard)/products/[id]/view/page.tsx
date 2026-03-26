@@ -1,6 +1,6 @@
 "use client";
 
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeRichTextHtml } from "@repo/sanitize-html";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -437,10 +437,7 @@ export default function ProductViewPage() {
                     <div
                       className="prose prose-sm max-w-none text-muted-foreground"
                       dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(product.description, {
-                          ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "h1", "h2", "h3", "ul", "ol", "li", "a"],
-                          ALLOWED_ATTR: ["href", "target"],
-                        }),
+                        __html: sanitizeRichTextHtml(product.description),
                       }}
                     />
                   ) : (
