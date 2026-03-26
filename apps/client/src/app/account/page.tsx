@@ -195,6 +195,10 @@ export default function AccountPage() {
   useEffect(() => {
     if (loading) return;
     const section = searchParams.get("section");
+    if (section === "password") {
+      window.history.replaceState({}, "", "/account");
+      return;
+    }
     if (section === "address") {
       setAddressModalOpen(true);
       window.history.replaceState({}, "", "/account");

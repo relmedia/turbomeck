@@ -103,14 +103,14 @@ async function fetchWithRetry(
 
 export async function fetchCategories(locale?: "sv" | "en"): Promise<ApiCategory[]> {
   const url = locale ? `${PRODUCT_API}/categories?locale=${locale}` : `${PRODUCT_API}/categories`;
-  const res = await fetchWithRetry(url, { cache: "no-store" });
+  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
   if (!res.ok) throw new Error("Failed to fetch categories");
   return res.json();
 }
 
 export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
   const url = locale ? `${PRODUCT_API}/products?locale=${locale}` : `${PRODUCT_API}/products`;
-  const res = await fetchWithRetry(url, { cache: "no-store" });
+  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
   if (!res.ok) throw new Error("Failed to fetch products");
   const data: ApiProduct[] = await res.json();
   return data.map(apiProductToProductType);
@@ -120,7 +120,10 @@ export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]
 export async function fetchSliderProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
   const params = new URLSearchParams({ featuredInSlider: "1" });
   if (locale) params.set("locale", locale);
-  const res = await fetchWithRetry(`${PRODUCT_API}/products?${params}`, { cache: "no-store" });
+  const res = await fetchWithRetry(
+    `${PRODUCT_API}/products?${params}`,
+    productApiRequestInit({ cache: "no-store" }),
+  );
   if (!res.ok) return [];
   const data: ApiProduct[] = await res.json();
   return data.map(apiProductToProductType);
@@ -281,7 +284,10 @@ export type ReviewsResponse = {
 };
 
 export async function fetchReviews(productId: number): Promise<ReviewsResponse> {
-  const res = await fetch(`${PRODUCT_API}/reviews?productId=${productId}`, { cache: "no-store" });
+  const res = await fetch(
+    `${PRODUCT_API}/reviews?productId=${productId}`,
+    productApiRequestInit({ cache: "no-store" }),
+  );
   if (!res.ok) throw new Error("Failed to fetch reviews");
   return res.json();
 }
