@@ -35,7 +35,7 @@ type SignInValues = z.infer<typeof emailLinkSchema>;
 function SignInContent() {
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/studio";
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const errorParam = searchParams.get("error");
   const error =
     errorParam === "EmailSignin"

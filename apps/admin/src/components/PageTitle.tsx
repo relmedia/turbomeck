@@ -11,7 +11,7 @@ export function PageTitle() {
   const fromPage = searchParams.get("fromPage");
 
   const getTitle = () => {
-    if (pathname === "/studio") return "Dashboard";
+    if (pathname === "/" || pathname === "/studio") return "Dashboard";
     if (pathname === "/studio/products/add") return "Lägg till produkt";
     if (pathname.startsWith("/studio/products")) return "Produkter";
     if (pathname.startsWith("/studio/users")) return "Användare";

@@ -99,7 +99,12 @@ module.exports = {
       cwd: "./apps/admin",
       script: "pnpm",
       args: "start",
-      env: { ...adminEnv, PORT: "3001" },
+      env: {
+        ...adminEnv,
+        AUTH_SIGNIN_PATH: "/",
+        AUTH_VERIFY_PATH: adminEnv.AUTH_VERIFY_PATH?.trim() || "/studio/verify",
+        PORT: "3001",
+      },
       instances: 1,
       autorestart: true,
       watch: false,

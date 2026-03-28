@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+/* Staff UI is served at `/` (rewritten to `/studio` internally). NextAuth must use `/`
+ * for `pages.signIn` / `pages.error`, otherwise flows redirect the browser to `/studio`. */
+process.env.AUTH_SIGNIN_PATH = "/";
+process.env.AUTH_VERIFY_PATH =
+  process.env.AUTH_VERIFY_PATH?.trim() || "/studio/verify";
+
 function getR2ImagePattern() {
   try {
     const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;

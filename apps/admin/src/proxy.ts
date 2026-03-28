@@ -27,7 +27,7 @@ export default auth((req) => {
 
   const session = req.auth;
   if (!session?.user) {
-    return NextResponse.redirect(new URL("/studio", req.url));
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
   if (isAdminRoute(pathname)) {

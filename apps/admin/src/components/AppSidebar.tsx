@@ -49,7 +49,7 @@ import AddCategory from "./AddCategory";
 const items = [
   {
     title: "Dashboard",
-    url: "/studio",
+    url: "/",
     icon: Home,
   },
   {
@@ -93,7 +93,7 @@ const AppSidebar = ({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/studio" className="[&>span]:text-lg [&>span]:font-semibold">
+              <Link href="/" className="[&>span]:text-lg [&>span]:font-semibold">
                 <Image src="/logo.svg" alt="logo" width={24} height={24} />
                 <span>Turbomeck</span>
               </Link>
@@ -294,7 +294,7 @@ const AppSidebar = ({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={() => signOut({ callbackUrl: "/studio" })}
+                  onClick={() => signOut({ callbackUrl: "/" })}
                 >
                   <LogOut className="size-4" />
                   Logga ut

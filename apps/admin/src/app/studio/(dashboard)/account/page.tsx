@@ -6,7 +6,7 @@ import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 export default async function AccountPage() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/studio");
+    redirect("/");
   }
 
   return (

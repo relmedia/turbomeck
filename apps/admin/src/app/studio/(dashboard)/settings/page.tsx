@@ -10,10 +10,10 @@ export const metadata = {
 export default async function SettingsPage() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/studio");
+    redirect("/");
   }
   if (session.user.role !== "admin") {
-    redirect("/studio");
+    redirect("/");
   }
 
   return (

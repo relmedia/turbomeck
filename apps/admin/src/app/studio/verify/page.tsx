@@ -7,7 +7,7 @@ import { Mail } from "lucide-react";
 export default function VerifyRequestPage() {
   return (
     <div className="flex flex-col gap-6 min-h-screen items-center justify-center bg-background py-12 px-4">
-      <Link href="/studio" className="flex items-center justify-center gap-3">
+      <Link href="/" className="flex items-center justify-center gap-3">
         <Image
           src="/logo.svg"
           alt="Turbomeck"

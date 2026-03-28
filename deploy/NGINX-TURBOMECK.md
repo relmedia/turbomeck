@@ -35,6 +35,8 @@ Maps at the top only cover **`/api/reviews`** routing between apps.
    NEXTAUTH_URL=https://studio.turbomeck.cloud
    ```
 
+   The admin app forces `AUTH_SIGNIN_PATH=/` (via `next.config.ts` and PM2) so NextAuth does not send staff to `/studio` in the URL bar. Optionally set `AUTH_VERIFY_PATH` if you move the “check your email” page (default `/studio/verify`).
+
    Restart admin after changes:
 
    ```bash
