@@ -1,68 +1,77 @@
-# nginx: storefront `/api/product` must hit the client (port 3000)
+# nginx: Turbomeck (storefront + studio subdomain)
 
-## Reference config
+## Reference config (Option 2 — **recommended**)
 
-Use **`deploy/nginx-turbomeck.cloud.conf`** as a **single paste** into `/etc/nginx/sites-available/turbomeck` (or your site file). It includes the two **`map`** blocks at the top (valid because `sites-enabled` is included inside **`http { }`** on Debian/Ubuntu), then the HTTPS + HTTP **server** blocks.
+**`deploy/nginx-turbomeck.cloud.conf`** is set up for:
 
-It adds `^~ /api/product/` → 3000, **`^~ /api/auth/` → 3000** (NextAuth must hit the storefront so redirects use `/logga-in`, not admin `/studio/logga-in`), removes `product` / `reviews` / `account` / **`auth`** from the admin regex, adds `/login` → 3001, and uses **maps** for `/api/reviews` (POST vs GET) and numeric IDs (PATCH from `/studio` vs storefront).
+- **`https://turbomeck.cloud`** — storefront Next.js **:3000**; `/api/product/` only to **3000** (catalog + checkout).
+- **`https://studio.turbomeck.cloud`** — admin Next.js **:3001** for **all** paths (`/studio`, `/api/product` saves, `/api/auth` for staff login, `/_next/`, etc.).
+- **Redirects** — `https://turbomeck.cloud/studio/...` and `/login/...` → **301** → same path on **`studio.turbomeck.cloud`** (old bookmarks keep working).
 
-**Two Next.js apps on one hostname** both request `/_next/static/...`. The reference config adds **`map $http_referer $next_static_upstream`** and **`location ^~ /_next/`** so requests **referred** from `/logga-in`, `/studio`, or `/login` go to **3001**; everything else defaults to **3000**. If anything still loads wrong assets (empty `Referer`), use **`basePath`** on the admin app or **`admin.turbomeck.cloud` → 3001** only.
+Maps at the top only cover **`/api/reviews`** routing between apps.
+
+### Deploy checklist
+
+1. **DNS** — `A` / `AAAA` for **`studio.turbomeck.cloud`** → same VPS as the shop.
+2. **TLS** — after DNS resolves:
+
+   ```bash
+   sudo certbot certonly --nginx -d studio.turbomeck.cloud
+   ```
+
+   Paths in the config assume certs live under  
+   `/etc/letsencrypt/live/studio.turbomeck.cloud/`.
+
+3. **Merge nginx** — paste or include the file in `sites-enabled`, then:
+
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+4. **Admin app env** (`apps/admin/.env`, picked up by PM2 `ecosystem.config.js`):
+
+   ```env
+   AUTH_URL=https://studio.turbomeck.cloud
+   NEXTAUTH_URL=https://studio.turbomeck.cloud
+   ```
+
+   Restart admin after changes:
+
+   ```bash
+   pm2 restart admin --update-env
+   ```
+
+   Storefront **`AUTH_URL` / `NEXTAUTH_URL`** stay **`https://turbomeck.cloud`** (customer login + magic links).
+
+5. **Optional:** set cookie **`domain=.turbomeck.cloud`** only if you intentionally want one session shared across both hosts (usually not required; staff use the studio host only).
 
 ### Magic-link email (SMTP)
 
-Mail is sent by `@repo/auth` using **`app_settings.mail`** (JSON) in the database. If that row is missing or empty, auth falls back to **environment variables** on the server running Next (admin + client): `SMTP_HOST`, `SMTP_PORT` (default 587), `SMTP_SECURE` (`true`/`1` for SSL), `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`. Set these in **PM2** / systemd or `.env` for the Node process — not in nginx.
+Mail is sent by `@repo/auth` using **`app_settings.mail`** (JSON) in the database. If that row is missing or empty, auth falls back to **environment variables** on the server running Next (**client** and **admin**): `SMTP_HOST`, `SMTP_PORT` (default 587), `SMTP_SECURE` (`true`/`1` for SSL), `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`. Set these in **PM2** or `.env` for each Node process — not in nginx.
 
 ---
 
 ## What went wrong (short)
 
-If the admin regex includes **`product`**, then **`/api/product/products`** is proxied to **3001**. Admin middleware may **307** guests to sign-in. The storefront client (3000) must serve **`/api/product/*`**.
+1. **403 when saving products** — On the **shop** host, `/api/product/` was proxied only to **3000**. The storefront blocks admin `PUT`. With Option 2, editors use **`admin.*`**, so `/api/product/` there hits **3001**.
 
-Direct test:
+2. **Public `GET /api/product` 307 to login** — If an nginx regex sends **GET** catalog requests to **3001**, fix the regex (do not include `product` in the admin-only API block on the **apex** server).
 
-- `curl -I http://127.0.0.1:3000/api/product/products` → **200** (client)
-- `curl -I https://turbomeck.cloud/api/product/products` → **307** to `/logga-in` if nginx sent traffic to **3001**
-
-## Fix (pick one)
-
-### A) Prefer: dedicated location **before** the admin regex
-
-Add **above** the `location ~ ^/api/(dashboard|...)` block (order matters: prefix `^~` wins over regex):
-
-```nginx
-location ^~ /api/product/ {
-    proxy_pass http://localhost:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-Use the same `proxy_*` headers as your other `proxy_pass` blocks.
-
-### B) Remove `product` from the admin regex
-
-Edit the alternation and **delete** `product`:
-
-```nginx
-location ~ ^/api/(dashboard|orders|shipping|...) {
-    proxy_pass http://localhost:3001;
-```
-
-Ensure your **default** `location /` (or catch-all) for the storefront still proxies to **3000** so `/api/product/*` is not dropped.
-
-## After editing
+### Smokes
 
 ```bash
-sudo nginx -t && sudo systemctl reload nginx
+curl -sSI https://turbomeck.cloud/api/product/products | head -n 5
+# Expect 200 on shop
+
+curl -sSI https://studio.turbomeck.cloud/studio | head -n 5
+# Expect 200 or 307 to login — must not be shop (3000)
+
+curl -sSI https://turbomeck.cloud/studio | grep -i location
+# Expect 301 → https://studio.turbomeck.cloud/studio
 ```
 
-Then:
+---
 
-```bash
-curl -sSI "https://turbomeck.cloud/api/product/products" | grep -iE '^(HTTP/|location:)'
-```
+## Legacy: single hostname + Referer split
 
-Expect **200** and **no** `Location: .../logga-in`.
+If you **cannot** use a dedicated studio subdomain, you can route `/api/product/` with `map $http_referer` (studio/login → 3001, default → 3000) and keep `/_next/` on a Referer map. The repo previously documented that pattern; **Option 2 avoids Referer quirks** (empty Referer, new tabs).

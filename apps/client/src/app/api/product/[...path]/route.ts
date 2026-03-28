@@ -24,7 +24,13 @@ function assertStorefrontMutationAllowed(
     (method === "POST" && pathStr === "orders") ||
     (method === "PATCH" && /^orders\/\d+\/balance-paid$/.test(pathStr));
   if (!ok) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json(
+      {
+        error:
+          "Forbidden: catalog changes must go through the admin app’s API (/api/product on the admin host), not the storefront.",
+      },
+      { status: 403 },
+    );
   }
   return null;
 }
