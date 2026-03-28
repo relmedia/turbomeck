@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,41 +72,34 @@ function SignInContent() {
     setLoading(true);
     form.setError("root", { message: "" });
     try {
-      const csrfRes = await fetch("/api/auth/csrf");
-      const csrfText = await csrfRes.text();
-      if (!csrfRes.ok) {
-        throw new Error("Kunde inte hämta säkerhetstoken. Försök igen.");
-      }
-      let csrfToken: string;
-      try {
-        const csrfData = JSON.parse(csrfText);
-        csrfToken = csrfData?.csrfToken ?? "";
-      } catch {
-        throw new Error("Ogiltigt svar från servern. Försök igen.");
-      }
-      if (!csrfToken) {
-        throw new Error("Saknar säkerhetstoken.");
-      }
-      const params = new URLSearchParams({
-        csrfToken,
-        email: values.email,
+      /* Use next-auth/react signIn (same as storefront): Auth.js expects
+       * X-Auth-Return-Redirect + JSON body; raw fetch often breaks with “Failed to fetch”. */
+      const result = await signIn("email", {
+        email: values.email.trim().toLowerCase(),
         callbackUrl,
+        redirect: false,
       });
-      const res = await fetch("/api/auth/signin/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        const match = text.match(/error=([^&"'\s]+)/);
-        const errCode = match?.[1];
-        throw new Error(
-          errCode ? decodeURIComponent(errCode) : "Inloggningen misslyckades"
-        );
+      if (!result) {
+        form.setError("root", { message: "Inloggningen misslyckades" });
+        return;
       }
-      const targetUrl = res.redirected && res.url ? res.url : "/studio/verify";
-      window.location.href = targetUrl;
+      if (result.error) {
+        const code = result.error;
+        form.setError("root", {
+          message:
+            code === "EmailSignin"
+              ? "Kunde inte skicka inloggningslänk. Kontrollera att e-post är konfigurerad i Inställningar."
+              : code === "Verification"
+                ? "Inloggningslänken är inte längre giltig. Den kan redan ha använts eller ha gått ut."
+                : "Inloggningen misslyckades",
+        });
+        return;
+      }
+      if (result.ok && result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      window.location.href = "/studio/verify";
     } catch (err) {
       form.setError("root", {
         message: err instanceof Error ? err.message : "Något gick fel",
