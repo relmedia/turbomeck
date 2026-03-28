@@ -1,3 +1,4 @@
+import "./load-local-env.js";
 import express, { type Request } from "express";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
