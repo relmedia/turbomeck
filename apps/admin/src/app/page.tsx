@@ -1,10 +1,7 @@
-import { auth } from "@repo/auth";
-import { redirect } from "next/navigation";
-
-export default async function RootPage() {
-  const session = await auth();
-  if (session?.user) {
-    redirect("/studio");
-  }
-  redirect("/studio");
+/**
+ * `/` is rewritten to `/studio` in next.config (beforeFiles).
+ * This file satisfies the `/` route segment; the rewrite serves the studio tree.
+ */
+export default function RootPage() {
+  return null;
 }

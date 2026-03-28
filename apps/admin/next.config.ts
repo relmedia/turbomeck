@@ -12,6 +12,18 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  // Subdomain studio.turbomeck.cloud should use / as entry (not /studio in the URL bar).
+  async redirects() {
+    return [
+      { source: "/studio", destination: "/", permanent: true },
+      { source: "/studio/", destination: "/", permanent: true },
+    ];
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/", destination: "/studio" }],
+    };
+  },
   env: {
     // Must be inlined for client; read from apps/admin/.env (falls back for dev).
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3001",
