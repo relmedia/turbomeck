@@ -16,8 +16,6 @@ export type ProductType = {
   colors: [string, ...string[]];
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T"] }] - customer must choose when adding to cart */
   attributes?: { name: string; options: string[] }[];
-  /** Core exchange: deposit (SEK) paid upfront; balance after old part received and new turbo shipped */
-  depositAmount?: number;
   images: Record<string, string>;
   /** All images for gallery (main + thumbnails) */
   galleryImages?: string[];
@@ -65,7 +63,7 @@ export const shippingFormSchema = z.object({
   phone: z
     .string()
     .min(10, "Telefonnummer måste vara giltigt (minst 10 siffror med landskod)!")
-    .regex(/^\+\d{10,15}$/, "Ange ett giltigt europeiskt telefonnummer (t.ex. +46701234567)"),
+    .regex(/^\+\d{10,15}$/, "Ange ett giltigt europeiskt telefonnummer (t.ex. +46709165006)"),
   country: z
     .string()
     .refine((v) => EUROPEAN_COUNTRY_CODES.includes(v as (typeof EUROPEAN_COUNTRY_CODES)[number]), "Välj ett europeiskt land"),

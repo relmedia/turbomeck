@@ -32,8 +32,8 @@ const Footer = () => {
         <div className="flex flex-col gap-4 pt-6 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-1">
             <p>© {new Date().getFullYear()} Turbomeck. {t("footer.rightsReserved")}</p>
-            <a href="tel:+46701234567" className="hover:text-gray-900 dark:hover:text-white transition-colors">
-              +46 70 123 45 67
+            <a href="tel:+46709165006" className="hover:text-gray-900 dark:hover:text-white transition-colors">
+              +46 709 16 50 06
             </a>
             <a
               href="https://www.google.com/maps/search/?api=1&query=Husholmsgatan+4+425+30+Hisings+Kärra"

@@ -162,6 +162,13 @@ export async function GET(
       shipping: Number(order.shippingCost),
       discount: Number(order.discount),
       total: Number(order.total),
+      depositAmount:
+        order.depositAmount != null ? Number(order.depositAmount) : undefined,
+      balanceDue: order.balanceDue != null ? Number(order.balanceDue) : undefined,
+      commitsCoreReturnWithin14: order.commitsCoreReturnWithin14 ?? null,
+      coreKeepFeeSek: order.coreKeepFeeSek ?? 0,
+      coreReturnDeadline: order.coreReturnDeadline?.toISOString?.() ?? null,
+      coreReceivedAt: order.coreReceivedAt?.toISOString?.() ?? null,
       status: order.status ?? "confirmed",
       deliveryStatus: mapToDeliveryStatus(order.status),
       servicePointName: order.servicePointName ?? undefined,

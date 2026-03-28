@@ -13,7 +13,7 @@ import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 import { sendOrderConfirmationEmail } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
-import { resolveCheckoutOrder } from "./order-pricing.js";
+import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -548,7 +548,6 @@ app.get("/api/products", async (req, res) => {
       stock: products.stock,
       weight: products.weight,
       attributes: products.attributes,
-      depositAmount: products.depositAmount,
       featuredInSlider: products.featuredInSlider,
       sliderOrder: products.sliderOrder,
       createdAt: products.createdAt,
@@ -605,7 +604,6 @@ app.get("/api/products", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryMap.get(p.id) ?? [],
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
-      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       featuredInSlider: (p as { featuredInSlider?: number | null }).featuredInSlider ?? 0,
       sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
       createdAt: p.createdAt,
@@ -655,7 +653,6 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
-        depositAmount: products.depositAmount,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -684,7 +681,6 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
-      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -714,7 +710,6 @@ app.get("/api/products/:id", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
-        depositAmount: products.depositAmount,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -752,7 +747,6 @@ app.get("/api/products/:id", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
-      depositAmount: (p as { depositAmount?: string | null }).depositAmount != null ? parseFloat((p as { depositAmount: string }).depositAmount) : null,
       orderCount,
       totalRevenue,
       createdAt: p.createdAt,
@@ -767,7 +761,7 @@ app.get("/api/products/:id", async (req, res) => {
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn, depositAmount } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
@@ -823,7 +817,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, depositAmount, featuredInSlider, sliderOrder } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -850,10 +844,6 @@ app.put("/api/products/:id", async (req, res) => {
       updateData.attributes = Array.isArray(attributes)
         ? attributes.filter((a: unknown) => a && typeof a === "object" && "name" in a && "options" in a && Array.isArray((a as { options: unknown }).options))
         : [];
-    }
-    if (depositAmount !== undefined) {
-      const da = depositAmount != null && String(depositAmount).trim() !== "" ? Number(depositAmount) : NaN;
-      updateData.depositAmount = !Number.isNaN(da) && da > 0 ? String(da) : null;
     }
     if (featuredInSlider !== undefined) {
       updateData.featuredInSlider = featuredInSlider === true || featuredInSlider === 1 || featuredInSlider === "1" ? 1 : 0;
@@ -920,6 +910,43 @@ async function generateOrderNumber(): Promise<string> {
   return `#${num}`;
 }
 
+/** Server-side checkout quote — amount matches POST /api/orders; never trust client-displayed totals. */
+app.post("/api/checkout-quote", async (req, res) => {
+  try {
+    const body = req.body as {
+      items?: unknown;
+      couponCode?: string;
+      country?: string;
+      deliveryOption?: string;
+      commitsCoreReturnWithin14?: boolean;
+    };
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ error: "items required" });
+    }
+    const priced = await resolveCheckoutOrder({
+      items: body.items as OrderItemInput[],
+      couponCode: body.couponCode,
+      country: body.country,
+      deliveryOption: body.deliveryOption,
+      commitsCoreReturnWithin14: body.commitsCoreReturnWithin14,
+    });
+    if (!priced.ok) {
+      return res.status(priced.status).json({ error: priced.error });
+    }
+    res.json({
+      amount: priced.stripeChargeSek,
+      subtotal: priced.subtotal,
+      discount: priced.discount,
+      shipping: priced.shipping,
+      coreKeepFeeSek: priced.coreKeepFeeSek,
+      total: priced.total,
+    });
+  } catch (error) {
+    console.error("checkout-quote:", error);
+    res.status(500).json({ error: "Failed to quote checkout" });
+  }
+});
+
 // POST create order (checkout) — line prices and totals computed from DB + Stripe verification
 app.post("/api/orders", async (req, res) => {
   try {
@@ -940,6 +967,7 @@ app.post("/api/orders", async (req, res) => {
       stripePaymentId?: string;
       postNordTrackingId?: string;
       locale?: "sv" | "en";
+      commitsCoreReturnWithin14?: boolean;
       items: Array<{
         productId?: number;
         productName: string;
@@ -959,6 +987,7 @@ app.post("/api/orders", async (req, res) => {
       couponCode: body.couponCode,
       country: body.country,
       deliveryOption: body.deliveryOption,
+      commitsCoreReturnWithin14: body.commitsCoreReturnWithin14,
     });
     if (!priced.ok) {
       return res.status(priced.status).json({ error: priced.error });
@@ -982,11 +1011,12 @@ app.post("/api/orders", async (req, res) => {
       String(body.postNordTrackingId).trim() &&
       String(body.postNordTrackingId).toLowerCase() !== "null"
     );
-    const initialStatus = hasTrackingId
-      ? "shipped"
-      : priced.isDepositCheckout
-        ? "deposit_paid"
-        : "confirmed";
+    const initialStatus = hasTrackingId ? "shipped" : "confirmed";
+
+    const coreDeadline =
+      priced.commitsCoreReturnWithin14 === true
+        ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        : null;
 
     const viewToken = generateOrderViewToken();
     const [order] = await db
@@ -1010,9 +1040,11 @@ app.post("/api/orders", async (req, res) => {
         shippingCost: String(priced.shipping),
         discount: String(priced.discount),
         total: String(priced.total),
-        depositAmount: priced.isDepositCheckout ? String(priced.depositSum) : null,
-        balanceDue:
-          priced.balanceDue != null && priced.balanceDue > 0 ? String(priced.balanceDue) : null,
+        depositAmount: null,
+        balanceDue: null,
+        commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
+        coreKeepFeeSek: priced.coreKeepFeeSek,
+        coreReturnDeadline: coreDeadline,
         stripePaymentId: stripePaymentId || null,
         postNordTrackingId: body.postNordTrackingId ?? null,
         status: initialStatus,
@@ -1116,6 +1148,9 @@ app.get("/api/orders", async (req, res) => {
           total: parseFloat(o.total),
           depositAmount: (o as { depositAmount?: string | null }).depositAmount != null ? parseFloat((o as { depositAmount: string }).depositAmount) : undefined,
           balanceDue: (o as { balanceDue?: string | null }).balanceDue != null ? parseFloat((o as { balanceDue: string }).balanceDue) : undefined,
+          commitsCoreReturnWithin14: (o as { commitsCoreReturnWithin14?: boolean | null }).commitsCoreReturnWithin14 ?? undefined,
+          coreKeepFeeSek: (o as { coreKeepFeeSek?: number | null }).coreKeepFeeSek ?? 0,
+          coreReturnDeadline: (o as { coreReturnDeadline?: Date | null }).coreReturnDeadline ?? undefined,
           coreReceivedAt: (o as { coreReceivedAt?: Date | null }).coreReceivedAt ?? undefined,
           status: o.status,
           postNordTrackingId: o.postNordTrackingId,
@@ -1175,6 +1210,9 @@ app.get("/api/orders/:id", async (req, res) => {
       total: parseFloat(order.total),
       depositAmount: (order as { depositAmount?: string | null }).depositAmount != null ? parseFloat((order as { depositAmount: string }).depositAmount) : undefined,
       balanceDue: (order as { balanceDue?: string | null }).balanceDue != null ? parseFloat((order as { balanceDue: string }).balanceDue) : undefined,
+      commitsCoreReturnWithin14: (order as { commitsCoreReturnWithin14?: boolean | null }).commitsCoreReturnWithin14 ?? undefined,
+      coreKeepFeeSek: (order as { coreKeepFeeSek?: number | null }).coreKeepFeeSek ?? 0,
+      coreReturnDeadline: (order as { coreReturnDeadline?: Date | null }).coreReturnDeadline ?? undefined,
       coreReceivedAt: (order as { coreReceivedAt?: Date | null }).coreReceivedAt ?? undefined,
       status: order.status,
       postNordTrackingId: order.postNordTrackingId,

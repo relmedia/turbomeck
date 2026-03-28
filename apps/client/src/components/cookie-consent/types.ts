@@ -86,8 +86,9 @@ export interface ConsentScopeConfig {
 
 export interface CategoryConfig {
   key: ConsentCategory
-  title: string
-  description: string
+  /** Optional override; otherwise resolved from `cookies.category.{key}` in i18n */
+  title?: string
+  description?: string
   required?: boolean
 }
 

@@ -72,7 +72,6 @@ type Product = {
   thumbnails: string[];
   stock: number;
   weight: number | null;
-  depositAmount?: number | null;
   categoryIds: number[];
   createdAt: string;
   updatedAt: string;
@@ -109,7 +108,6 @@ export default function ProductDetailPage() {
     price: string;
     stock: string;
     weight: string;
-    depositAmount: string;
     categoryIds: number[];
     attributes: { name: string; options: string[] }[];
     image: string | null;
@@ -124,7 +122,6 @@ export default function ProductDetailPage() {
     price: "",
     stock: "",
     weight: "",
-    depositAmount: "",
     categoryIds: [],
     attributes: [],
     image: null,
@@ -156,7 +153,6 @@ export default function ProductDetailPage() {
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
         weight: data.weight != null ? data.weight.toString() : "",
-        depositAmount: data.depositAmount != null ? data.depositAmount.toString() : "",
         categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
         attributes: Array.isArray(data.attributes)
           ? data.attributes.filter((a: { name?: string; options?: string[] }) => a?.name && Array.isArray(a?.options))
@@ -340,7 +336,6 @@ export default function ProductDetailPage() {
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
           weight: formData.weight ? Number(formData.weight) : null,
-          depositAmount: formData.depositAmount ? Number(formData.depositAmount) : null,
           categoryIds: Array.isArray(formData.categoryIds) ? formData.categoryIds : [],
           attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
           image: formData.image ?? null,
@@ -711,19 +706,6 @@ export default function ProductDetailPage() {
                     value={formData.weight ?? ""}
                     onChange={handleInputChange}
                     placeholder="t.ex. 2.5"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="depositAmount">Deposition (kr) – kärnbyte</Label>
-                  <Input
-                    id="depositAmount"
-                    name="depositAmount"
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={formData.depositAmount ?? ""}
-                    onChange={handleInputChange}
-                    placeholder="0 = full betalning"
                   />
                 </div>
                 <div className="space-y-4 col-span-2">

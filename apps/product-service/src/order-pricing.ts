@@ -2,6 +2,9 @@ import { db, products, discountCodes } from "@repo/database";
 import { sql, inArray } from "drizzle-orm";
 import { getShippingPrice } from "./shipping-pricing.js";
 
+/** Fixed SEK surcharge when Swedish customer opts not to return the old turbo (charged at checkout). */
+export const CORE_KEEP_FEE_SEK = 1000;
+
 export type OrderItemInput = {
   productId?: number;
   productName: string;
@@ -66,10 +69,9 @@ export type ResolvedCheckout =
       subtotal: number;
       discount: number;
       shipping: number;
+      coreKeepFeeSek: number;
+      commitsCoreReturnWithin14: boolean | null;
       total: number;
-      depositSum: number;
-      balanceDue: number | null;
-      isDepositCheckout: boolean;
       stripeChargeSek: number;
       lines: Array<{
         productId: number;
@@ -86,6 +88,8 @@ export async function resolveCheckoutOrder(body: {
   couponCode?: string;
   country?: string;
   deliveryOption?: string;
+  /** Sweden only: true = return old turbo within 14 days (no fee); false = pay CORE_KEEP_FEE_SEK at checkout */
+  commitsCoreReturnWithin14?: boolean;
 }): Promise<ResolvedCheckout> {
   const country = (body.country ?? "SE").toUpperCase().trim();
   const deliveryRaw = body.deliveryOption ?? "servicepoint";
@@ -109,6 +113,22 @@ export async function resolveCheckoutOrder(body: {
     productIds.push(pid);
   }
 
+  const isSe = country === "SE";
+  let commitsCoreReturnWithin14: boolean | null = null;
+  if (isSe) {
+    if (typeof body.commitsCoreReturnWithin14 !== "boolean") {
+      return {
+        ok: false,
+        status: 400,
+        error: "Välj om du skickar in din gamla turbo inom 14 dagar eller betalar kärnavgift.",
+      };
+    }
+    commitsCoreReturnWithin14 = body.commitsCoreReturnWithin14;
+  }
+
+  const coreKeepFeeSek =
+    isSe && commitsCoreReturnWithin14 === false ? CORE_KEEP_FEE_SEK : 0;
+
   const uniqueIds = [...new Set(productIds)];
   const rows = await db.select().from(products).where(inArray(products.id, uniqueIds));
   const byId = new Map(rows.map((p) => [p.id, p]));
@@ -124,7 +144,6 @@ export async function resolveCheckoutOrder(body: {
 
   let subtotal = 0;
   let totalWeightKg = 0;
-  let depositSum = 0;
 
   for (const it of body.items) {
     const pid = it.productId!;
@@ -150,11 +169,6 @@ export async function resolveCheckoutOrder(body: {
     const wkg = Number.isFinite(w) && w > 0 ? w : 1;
     totalWeightKg += wkg * it.quantity;
 
-    const dep = p.depositAmount != null ? Number(p.depositAmount) : 0;
-    if (country === "SE" && Number.isFinite(dep) && dep > 0) {
-      depositSum += Math.round(dep * it.quantity);
-    }
-
     lineAcc.push({
       productId: pid,
       productName: p.name,
@@ -176,21 +190,17 @@ export async function resolveCheckoutOrder(body: {
   }
 
   const shipping = getShippingPrice(Math.max(0.1, totalWeightKg), country, deliveryOption);
-  const total = Math.max(0, Math.round(subtotal - discount + shipping));
-
-  const isDepositCheckout = country === "SE" && depositSum > 0;
-  const balanceDue = isDepositCheckout ? Math.max(0, total - Math.round(depositSum)) : null;
-  const stripeChargeSek = isDepositCheckout ? Math.round(depositSum) : total;
+  const total = Math.max(0, Math.round(subtotal - discount + shipping + coreKeepFeeSek));
+  const stripeChargeSek = total;
 
   return {
     ok: true,
     subtotal: Math.round(subtotal),
     discount,
     shipping,
+    coreKeepFeeSek,
+    commitsCoreReturnWithin14,
     total,
-    depositSum: Math.round(depositSum),
-    balanceDue,
-    isDepositCheckout,
     stripeChargeSek,
     lines: lineAcc,
   };

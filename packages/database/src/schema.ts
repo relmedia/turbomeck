@@ -1,4 +1,15 @@
-import { pgTable, serial, text, integer, timestamp, decimal, jsonb, foreignKey, primaryKey } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  boolean,
+  timestamp,
+  decimal,
+  jsonb,
+  foreignKey,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ============ AUTH.JS ============
@@ -74,8 +85,6 @@ export const products = pgTable("products", {
   thumbnails: jsonb("thumbnails").$type<string[]>().default([]), // Additional gallery images
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T","14t"] }] - customer must choose when adding to cart */
   attributes: jsonb("attributes").$type<{ name: string; options: string[] }[]>().default([]),
-  /** Core exchange: requires customer to send old part first. Deposit (SEK) paid upfront; balance paid after new part shipped */
-  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   /** Homepage slider: 1 = show in slider, 0 = hide; sliderOrder = display order (lower first) */
   featuredInSlider: integer("featured_in_slider").default(0),
   sliderOrder: integer("slider_order"),
@@ -183,6 +192,12 @@ export const orders = pgTable("orders", {
   stripeBalancePaymentId: text("stripe_balance_payment_id"),
   /** Set when store receives customer's old turbo part */
   coreReceivedAt: timestamp("core_received_at", { mode: "date" }),
+  /** Sweden: customer commits to return old turbo within 14 days (no upfront core fee). If false, core_keep_fee_sek charged at checkout. */
+  commitsCoreReturnWithin14: boolean("commits_core_return_within_14"),
+  /** SEK added to order total when customer declines core return (server-computed; do not trust client) */
+  coreKeepFeeSek: integer("core_keep_fee_sek").default(0).notNull(),
+  /** When commitsCoreReturnWithin14, deadline for receiving the old part */
+  coreReturnDeadline: timestamp("core_return_deadline", { mode: "date" }),
   postNordTrackingId: text("post_nord_tracking_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

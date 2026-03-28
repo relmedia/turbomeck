@@ -18,11 +18,12 @@ import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { getShippingPrice } from "@/lib/postnord";
 import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
+import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 
 
 const CartPage: React.FC = () => {
@@ -49,7 +50,7 @@ const CartPage: React.FC = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [savedAddress, setSavedAddress] = useState<SavedAddress | undefined>();
-  const [geoCountry, setGeoCountry] = useState<string | null>(null);
+  const [coreReturnChoice, setCoreReturnChoice] = useState<"return" | "keep" | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -60,13 +61,6 @@ const CartPage: React.FC = () => {
       setSavedAddress(undefined);
     }
   }, [userId]);
-
-  useEffect(() => {
-    fetch("/api/geo/country")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setGeoCountry(d?.country ?? null))
-      .catch(() => setGeoCountry(null));
-  }, []);
 
   const deliveryOption =
     shippingForm?.deliveryOption ?? shippingPreview?.deliveryOption ?? "servicepoint";
@@ -126,16 +120,55 @@ const CartPage: React.FC = () => {
       : shippingFromApi != null
         ? shippingFromApi
         : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
-  const total = subtotal - discount + shipping;
 
-  // Deposit flow: only for Sweden, determined by IP geolocation. Shipping form country does not affect deposit.
-  const orderDeposit = cart.reduce(
-    (acc, item) => acc + (item.depositAmount ?? 0) * item.quantity,
-    0
-  );
-  const isDepositOrder = orderDeposit > 0 && geoCountry === "SE";
-  const balanceDue = isDepositOrder ? Math.max(0, total - orderDeposit) : 0;
-  const amountToCharge = isDepositOrder ? orderDeposit : total;
+  const isSeDelivery = shippingCountry.toUpperCase() === "SE";
+
+  useEffect(() => {
+    if (!isSeDelivery) setCoreReturnChoice(null);
+  }, [isSeDelivery]);
+
+  const coreKeepFeeApplied =
+    isSeDelivery && coreReturnChoice === "keep" ? CORE_KEEP_FEE_SEK : 0;
+  const total = subtotal - discount + shipping + coreKeepFeeApplied;
+  const amountToCharge = total;
+
+  const mapItemsForCheckout = () =>
+    cart.map((item) => ({
+      productId: typeof item.id === "number" ? item.id : undefined,
+      productName: item.name,
+      productImage: item.images?.default || item.galleryImages?.[0],
+      variant: item.selectedVariant,
+      price: item.price,
+      quantity: item.quantity,
+    }));
+
+  const checkoutQuoteBody = useMemo(() => {
+    if (!shippingForm) return null;
+    const c = (shippingForm.country ?? "SE").toUpperCase();
+    if (c === "SE" && coreReturnChoice === null) return null;
+    return {
+      items: cart.map((item) => ({
+        productId: typeof item.id === "number" ? item.id : undefined,
+        productName: item.name,
+        productImage: item.images?.default || item.galleryImages?.[0],
+        variant: item.selectedVariant,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+      couponCode:
+        appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
+      country: shippingForm.country ?? "SE",
+      deliveryOption,
+      commitsCoreReturnWithin14: c === "SE" ? coreReturnChoice === "return" : undefined,
+    };
+  }, [
+    shippingForm,
+    cart,
+    appliedCoupon,
+    lastValidatedCode,
+    deliveryOption,
+    coreReturnChoice,
+  ]);
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim();
@@ -210,6 +243,8 @@ const CartPage: React.FC = () => {
       content: shippingForm ? (
         <PaymentForm
           total={amountToCharge}
+          checkoutQuoteBody={checkoutQuoteBody}
+          quoteIncompleteMessage={t("cart.quoteIncomplete")}
           getOrderPayload={() => ({
             userId: userId ?? undefined,
             email: shippingForm!.email,
@@ -227,18 +262,13 @@ const CartPage: React.FC = () => {
             shippingCost: shipping,
             discount,
             total,
-            depositAmount: isDepositOrder ? orderDeposit : undefined,
-            balanceDue: isDepositOrder ? balanceDue : undefined,
+            commitsCoreReturnWithin14:
+              (shippingForm!.country ?? "SE").toUpperCase() === "SE"
+                ? coreReturnChoice === "return"
+                : undefined,
             postNordTrackingId: undefined,
             locale: locale as "sv" | "en",
-            items: cart.map((item) => ({
-              productId: typeof item.id === "number" ? item.id : undefined,
-              productName: item.name,
-              productImage: item.images?.default || item.galleryImages?.[0],
-              variant: item.selectedVariant,
-              price: item.price,
-              quantity: item.quantity,
-            })),
+            items: mapItemsForCheckout(),
           })}
           onComplete={async (result) => {
             let postNordTrackingId: string | null = null;
@@ -291,19 +321,14 @@ const CartPage: React.FC = () => {
                 shippingCost: shipping,
                 discount,
                 total,
-                depositAmount: isDepositOrder ? orderDeposit : undefined,
-                balanceDue: isDepositOrder ? balanceDue : undefined,
+                commitsCoreReturnWithin14:
+                  (shippingForm!.country ?? "SE").toUpperCase() === "SE"
+                    ? coreReturnChoice === "return"
+                    : undefined,
                 stripePaymentId: result.stripePaymentId,
                 postNordTrackingId: postNordTrackingId ?? undefined,
                 locale: locale as "sv" | "en",
-                items: cart.map((item) => ({
-                  productId: typeof item.id === "number" ? item.id : undefined,
-                  productName: item.name,
-                  productImage: item.images?.default || item.galleryImages?.[0],
-                  variant: item.selectedVariant,
-                  price: item.price,
-                  quantity: item.quantity,
-                })),
+                items: mapItemsForCheckout(),
               });
               clearCart();
               const params = new URLSearchParams();
@@ -401,35 +426,59 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
-              {isDepositOrder && (
-                <>
-                  <div className="flex justify-between text-amber-700 dark:text-amber-400">
-                    <span>{t("cart.depositNow")}</span>
-                    <span className="font-medium">
-                      {orderDeposit.toLocaleString("sv-SE", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}{" "}
-                      kr
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground text-xs">
-                    <span>{t("cart.balanceLater")}</span>
+              {isSeDelivery && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                  <p className="text-sm font-medium">{t("cart.coreReturnTitle")}</p>
+                  <p className="text-xs text-muted-foreground">{t("cart.coreReturnIntro")}</p>
+                  <label className="flex items-start gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="core-return"
+                      className="mt-1"
+                      checked={coreReturnChoice === "return"}
+                      onChange={() => setCoreReturnChoice("return")}
+                    />
+                    <span>{t("cart.coreReturnOptionSend")}</span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="core-return"
+                      className="mt-1"
+                      checked={coreReturnChoice === "keep"}
+                      onChange={() => setCoreReturnChoice("keep")}
+                    />
                     <span>
-                      {balanceDue.toLocaleString("sv-SE", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}{" "}
-                      kr
+                      {t("cart.coreReturnOptionKeep", {
+                        amount: CORE_KEEP_FEE_SEK.toLocaleString("sv-SE"),
+                      })}
                     </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t("cart.depositInfo")}</p>
-                </>
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {t("cart.coreReturnInvoiceNote", {
+                      amount: CORE_KEEP_FEE_SEK.toLocaleString("sv-SE"),
+                    })}
+                  </p>
+                </div>
+              )}
+              {coreKeepFeeApplied > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{t("cart.coreKeepFeeLine")}</span>
+                  <span className="font-medium">
+                    {coreKeepFeeApplied.toLocaleString("sv-SE", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}{" "}
+                    kr
+                  </span>
+                </div>
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.vat")}</span>
                 <span className="font-medium">
-                  {Math.round((subtotal - discount + shipping) * 0.2).toLocaleString("sv-SE", {
+                  {Math.round(
+                    (subtotal - discount + shipping + coreKeepFeeApplied) * 0.2
+                  ).toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
                   })}{" "}
@@ -437,7 +486,7 @@ const CartPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-1">
-                <span>{isDepositOrder ? t("cart.depositNow") : t("cart.total")}</span>
+                <span>{t("cart.total")}</span>
                 <span>
                   {amountToCharge.toLocaleString("sv-SE", {
                     minimumFractionDigits: 0,

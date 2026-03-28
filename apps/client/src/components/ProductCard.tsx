@@ -125,11 +125,6 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
       <Card className="h-full w-full max-w-sm overflow-hidden group bg-background text-foreground shadow-none rounded-md flex flex-col pt-0 pb-4 gap-3">
         {/* Image carousel */}
         <div className="relative aspect-square overflow-hidden bg-muted">
-          {isSweden && product.depositAmount != null && product.depositAmount > 0 && (
-            <span className="absolute top-3 left-3 z-20 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-md">
-              Utbytes
-            </span>
-          )}
           {!imageLoaded && (
             <Skeleton className="absolute inset-x-0 top-0 bottom-16 z-10 rounded-none" />
           )}

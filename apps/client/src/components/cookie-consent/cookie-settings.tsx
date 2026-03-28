@@ -15,16 +15,29 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useCookieConsent, defaultCategories } from "./cookie-provider"
-import type { ConsentCategories, ConsentCategory } from "./types"
+import type { CategoryConfig, ConsentCategories, ConsentCategory } from "./types"
 import { getDefaultCategories, getAllAcceptedCategories } from "./utils"
 import { cn } from "@/lib/utils"
+import { useTranslation } from "@/i18n/context"
 
 export interface CookieSettingsProps {
   className?: string
 }
 
+function categoryLabels(
+  category: CategoryConfig,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
+  return {
+    title: category.title ?? t(`cookies.category.${category.key}.title`),
+    description:
+      category.description ?? t(`cookies.category.${category.key}.description`),
+  }
+}
+
 export function CookieSettings({ className }: CookieSettingsProps) {
   const { isSettingsOpen, closeSettings, state, updateConsent, config, acceptAll, rejectAll } = useCookieConsent()
+  const t = useTranslation()
 
   const categories = config.categories ?? defaultCategories
 
@@ -74,8 +87,8 @@ export function CookieSettings({ className }: CookieSettingsProps) {
               <Shield className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <DialogTitle>Cookie-inställningar</DialogTitle>
-              <DialogDescription>Hantera dina cookie-preferenser nedan.</DialogDescription>
+              <DialogTitle>{t("footer.cookieSettings")}</DialogTitle>
+              <DialogDescription>{t("cookies.settingsDescription")}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -86,6 +99,7 @@ export function CookieSettings({ className }: CookieSettingsProps) {
           {categories.map((category) => {
             const isEnabled = localCategories[category.key]
             const isRequired = category.required
+            const { title: catTitle, description: catDesc } = categoryLabels(category, t)
 
             return (
               <div
@@ -98,20 +112,22 @@ export function CookieSettings({ className }: CookieSettingsProps) {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Label htmlFor={`cookie-${category.key}`} className="text-sm font-medium cursor-pointer">
-                      {category.title}
+                      {catTitle}
                     </Label>
                     {isRequired && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Required</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {t("cookies.requiredBadge")}
+                      </span>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{category.description}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{catDesc}</p>
                 </div>
                 <Switch
                   id={`cookie-${category.key}`}
                   checked={isEnabled}
                   onCheckedChange={(checked) => handleToggle(category.key, checked)}
                   disabled={isRequired}
-                  aria-label={`Toggle ${category.title} cookies`}
+                  aria-label={t("cookies.toggleAria", { name: catTitle })}
                 />
               </div>
             )
@@ -122,27 +138,27 @@ export function CookieSettings({ className }: CookieSettingsProps) {
 
         <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button variant="outline" size="sm" onClick={handleRejectAll} className="w-full sm:w-auto bg-transparent">
-            Avvisa alla
+            {t("cookies.rejectAll")}
           </Button>
           <Button variant="outline" size="sm" onClick={handleAcceptAll} className="w-full sm:w-auto bg-transparent">
-            Acceptera alla
+            {t("cookies.acceptAll")}
           </Button>
           <Button size="sm" onClick={handleSave} className="w-full sm:w-auto gap-2">
             <Check className="h-4 w-4" />
-            Spara inställningar
+            {t("cookies.saveSettings")}
           </Button>
         </DialogFooter>
 
         {config.privacyPolicyUrl && (
           <p className="text-xs text-center text-muted-foreground">
-            Läs vår{" "}
+            {t("cookies.privacyLead")}{" "}
             <a
               href={config.privacyPolicyUrl}
               className="underline underline-offset-4 hover:text-foreground transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
-              integritetspolicy
+              {t("footer.privacy")}
             </a>
           </p>
         )}

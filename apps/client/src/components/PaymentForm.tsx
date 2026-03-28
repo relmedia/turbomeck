@@ -33,8 +33,7 @@ export type PendingOrderPayload = {
   shippingCost: number;
   discount: number;
   total: number;
-  depositAmount?: number;
-  balanceDue?: number;
+  commitsCoreReturnWithin14?: boolean;
   postNordTrackingId?: string;
   locale?: "sv" | "en";
   items: Array<{
@@ -47,10 +46,27 @@ export type PendingOrderPayload = {
   }>;
 };
 
+/** Passed to /api/stripe/create-payment-intent — amount is computed server-side from DB prices. */
+export type CheckoutQuoteBody = {
+  items: PendingOrderPayload["items"];
+  couponCode?: string;
+  country: string;
+  deliveryOption: string;
+  commitsCoreReturnWithin14?: boolean;
+};
+
 type PaymentFormProps = {
+  /** Label / fallback; actual charge uses server quote when `checkoutQuoteBody` is set. */
   total: number;
+  /**
+   * When set: payment intent uses server-side checkout quote (secure).
+   * `null` = not ready (e.g. missing SE core choice). Omit for legacy balance pay ({ amount: total }).
+   */
+  checkoutQuoteBody?: CheckoutQuoteBody | null;
   getOrderPayload: () => PendingOrderPayload;
   onComplete?: (result: { stripePaymentId: string }) => void;
+  /** Shown when `checkoutQuoteBody` is null (e.g. Swedish customer must pick core option first). */
+  quoteIncompleteMessage?: string;
 };
 
 function CheckoutForm({
@@ -202,7 +218,13 @@ function CheckoutForm({
   );
 }
 
-export default function PaymentForm({ total, getOrderPayload, onComplete }: PaymentFormProps) {
+export default function PaymentForm({
+  total,
+  checkoutQuoteBody,
+  getOrderPayload,
+  onComplete,
+  quoteIncompleteMessage,
+}: PaymentFormProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
@@ -229,15 +251,37 @@ export default function PaymentForm({ total, getOrderPayload, onComplete }: Paym
   }, []);
 
   useEffect(() => {
-    if (!stripePromise || total <= 0) return;
+    if (!stripePromise) return;
+
+    const useQuote = checkoutQuoteBody !== undefined;
+    if (useQuote && checkoutQuoteBody === null) {
+      setClientSecret(null);
+      setPaymentIntentId(null);
+      setLoading(false);
+      setApiError(null);
+      return;
+    }
+
+    if (!useQuote && total <= 0) return;
 
     setLoading(true);
     setApiError(null);
 
+    const body =
+      useQuote && checkoutQuoteBody
+        ? {
+            items: checkoutQuoteBody.items,
+            couponCode: checkoutQuoteBody.couponCode,
+            country: checkoutQuoteBody.country,
+            deliveryOption: checkoutQuoteBody.deliveryOption,
+            commitsCoreReturnWithin14: checkoutQuoteBody.commitsCoreReturnWithin14,
+          }
+        : { amount: total };
+
     fetch("/api/stripe/create-payment-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: total }),
+      body: JSON.stringify(body),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -247,7 +291,7 @@ export default function PaymentForm({ total, getOrderPayload, onComplete }: Paym
       })
       .catch((err) => setApiError(err.message ?? "Kunde inte starta betalning"))
       .finally(() => setLoading(false));
-  }, [stripePromise, total]);
+  }, [stripePromise, total, checkoutQuoteBody]);
 
   if (!stripePromise && !apiError) {
     return (
@@ -284,6 +328,11 @@ export default function PaymentForm({ total, getOrderPayload, onComplete }: Paym
   }
 
   if (!clientSecret) {
+    if (checkoutQuoteBody === null && quoteIncompleteMessage) {
+      return (
+        <p className="text-sm text-muted-foreground py-4">{quoteIncompleteMessage}</p>
+      );
+    }
     return null;
   }
 

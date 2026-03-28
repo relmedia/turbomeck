@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { Cookie, Settings } from "lucide-react";
 import { useCookieConsent } from "./cookie-provider";
+import { useTranslation } from "@/i18n/context";
 
 export interface CookieBannerProps {
   className?: string;
@@ -12,6 +13,7 @@ export interface CookieBannerProps {
 export function CookieBanner({ className }: CookieBannerProps) {
   const { isBannerVisible, acceptAll, rejectAll, openSettings, config } =
     useCookieConsent();
+  const t = useTranslation();
 
   const positionClasses = {
     bottom: "inset-x-0 bottom-0",
@@ -75,13 +77,13 @@ export function CookieBanner({ className }: CookieBannerProps) {
                     className="gap-2 bg-transparent"
                   >
                     <Settings className="h-4 w-4" />
-                    Anpassa
+                    {t("cookies.customize")}
                   </Button>
                   <Button size="sm" onClick={rejectAll}>
-                    Avvisa alla
+                    {t("cookies.rejectAll")}
                   </Button>
                   <Button size="sm" onClick={acceptAll}>
-                    Acceptera alla
+                    {t("cookies.acceptAll")}
                   </Button>
                 </div>
               </div>

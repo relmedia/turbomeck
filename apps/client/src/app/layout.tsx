@@ -47,30 +47,10 @@ export default function RootLayout({
               privacyPolicyUrl: "/privacy",
               position: "bottom",
               categories: [
-                {
-                  key: "necessary",
-                  title: "Nödvändiga",
-                  description:
-                    "Väsentliga cookies som behövs för att webbplatsen ska fungera. Dessa kan inte stängas av.",
-                  required: true,
-                },
-                {
-                  key: "analytics",
-                  title: "Analys",
-                  description:
-                    "Cookies som hjälper oss förstå hur besökare använder webbplatsen.",
-                },
-                {
-                  key: "marketing",
-                  title: "Marknadsföring",
-                  description:
-                    "Cookies för reklam och spårning över webbplatser.",
-                },
-                {
-                  key: "preferences",
-                  title: "Inställningar",
-                  description: "Cookies som sparar dina val och preferenser.",
-                },
+                { key: "necessary", required: true },
+                { key: "analytics" },
+                { key: "marketing" },
+                { key: "preferences" },
               ],
             }}
           >

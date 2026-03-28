@@ -37,29 +37,10 @@ const CookieConsentContext =
   React.createContext<CookieConsentContextValue | null>(null);
 
 export const defaultCategories: CategoryConfig[] = [
-  {
-    key: "necessary",
-    title: "Necessary",
-    description:
-      "Essential cookies required for the website to function properly. These cannot be disabled.",
-    required: true,
-  },
-  {
-    key: "analytics",
-    title: "Analytics",
-    description:
-      "Cookies that help us understand how visitors interact with our website.",
-  },
-  {
-    key: "marketing",
-    title: "Marketing",
-    description: "Cookies used for advertising and tracking across websites.",
-  },
-  {
-    key: "preferences",
-    title: "Preferences",
-    description: "Cookies that remember your settings and preferences.",
-  },
+  { key: "necessary", required: true },
+  { key: "analytics" },
+  { key: "marketing" },
+  { key: "preferences" },
 ];
 
 interface CookieConsentProviderProps {

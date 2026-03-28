@@ -52,6 +52,9 @@ type OrderDetail = {
   total: number;
   depositAmount?: number;
   balanceDue?: number;
+  commitsCoreReturnWithin14?: boolean | null;
+  coreKeepFeeSek?: number;
+  coreReturnDeadline?: string | null;
   coreReceivedAt?: string | null;
   status?: string;
   deliveryStatus: "processing" | "shipped" | "out_for_delivery" | "delivered";
@@ -332,6 +335,23 @@ export default function OrderDetailPage() {
                       </p>
                     </div>
                   </div>
+                  {(order.commitsCoreReturnWithin14 === true || order.coreKeepFeeSek) && (
+                    <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
+                      <p className="font-medium text-sm">Kärnretur (nya flödet)</p>
+                      {order.commitsCoreReturnWithin14 === true && order.coreReturnDeadline && (
+                        <p className="text-muted-foreground">
+                          Kund åtar sig retur av gammal turbo senast{" "}
+                          {formatDate(new Date(order.coreReturnDeadline).toISOString().slice(0, 10))}.
+                          Vid utebliven retur kan 1&nbsp;000 kr faktureras (se köpvillkor).
+                        </p>
+                      )}
+                      {order.coreKeepFeeSek != null && order.coreKeepFeeSek > 0 && (
+                        <p className="text-muted-foreground">
+                          Kärnavgift betald i kassan: {formatCurrency(order.coreKeepFeeSek)}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {order.depositAmount != null && order.depositAmount > 0 && order.balanceDue != null && order.balanceDue > 0 && !order.coreReceivedAt && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -408,6 +428,12 @@ export default function OrderDetailPage() {
                 <div className="flex justify-between text-emerald-600">
                   <span>Rabatt</span>
                   <span>-{formatCurrency(order.discount)}</span>
+                </div>
+              )}
+              {order.coreKeepFeeSek != null && order.coreKeepFeeSek > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Kärnavgift</span>
+                  <span>{formatCurrency(order.coreKeepFeeSek)}</span>
                 </div>
               )}
               {order.depositAmount != null && order.depositAmount > 0 && (

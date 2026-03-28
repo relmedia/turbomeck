@@ -3,6 +3,7 @@ import { Cookie } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCookieConsent } from "./cookie-provider"
 import { cn } from "@/lib/utils"
+import { useTranslation } from "@/i18n/context"
 
 export interface CookieTriggerProps {
   className?: string
@@ -15,6 +16,8 @@ export interface CookieTriggerProps {
  */
 export function CookieTrigger({ className, variant = "text", children }: CookieTriggerProps) {
   const { openSettings, state } = useCookieConsent()
+  const t = useTranslation()
+  const cookieLabel = t("footer.cookieSettings")
 
   if (!state.hasConsented) {
     return null
@@ -27,7 +30,7 @@ export function CookieTrigger({ className, variant = "text", children }: CookieT
         size="icon"
         onClick={openSettings}
         className={cn("h-8 w-8", className)}
-        aria-label="Cookie settings"
+        aria-label={cookieLabel}
       >
         <Cookie className="h-4 w-4" />
       </Button>
@@ -38,20 +41,21 @@ export function CookieTrigger({ className, variant = "text", children }: CookieT
     return (
       <Button variant="outline" size="sm" onClick={openSettings} className={cn("gap-2", className)}>
         <Cookie className="h-4 w-4" />
-        {children ?? "Cookie Settings"}
+        {children ?? cookieLabel}
       </Button>
     )
   }
 
   return (
     <button
+      type="button"
       onClick={openSettings}
       className={cn(
         "text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
         className,
       )}
     >
-      {children ?? "Cookie Settings"}
+      {children ?? cookieLabel}
     </button>
   )
 }
