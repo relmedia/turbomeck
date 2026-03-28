@@ -73,6 +73,33 @@ function getMagicLinkBase(): string {
   );
 }
 
+function isAdminStudioAuthApp(): boolean {
+  return (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/");
+}
+
+/**
+ * Auth.js often puts storefront callbackUrl in the query even for studio sign-in; force staff return URL.
+ */
+function coerceAdminMagicLinkCallback(link: string, base: URL): string {
+  try {
+    const u = new URL(link);
+    const cb = u.searchParams.get("callbackUrl");
+    if (!cb) return link;
+    const decoded = decodeURIComponent(cb);
+    let cbAbs: URL;
+    try {
+      cbAbs = new URL(decoded);
+    } catch {
+      cbAbs = new URL(decoded.startsWith("/") ? decoded : `/${decoded}`, base.origin);
+    }
+    if (cbAbs.origin === base.origin) return link;
+    u.searchParams.set("callbackUrl", `${base.origin}/`);
+    return u.toString();
+  } catch {
+    return link;
+  }
+}
+
 /**
  * Emailed magic links must hit the same Next.js app that sent the email (studio subdomain vs shop).
  * Auth.js may pass the storefront origin or a relative path; rewrite using this app’s PUBLIC_AUTH_ORIGIN.
@@ -90,15 +117,22 @@ function magicLinkUrlForThisApp(url: string): string {
   try {
     const normalizedBase = baseRaw.replace(/\/$/, "");
     const base = new URL(normalizedBase);
-    let pathWithQuery: string;
+    let out: string;
     if (url.startsWith("http://") || url.startsWith("https://")) {
       const parsed = new URL(url);
-      if (parsed.origin === base.origin) return url;
-      pathWithQuery = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      if (parsed.origin === base.origin) {
+        out = parsed.toString();
+      } else {
+        out = new URL(`${parsed.pathname}${parsed.search}${parsed.hash}`, base.origin).toString();
+      }
     } else {
-      pathWithQuery = url.startsWith("/") ? url : `/${url}`;
+      const pathWithQuery = url.startsWith("/") ? url : `/${url}`;
+      out = new URL(pathWithQuery, base.origin).toString();
     }
-    return new URL(pathWithQuery, base.origin).toString();
+    if (isAdminStudioAuthApp()) {
+      out = coerceAdminMagicLinkCallback(out, base);
+    }
+    return out;
   } catch {
     return url;
   }
@@ -141,6 +175,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
             : {},
         });
+        if (
+          process.env["NODE_ENV"] === "production" &&
+          isAdminStudioAuthApp() &&
+          !getMagicLinkBase()
+        ) {
+          console.error(
+            "[@repo/auth] Admin: set NEXTAUTH_URL=https://studio… in apps/admin/.env (and PM2) so magic links are not sent as storefront URLs.",
+          );
+        }
         const link = magicLinkUrlForThisApp(url);
         const { html, text } = renderMagicLinkEmail(link);
         await transporter.sendMail({
