@@ -60,6 +60,23 @@ declare module "next-auth" {
 
 export { renderTestEmail } from "./email-templates";
 
+/**
+ * Emailed magic links must land on the same Next.js app that handled sign-in (studio vs storefront).
+ * Auth.js can build the wrong origin (e.g. apex) if headers/env disagree; force AUTH_URL / NEXTAUTH_URL.
+ */
+function magicLinkUrlForThisApp(url: string): string {
+  const baseRaw = process.env.AUTH_URL?.trim() || process.env.NEXTAUTH_URL?.trim();
+  if (!baseRaw) return url;
+  try {
+    const parsed = new URL(url);
+    const base = new URL(baseRaw);
+    if (parsed.origin === base.origin) return url;
+    return new URL(`${parsed.pathname}${parsed.search}${parsed.hash}`, base.origin).toString();
+  } catch {
+    return url;
+  }
+}
+
 /** Storefront vs admin: each Next.js app sets AUTH_SIGNIN_PATH (and AUTH_VERIFY_PATH) in its own .env. */
 const authSignInPath = process.env.AUTH_SIGNIN_PATH?.trim() || "/logga-in";
 const authVerifyPath =
@@ -97,7 +114,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
             : {},
         });
-        const { html, text } = renderMagicLinkEmail(url);
+        const link = magicLinkUrlForThisApp(url);
+        const { html, text } = renderMagicLinkEmail(link);
         await transporter.sendMail({
           from: config.from || config.user || "noreply@localhost",
           to: email,

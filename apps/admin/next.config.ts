@@ -7,6 +7,13 @@ process.env.AUTH_SIGNIN_PATH = "/";
 process.env.AUTH_VERIFY_PATH =
   process.env.AUTH_VERIFY_PATH?.trim() || "/studio/verify";
 
+/* Auth.js uses AUTH_URL for absolute URLs in emails; keep both in sync (NEXTAUTH_URL wins if both set). */
+const adminPublicUrl = process.env.NEXTAUTH_URL?.trim() || process.env.AUTH_URL?.trim();
+if (adminPublicUrl) {
+  process.env.AUTH_URL = adminPublicUrl;
+  process.env.NEXTAUTH_URL = adminPublicUrl;
+}
+
 function getR2ImagePattern() {
   try {
     const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
@@ -31,8 +38,16 @@ const nextConfig: NextConfig = {
     };
   },
   env: {
-    // Must be inlined for client; read from apps/admin/.env (falls back for dev).
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3001",
+    /* Inlined for next-auth/react. Never default to http://localhost in production builds
+     * (mixed content / wrong origin). Set NEXTAUTH_URL or AUTH_URL on the server and at build time. */
+    ...((() => {
+      const url = adminPublicUrl;
+      if (url) return { NEXTAUTH_URL: url };
+      if (process.env.NODE_ENV === "development") {
+        return { NEXTAUTH_URL: "http://localhost:3001" };
+      }
+      return {};
+    })()),
   },
   turbopack: {
     root: path.resolve(__dirname, "../.."),

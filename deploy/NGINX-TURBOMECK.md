@@ -35,7 +35,11 @@ Maps at the top only cover **`/api/reviews`** routing between apps.
    NEXTAUTH_URL=https://studio.turbomeck.cloud
    ```
 
+   **Magic-link emails** use this origin; if either points at **`https://turbomeck.cloud`**, the link completes login on the **shop** instead of studio. PM2 mirrors `NEXTAUTH_URL` into `AUTH_URL` when needed.
+
    The admin app forces `AUTH_SIGNIN_PATH=/` (via `next.config.ts` and PM2) so NextAuth does not send staff to `/studio` in the URL bar. Optionally set `AUTH_VERIFY_PATH` if you move the “check your email” page (default `/studio/verify`).
+
+   **“Not secure” / broken padlock** usually means mixed content (an HTTPS page loading `http://…` assets) or a certificate problem. Set **`NEXTAUTH_URL`** / **`AUTH_URL`** to `https://studio.turbomeck.cloud` for production builds, and avoid **`NEXT_PUBLIC_UPLOADS_BASE`** pointing at plain HTTP; omit it so `/uploads/` stays same-origin, or use an HTTPS URL. After updating nginx, reload to apply **HSTS** on the studio vhost.
 
    Restart admin after changes:
 

@@ -3,13 +3,15 @@
  * to the public R2 URL when NEXT_PUBLIC_R2_PUBLIC_URL is set – the S3 endpoint returns
  * 400 for unauthenticated requests.
  */
-const UPLOADS_BASE =
-  process.env.NEXT_PUBLIC_UPLOADS_BASE || "http://localhost:3001";
+/** Same-origin by default so https://studio… never pulls http://localhost (mixed → “not secure”). */
+const UPLOADS_BASE = (process.env.NEXT_PUBLIC_UPLOADS_BASE || "").replace(/\/$/, "");
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 export function resolveImageUrl(path: string | null): string {
   if (!path) return "/products/1g.png";
-  if (path.startsWith("/uploads/")) return `${UPLOADS_BASE}${path}`;
+  if (path.startsWith("/uploads/")) {
+    return UPLOADS_BASE ? `${UPLOADS_BASE}${path}` : path;
+  }
   if (path.startsWith("http")) {
     if (R2_PUBLIC_URL && path.includes("r2.cloudflarestorage.com")) {
       try {

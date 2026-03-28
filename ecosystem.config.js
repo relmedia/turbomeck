@@ -103,6 +103,11 @@ module.exports = {
         ...adminEnv,
         AUTH_SIGNIN_PATH: "/",
         AUTH_VERIFY_PATH: adminEnv.AUTH_VERIFY_PATH?.trim() || "/studio/verify",
+        ...((): Record<string, string> => {
+          /* Prefer NEXTAUTH_URL so a mistaken storefront AUTH_URL in .env does not steal magic links. */
+          const u = (adminEnv.NEXTAUTH_URL || adminEnv.AUTH_URL || "").trim();
+          return u ? { AUTH_URL: u } : {};
+        })(),
         PORT: "3001",
       },
       instances: 1,
