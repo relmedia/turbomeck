@@ -33,9 +33,11 @@ Maps at the top only cover **`/api/reviews`** routing between apps.
    ```env
    AUTH_URL=https://studio.turbomeck.cloud
    NEXTAUTH_URL=https://studio.turbomeck.cloud
+   # Optional; PM2 + admin next.config also set this from the two lines above:
+   # PUBLIC_AUTH_ORIGIN=https://studio.turbomeck.cloud
    ```
 
-   **Magic-link emails** use this origin; if either points at **`https://turbomeck.cloud`**, the link completes login on the **shop** instead of studio. PM2 mirrors `NEXTAUTH_URL` into `AUTH_URL` when needed.
+   **Magic-link emails** must use **`https://studio.turbomeck.cloud`**, not the shop apex. The admin app sets **`PUBLIC_AUTH_ORIGIN`** (and syncs **`AUTH_URL`**) from **`NEXTAUTH_URL`** so the email button targets the admin callback. After changing `.env`, rebuild admin and request a **new** mail; old links still point at the old host.
 
    The admin app forces `AUTH_SIGNIN_PATH=/` (via `next.config.ts` and PM2) so NextAuth does not send staff to `/studio` in the URL bar. Optionally set `AUTH_VERIFY_PATH` if you move the “check your email” page (default `/studio/verify`).
 

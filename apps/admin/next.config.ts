@@ -13,6 +13,13 @@ if (adminPublicUrl) {
   process.env.AUTH_URL = adminPublicUrl;
   process.env.NEXTAUTH_URL = adminPublicUrl;
 }
+/* Emails: @repo/auth rewrites callback links to this origin (must match the host users open in the browser). */
+const adminMagicLinkOrigin =
+  adminPublicUrl ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:3001" : "");
+if (adminMagicLinkOrigin) {
+  process.env.PUBLIC_AUTH_ORIGIN = adminMagicLinkOrigin;
+}
 
 function getR2ImagePattern() {
   try {

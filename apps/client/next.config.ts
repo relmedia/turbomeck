@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const clientPublicUrl = process.env.NEXTAUTH_URL?.trim() || process.env.AUTH_URL?.trim();
+if (clientPublicUrl) {
+  process.env.AUTH_URL = clientPublicUrl;
+  process.env.NEXTAUTH_URL = clientPublicUrl;
+  process.env.PUBLIC_AUTH_ORIGIN = clientPublicUrl;
+} else if (process.env.NODE_ENV === "development") {
+  process.env.PUBLIC_AUTH_ORIGIN = "http://localhost:3000";
+}
+
 function getR2ImagePattern() {
   try {
     const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
@@ -27,7 +36,7 @@ const nextConfig: NextConfig = {
   },
   env: {
     // Pin next-auth/react to this app’s origin (avoid redirects to admin :3001 in dev).
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
+    NEXTAUTH_URL: clientPublicUrl || "http://localhost:3000",
   },
   outputFileTracingRoot: path.join(__dirname, "../../"),
   webpack: (config) => {

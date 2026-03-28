@@ -61,17 +61,44 @@ declare module "next-auth" {
 export { renderTestEmail } from "./email-templates";
 
 /**
- * Emailed magic links must land on the same Next.js app that handled sign-in (studio vs storefront).
- * Auth.js can build the wrong origin (e.g. apex) if headers/env disagree; force AUTH_URL / NEXTAUTH_URL.
+ * Canonical public origin for this Node process (set in each app’s next.config + PM2).
+ * Bracket access avoids some bundlers inlining the wrong value at build time.
+ */
+function getMagicLinkBase(): string {
+  return (
+    process.env["PUBLIC_AUTH_ORIGIN"]?.trim() ||
+    process.env["NEXTAUTH_URL"]?.trim() ||
+    process.env["AUTH_URL"]?.trim() ||
+    ""
+  );
+}
+
+/**
+ * Emailed magic links must hit the same Next.js app that sent the email (studio subdomain vs shop).
+ * Auth.js may pass the storefront origin or a relative path; rewrite using this app’s PUBLIC_AUTH_ORIGIN.
  */
 function magicLinkUrlForThisApp(url: string): string {
-  const baseRaw = process.env.AUTH_URL?.trim() || process.env.NEXTAUTH_URL?.trim();
-  if (!baseRaw) return url;
+  const baseRaw = getMagicLinkBase();
+  if (!baseRaw) {
+    if (process.env["NODE_ENV"] !== "production") {
+      console.warn(
+        "[@repo/auth] Set PUBLIC_AUTH_ORIGIN or NEXTAUTH_URL in this app so magic links use the correct host.",
+      );
+    }
+    return url;
+  }
   try {
-    const parsed = new URL(url);
-    const base = new URL(baseRaw);
-    if (parsed.origin === base.origin) return url;
-    return new URL(`${parsed.pathname}${parsed.search}${parsed.hash}`, base.origin).toString();
+    const normalizedBase = baseRaw.replace(/\/$/, "");
+    const base = new URL(normalizedBase);
+    let pathWithQuery: string;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      const parsed = new URL(url);
+      if (parsed.origin === base.origin) return url;
+      pathWithQuery = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } else {
+      pathWithQuery = url.startsWith("/") ? url : `/${url}`;
+    }
+    return new URL(pathWithQuery, base.origin).toString();
   } catch {
     return url;
   }
