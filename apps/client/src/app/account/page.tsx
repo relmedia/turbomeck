@@ -51,7 +51,7 @@ import OrderDetailModal from "@/components/OrderDetailModal";
 import OrderReviewsModal from "@/components/OrderReviewsModal";
 import { type SavedAddress } from "@/types";
 import { useWishlist } from "@/hooks/useWishlist";
-import { normalizeShopOrderNumber, productUrl } from "@/lib/utils";
+import { cn, normalizeShopOrderNumber, productUrl } from "@/lib/utils";
 
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
@@ -81,10 +81,30 @@ export default function AccountPage() {
 
   function orderStatusLabel(s: string) {
     if (s === "confirmed") return t("account.orderStatusConfirmed");
+    if (s === "deposit_paid") return t("account.orderStatusDepositPaid");
     if (s === "shipped") return t("account.orderStatusShipped");
     if (s === "delivered") return t("account.orderStatusDelivered");
+    if (s === "completed") return t("account.orderStatusCompleted");
     if (s === "cancelled") return t("account.orderStatusCancelled");
     return s;
+  }
+
+  /** Matches order detail modal palette: warm processing, blue in transit, green done. */
+  function orderStatusBadgeClass(s: string): string {
+    switch (s) {
+      case "confirmed":
+      case "deposit_paid":
+        return "border-amber-500/30 bg-amber-500/12 text-amber-950 dark:border-amber-400/35 dark:bg-amber-400/15 dark:text-amber-100";
+      case "shipped":
+        return "border-sky-500/30 bg-sky-500/12 text-sky-950 dark:border-sky-400/35 dark:bg-sky-400/15 dark:text-sky-100";
+      case "delivered":
+      case "completed":
+        return "border-emerald-500/30 bg-emerald-500/12 text-emerald-950 dark:border-emerald-400/35 dark:bg-emerald-400/15 dark:text-emerald-100";
+      case "cancelled":
+        return "border-rose-500/35 bg-rose-500/12 text-rose-950 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-100";
+      default:
+        return "border-border bg-muted/70 text-muted-foreground";
+    }
   }
   const { data: session, status, update: updateSession } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -574,7 +594,9 @@ export default function AccountPage() {
                       ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
                       : null;
                     const trackingPending =
-                      (order.status === "shipped" || order.status === "delivered") &&
+                      (order.status === "shipped" ||
+                        order.status === "delivered" ||
+                        order.status === "completed") &&
                       !order.postNordTrackingId;
                     const statusLabel = orderStatusLabel(order.status);
                     const stripeInfo = order.stripePaymentId
@@ -639,7 +661,12 @@ export default function AccountPage() {
                               )}{" "}
                               {t("common.kr")}
                               <span className="text-border mx-1.5">·</span>
-                              <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/80">
+                              <span
+                                className={cn(
+                                  "rounded-md border px-1.5 py-0.5 text-[11px] font-semibold leading-tight tracking-tight",
+                                  orderStatusBadgeClass(order.status),
+                                )}
+                              >
                                 {statusLabel}
                               </span>
                             </p>

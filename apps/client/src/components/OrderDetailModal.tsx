@@ -68,16 +68,20 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
   const statusLabel =
     order.status === "confirmed"
       ? t("orderDetail.orderStatusConfirmed")
-      : order.status === "shipped"
-        ? t("orderDetail.orderStatusShipped")
-        : order.status === "delivered"
-          ? t("orderDetail.orderStatusDelivered")
-          : order.status === "cancelled"
-            ? t("orderDetail.orderStatusCancelled")
-            : order.status;
+      : order.status === "deposit_paid"
+        ? t("orderDetail.orderStatusDepositPaid")
+        : order.status === "shipped"
+          ? t("orderDetail.orderStatusShipped")
+          : order.status === "delivered"
+            ? t("orderDetail.orderStatusDelivered")
+            : order.status === "completed"
+              ? t("orderDetail.orderStatusCompleted")
+              : order.status === "cancelled"
+                ? t("orderDetail.orderStatusCancelled")
+                : order.status;
 
   const statusBadge =
-    order.status === "confirmed"
+    order.status === "confirmed" || order.status === "deposit_paid"
       ? {
           Icon: Package,
           className:
@@ -88,7 +92,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
             Icon: Truck,
             className: "border-sky-500/25 bg-sky-500/10 text-sky-900 dark:text-sky-200",
           }
-        : order.status === "delivered"
+        : order.status === "delivered" || order.status === "completed"
           ? {
               Icon: CheckCircle2,
               className:
@@ -118,8 +122,10 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
     Boolean(trackingUrl) ||
     (order.status !== "cancelled" &&
       (order.status === "confirmed" ||
+        order.status === "deposit_paid" ||
         order.status === "shipped" ||
-        order.status === "delivered"));
+        order.status === "delivered" ||
+        order.status === "completed"));
 
   return (
     <div
@@ -196,12 +202,14 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                     <OrderTrackingPanel orderId={order.id} />
                   </div>
                 </div>
-              ) : order.status === "confirmed" ? (
+              ) : order.status === "confirmed" || order.status === "deposit_paid" ? (
                 <p className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/80" aria-hidden />
                   <span>{t("orderDetail.trackingWhenShipped")}</span>
                 </p>
-              ) : (order.status === "shipped" || order.status === "delivered") &&
+              ) : (order.status === "shipped" ||
+                  order.status === "delivered" ||
+                  order.status === "completed") &&
                 !order.postNordTrackingId ? (
                 <p className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/80" aria-hidden />
