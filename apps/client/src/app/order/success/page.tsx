@@ -4,12 +4,17 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowRight, Home, Loader2, CheckCircle } from "lucide-react";
+import { ArrowRight, ExternalLink, Home, Loader2, CheckCircle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Confetti } from "@/components/ui/confetti";
 import { createOrder, fetchOrder } from "@/lib/api";
 import useCartStore from "@/stores/cartStore";
 import { useLanguage, useTranslation } from "@/i18n/context";
+import { completePostNordSessionFromCheckoutPayload } from "@/lib/complete-postnord-session";
+import type { PendingOrderPayload } from "@/components/PaymentForm";
+
+const POSTNORD_TRACKING_BASE =
+  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
 function OrderSuccessContent() {
   const router = useRouter();
@@ -20,6 +25,7 @@ function OrderSuccessContent() {
   const orderIdParam = searchParams.get("orderId");
   const orderTokenParam = searchParams.get("token");
   const totalParam = searchParams.get("total");
+  const trackingParam = searchParams.get("tracking");
   const [paymentIntent, setPaymentIntent] = useState<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -70,9 +76,9 @@ function OrderSuccessContent() {
       setPendingCreate(false);
       return;
     }
-    let payload: Parameters<typeof createOrder>[0];
+    let payload: PendingOrderPayload;
     try {
-      payload = JSON.parse(raw);
+      payload = JSON.parse(raw) as PendingOrderPayload;
     } catch {
       setPendingCreate(false);
       return;
@@ -82,7 +88,30 @@ function OrderSuccessContent() {
     try {
       sessionStorage.setItem("orderSuccessTotal", String(totalNum));
     } catch { /* non-blocking */ }
-    createOrder({ ...payload, stripePaymentId: paymentIntent })
+
+    (async () => {
+      let postNordTrackingId = payload.postNordTrackingId ?? null;
+      if (!postNordTrackingId && payload.postNordSessionId) {
+        postNordTrackingId = await completePostNordSessionFromCheckoutPayload({
+          postNordSessionId: payload.postNordSessionId,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          email: payload.email,
+          phone: payload.phone,
+          address: payload.address,
+          city: payload.city,
+          postalCode: payload.postalCode,
+          country: payload.country,
+        });
+      }
+      const { postNordSessionId: _sn, ...orderPayload } = payload;
+      void _sn;
+      return createOrder({
+        ...orderPayload,
+        stripePaymentId: paymentIntent,
+        postNordTrackingId: postNordTrackingId ?? undefined,
+      });
+    })()
       .then((order) => {
         sessionStorage.removeItem("pendingStripeOrder");
         clearCart();
@@ -194,6 +223,10 @@ function OrderSuccessContent() {
     clientTotal ??
     (totalFromUrl ?? totalFromWindow ?? totalFromStorage);
   const isValidTotal = totalDisplay !== null && !isNaN(totalDisplay);
+  const trackingId = trackingParam?.trim() ?? "";
+  const postNordTrackingUrl = trackingId
+    ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(trackingId)}`
+    : null;
 
   return (
     <>
@@ -230,6 +263,32 @@ function OrderSuccessContent() {
               <span className="font-medium">{formattedDate}</span>
             </div>
           </div>
+
+          {postNordTrackingUrl && (
+            <div className="mt-6 rounded-lg border border-sky-200/90 bg-sky-50/70 px-4 py-3 text-sm dark:border-sky-900/60 dark:bg-sky-950/30">
+              <div className="mb-2 flex items-center gap-2 font-medium text-sky-950 dark:text-sky-100">
+                <Package className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                {t("orderDetail.trackDelivery")}
+              </div>
+              <p className="mb-3 font-mono text-xs text-sky-900/90 dark:text-sky-200/90 break-all">
+                {trackingId}
+              </p>
+              <a
+                href={postNordTrackingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 inline-flex"
+              >
+                <Button variant="outline" size="sm" className="border-sky-300/80 bg-white/80 hover:bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/50">
+                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                  {t("orderSuccess.trackAtPostNord")}
+                </Button>
+              </a>
+              <p className="text-xs leading-snug text-muted-foreground">
+                {t("orderDetail.trackingStatusHint")}
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 flex flex-row gap-3">
             <Link href="/" className="flex-1">

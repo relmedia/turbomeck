@@ -27,6 +27,7 @@ import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { cn } from "@/lib/utils";
 import type { PostNordShippingSelection } from "@/components/PostNordShippingModule";
+import { completePostNordSessionFromCheckoutPayload } from "@/lib/complete-postnord-session";
 
 
 const CartPage: React.FC = () => {
@@ -283,36 +284,24 @@ const CartPage: React.FC = () => {
                 ? coreReturnChoice === "return"
                 : undefined,
             postNordTrackingId: undefined,
+            postNordSessionId: postNordSelection?.sessionId,
             locale: locale as "sv" | "en",
             items: mapItemsForCheckout(),
           })}
           onComplete={async (result) => {
             let postNordTrackingId: string | null = null;
-
             if (postNordSelection?.sessionId && shippingForm) {
-              try {
-                const completeRes = await fetch(
-                  `/api/postnord/shipping/complete-session/${postNordSelection.sessionId}`,
-                  {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      deliveryAddress: shippingForm,
-                      userInputs: {
-                        email: shippingForm.email,
-                        phone: shippingForm.phone,
-                        phoneCountryTwoLetterIso: shippingForm.country,
-                      },
-                    }),
-                  }
-                );
-                if (completeRes.ok) {
-                  const data = await completeRes.json();
-                  postNordTrackingId = data?.shipmentId ?? data?.trackingId ?? null;
-                }
-              } catch {
-                // Non-blocking; continue with order
-              }
+              postNordTrackingId = await completePostNordSessionFromCheckoutPayload({
+                postNordSessionId: postNordSelection.sessionId,
+                firstName: shippingForm.firstName,
+                lastName: shippingForm.lastName,
+                email: shippingForm.email,
+                phone: shippingForm.phone,
+                address: shippingForm.address,
+                city: shippingForm.city,
+                postalCode: shippingForm.postalCode,
+                country: shippingForm.country,
+              });
             }
 
             try {

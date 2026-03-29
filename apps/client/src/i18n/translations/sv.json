@@ -256,6 +256,7 @@
     "dateTime": "Datum & tid:",
     "backToHome": "Till startsidan",
     "viewOrderHistory": "Visa orderhistorik",
+    "trackAtPostNord": "Spåra hos PostNord",
     "completingOrder": "Slutför beställningen...",
     "createOrderFailed": "Kunde inte slutföra beställningen",
     "backToCart": "Tillbaka till varukorgen"
@@ -265,6 +266,7 @@
     "status": "Status",
     "date": "Datum",
     "trackDelivery": "Spåra leverans",
+    "trackingStatusHint": "Spårningsnumret skapas direkt när försändelsen bokas, men PostNord kan visa \"ej hittad\" eller begränsad status tills paketet scannats första gången — det är vanligt.",
     "deliveryAddress": "Leveransadress",
     "servicePoint": "Ombud",
     "products": "Produkter",

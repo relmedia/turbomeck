@@ -1,11 +1,14 @@
 import { auth } from "@repo/auth";
 import { NextResponse } from "next/server";
+import { fetchPostNordTrackingJson } from "@/lib/postnord-track-shipment";
 
 /**
  * GET /api/postnord/track?trackingId=XXX
- * PostNord Track Shipment API – fetches tracking status for a shipment.
- * @see https://developer.postnord.com/apis/details?systemName=shipment-v7-trackandtrace-findbyidentifier-public
+ * PostNord Track Shipment API (default **v5** findByIdentifier; falls back to v2 on 404).
+ * @see https://developer.postnord.com/apis/details/YOoaIYIBtTJB9kBCpFRe
  * @see https://www.postnord.com/integrations/track-shipment-api
+ *
+ * Override version: `POSTNORD_TRACK_SHIPMENT_VERSION=v2` in .env
  */
 export async function GET(req: Request) {
   const session = await auth();
@@ -19,55 +22,31 @@ export async function GET(req: Request) {
   if (!trackingId) {
     return NextResponse.json(
       { error: "trackingId query parameter required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const apiKey = process.env.POSTNORD_API_KEY?.trim();
-  if (!apiKey || apiKey === "your_postnord_api_key_here") {
-    return NextResponse.json(
-      { error: "PostNord API key not configured. Add POSTNORD_API_KEY to .env" },
-      { status: 503 }
-    );
-  }
+  const locale = searchParams.get("locale")?.trim() || "sv";
 
-  const host =
-    process.env.POSTNORD_USE_TEST_API === "true"
-      ? "atapi2.postnord.com"
-      : process.env.POSTNORD_API_HOST ?? "api2.postnord.com";
-
-  // Try v2 (documented) and v7 (portal) – PostNord versioning varies by API key
-  const url = new URL(`https://${host}/rest/shipment/v2/trackandtrace/findByIdentifier.json`);
-  url.searchParams.set("id", trackingId);
-  url.searchParams.set("locale", "sv");
-  url.searchParams.set("apikey", apiKey);
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 0 },
-    });
-
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok) {
+  const result = await fetchPostNordTrackingJson(trackingId, locale);
+  if (!result.ok) {
+    if (result.status === 503) {
       return NextResponse.json(
-        {
-          error: data?.TrackingInformationResponse?.serviceCode
-            ? `PostNord: ${data.TrackingInformationResponse.serviceCode}`
-            : "Kunde inte hämta spårningsinformation",
-        },
-        { status: res.status >= 500 ? 502 : res.status }
+        { error: "PostNord API key not configured. Add POSTNORD_API_KEY to .env" },
+        { status: 503 },
       );
     }
-
-    // PostNord returns TrackingInformationResponse with shipments
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("[postnord/track]", err);
+    const data = result.data as Record<string, unknown> | null | undefined;
+    const tir = data?.TrackingInformationResponse as { serviceCode?: string } | undefined;
+    const code = typeof tir?.serviceCode === "string" ? tir.serviceCode : null;
     return NextResponse.json(
-      { error: "Kunde inte ansluta till PostNord" },
-      { status: 502 }
+      {
+        error: code ? `PostNord: ${code}` : "Kunde inte hämta spårningsinformation",
+        postNordResponse: data ?? result.data,
+      },
+      { status: result.status >= 500 ? 502 : result.status },
     );
   }
+
+  return NextResponse.json(result.data);
 }

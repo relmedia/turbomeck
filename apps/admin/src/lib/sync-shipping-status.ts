@@ -1,6 +1,7 @@
 import { db } from "@repo/database";
 import { orders } from "@repo/database/schema";
 import { and, eq, isNotNull } from "drizzle-orm";
+import { fetchPostNordTrackingJson } from "@/lib/postnord-track-shipment";
 
 const DELIVERED_INDICATORS = [
   "delivered",
@@ -19,22 +20,9 @@ function isDeliveredInResponse(data: unknown): boolean {
 }
 
 async function fetchPostNordTracking(trackingId: string): Promise<unknown> {
-  const apiKey = process.env.POSTNORD_API_KEY?.trim();
-  if (!apiKey || apiKey === "your_postnord_api_key_here") return null;
-
-  const host =
-    process.env.POSTNORD_USE_TEST_API === "true"
-      ? "atapi2.postnord.com"
-      : process.env.POSTNORD_API_HOST ?? "api2.postnord.com";
-
-  const url = new URL(`https://${host}/rest/shipment/v2/trackandtrace/findByIdentifier.json`);
-  url.searchParams.set("id", trackingId);
-  url.searchParams.set("locale", "sv");
-  url.searchParams.set("apikey", apiKey);
-
-  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
+  const result = await fetchPostNordTrackingJson(trackingId, "sv");
+  if (!result.ok) return null;
+  return result.data;
 }
 
 /**

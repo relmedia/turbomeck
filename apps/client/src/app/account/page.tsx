@@ -701,6 +701,7 @@ export default function AccountPage() {
                               href={trackingUrl}
                               target="_blank"
                               rel="noopener noreferrer"
+                              title={t("orderDetail.trackingStatusHint")}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Button variant="outline" size="sm">

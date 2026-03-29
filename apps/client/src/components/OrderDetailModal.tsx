@@ -73,12 +73,17 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
             </span>
           </div>
           {trackingUrl && (
-            <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="w-full">
-                <ExternalLink className="w-3 h-3 mr-2" />
-                {t("orderDetail.trackDelivery")}
-              </Button>
-            </a>
+            <div>
+              <a href={trackingUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="w-full">
+                  <ExternalLink className="w-3 h-3 mr-2" />
+                  {t("orderDetail.trackDelivery")}
+                </Button>
+              </a>
+              <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                {t("orderDetail.trackingStatusHint")}
+              </p>
+            </div>
           )}
           <div className="border-t pt-4">
             <p className="text-sm font-medium mb-2">{t("orderDetail.deliveryAddress")}</p>

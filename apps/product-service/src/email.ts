@@ -133,6 +133,8 @@ const translations = {
     trackDelivery: "Spåra din leverans",
     trackingNumber: "Spårningsnummer",
     trackAtPostNord: "Spåra hos PostNord",
+    trackingInitialStatusNote:
+      "Spårningsnumret skapas direkt när försändelsen bokas, men PostNord kan visa \"ej hittad\" eller begränsad status tills paketet scannats första gången — det är vanligt. Spårningen uppdateras när säljaren lämnar in paketet.",
     orderedProducts: "Beställda produkter",
     quantity: "Antal",
     subtotal: "Delsumma",
@@ -313,6 +315,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📦 ${t.trackDelivery}</p>
                     <p style="margin: 0 0 12px 0; font-size: 14px; color: #3b82f6;">${t.trackingNumber}: ${data.trackingId}</p>
                     <a href="${trackingUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">${t.trackAtPostNord} →</a>
+                    <p style="margin: 14px 0 0 0; font-size: 12px; color: #64748b; line-height: 1.45;">${t.trackingInitialStatusNote}</p>
                   </td>
                 </tr>
               </table>

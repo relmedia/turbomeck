@@ -35,6 +35,8 @@ export type PendingOrderPayload = {
   total: number;
   commitsCoreReturnWithin14?: boolean;
   postNordTrackingId?: string;
+  /** PostNord Shipping Module session — completed after payment (incl. Stripe return flow). */
+  postNordSessionId?: string;
   locale?: "sv" | "en";
   items: Array<{
     productId?: number;

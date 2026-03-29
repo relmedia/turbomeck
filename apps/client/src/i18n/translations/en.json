@@ -256,6 +256,7 @@
     "dateTime": "Date & time:",
     "backToHome": "Back to homepage",
     "viewOrderHistory": "View order history",
+    "trackAtPostNord": "Track at PostNord",
     "completingOrder": "Completing your order...",
     "createOrderFailed": "Could not complete the order",
     "backToCart": "Back to cart"
@@ -265,6 +266,7 @@
     "status": "Status",
     "date": "Date",
     "trackDelivery": "Track delivery",
+    "trackingStatusHint": "Your tracking number is created as soon as the shipment is booked, but PostNord may show \"not found\" or limited status until the parcel is first scanned — that is normal.",
     "deliveryAddress": "Delivery address",
     "servicePoint": "Pickup point",
     "products": "Products",
