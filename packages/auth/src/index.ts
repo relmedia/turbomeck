@@ -111,33 +111,25 @@ function coerceMagicLinkBaseForStudioProcess(baseRaw: string): string {
   return baseRaw.replace(/\/$/, "");
 }
 
-function isAdminStudioAuthApp(): boolean {
-  return (
-    process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1" ||
-    (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/")
-  );
-}
-
 /**
- * Auth.js often puts storefront callbackUrl in the query even for studio sign-in; force staff return URL.
+ * Staff mail links: never trust Auth.js `url` host (often apex). Rebuild from query + our studio origin.
  */
-function coerceAdminMagicLinkCallback(link: string, base: URL): string {
+function buildStaffMagicLinkFromAuthJsUrl(url: string, base: URL): string {
   try {
-    const u = new URL(link);
-    const cb = u.searchParams.get("callbackUrl");
-    if (!cb) return link;
-    const decoded = decodeURIComponent(cb);
-    let cbAbs: URL;
-    try {
-      cbAbs = new URL(decoded);
-    } catch {
-      cbAbs = new URL(decoded.startsWith("/") ? decoded : `/${decoded}`, base.origin);
-    }
-    if (cbAbs.origin === base.origin) return link;
-    u.searchParams.set("callbackUrl", `${base.origin}/`);
-    return u.toString();
+    const href =
+      url.startsWith("http://") || url.startsWith("https://")
+        ? url
+        : `https://placeholder.invalid${url.startsWith("/") ? "" : "/"}${url}`;
+    const parsed = new URL(href);
+    const qs = new URLSearchParams(parsed.searchParams);
+    qs.set("callbackUrl", `${base.origin}/`);
+    const path =
+      parsed.pathname && parsed.pathname.includes("callback")
+        ? parsed.pathname
+        : "/api/auth/callback/email";
+    return `${base.origin}${path}?${qs.toString()}`;
   } catch {
-    return link;
+    return url;
   }
 }
 
@@ -169,6 +161,11 @@ function magicLinkUrlForThisApp(url: string): string {
   try {
     const normalizedBase = baseRaw.replace(/\/$/, "");
     const base = new URL(normalizedBase);
+
+    if (isStudioAdminProcess()) {
+      return buildStaffMagicLinkFromAuthJsUrl(url, base);
+    }
+
     let out: string;
     if (url.startsWith("http://") || url.startsWith("https://")) {
       const parsed = new URL(url);
@@ -180,9 +177,6 @@ function magicLinkUrlForThisApp(url: string): string {
     } else {
       const pathWithQuery = url.startsWith("/") ? url : `/${url}`;
       out = new URL(pathWithQuery, base.origin).toString();
-    }
-    if (isAdminStudioAuthApp()) {
-      out = coerceAdminMagicLinkCallback(out, base);
     }
     return out;
   } catch {

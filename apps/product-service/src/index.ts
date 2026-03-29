@@ -551,6 +551,7 @@ app.get("/api/products", async (req, res) => {
       attributes: products.attributes,
       featuredInSlider: products.featuredInSlider,
       sliderOrder: products.sliderOrder,
+      isExchangeTurbo: products.isExchangeTurbo,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     };
@@ -607,6 +608,7 @@ app.get("/api/products", async (req, res) => {
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       featuredInSlider: (p as { featuredInSlider?: number | null }).featuredInSlider ?? 0,
       sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
+      isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       averageRating: ratingMap.get(p.id)?.avg ?? null,
@@ -654,6 +656,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        isExchangeTurbo: products.isExchangeTurbo,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -682,6 +685,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -711,6 +715,7 @@ app.get("/api/products/:id", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        isExchangeTurbo: products.isExchangeTurbo,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
       })
@@ -748,6 +753,7 @@ app.get("/api/products/:id", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       orderCount,
       totalRevenue,
       createdAt: p.createdAt,
@@ -762,7 +768,7 @@ app.get("/api/products/:id", async (req, res) => {
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn, isExchangeTurbo } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
@@ -780,6 +786,8 @@ app.post("/api/products", async (req, res) => {
       nameEn: nameEn != null && String(nameEn).trim() !== "" ? String(nameEn) : null,
       shortDescriptionEn: shortDescriptionEn != null && String(shortDescriptionEn).trim() !== "" ? String(shortDescriptionEn) : null,
       descriptionEn: descriptionEn != null && String(descriptionEn).trim() !== "" ? String(descriptionEn) : null,
+      isExchangeTurbo:
+        isExchangeTurbo === true || isExchangeTurbo === 1 || isExchangeTurbo === "1" || isExchangeTurbo === "true",
     };
 
     const inserted = await db.insert(products).values(newProduct).returning();
@@ -805,6 +813,7 @@ app.post("/api/products", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryIdsRes,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -818,7 +827,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -852,6 +861,10 @@ app.put("/api/products/:id", async (req, res) => {
     if (sliderOrder !== undefined) {
       const so = sliderOrder != null && String(sliderOrder).trim() !== "" ? Number(sliderOrder) : NaN;
       updateData.sliderOrder = !Number.isNaN(so) && so >= 0 ? so : null;
+    }
+    if (isExchangeTurbo !== undefined) {
+      updateData.isExchangeTurbo =
+        isExchangeTurbo === true || isExchangeTurbo === 1 || isExchangeTurbo === "1" || isExchangeTurbo === "true";
     }
 
     const updated = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
@@ -888,6 +901,7 @@ app.put("/api/products/:id", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryIdsRes,
+      isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });

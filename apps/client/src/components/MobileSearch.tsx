@@ -83,6 +83,7 @@ export function MobileSearch() {
             price: number;
             image?: string | null;
             thumbnails?: string[];
+            isExchangeTurbo?: boolean;
           }) => {
             const img = resolveImageUrl(p.image || p.thumbnails?.[0] || null);
             return {
@@ -92,6 +93,7 @@ export function MobileSearch() {
               shortDescription: p.shortDescription || "",
               description: p.description || "",
               price: p.price,
+              isExchangeTurbo: p.isExchangeTurbo === true,
               images: { default: img },
               galleryImages: [img],
               sizes: ["-"] as [string, ...string[]],

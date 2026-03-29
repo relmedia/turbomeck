@@ -85,6 +85,13 @@ const nextConfig: NextConfig = {
       }
       return {};
     })()),
+    NEXT_PUBLIC_ADMIN_ORIGIN:
+      adminMagicLinkOrigin ||
+      (process.env.NODE_ENV === "development"
+        ? "http://localhost:3001"
+        : `https://${ADMIN_STUDIO_HOST}`),
+    NEXT_PUBLIC_SHOP_LOGIN_HOSTS:
+      process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud",
   },
   turbopack: {
     root: path.resolve(__dirname, "../.."),

@@ -37,7 +37,7 @@ Maps at the top only cover **`/api/reviews`** routing between apps.
    # PUBLIC_AUTH_ORIGIN=https://studio.turbomeck.cloud
    ```
 
-   **Magic-link emails** must use **`https://studio.turbomeck.cloud`**, not the shop apex. If **`NEXTAUTH_URL`** is mistakenly **`https://turbomeck.cloud`**, admin **`next.config.ts`** and PM2 now **rewrite** it to **`https://studio.turbomeck.cloud`** (override with **`ADMIN_CANONICAL_ORIGIN`** or **`ADMIN_STUDIO_HOSTNAME`** if your hosts differ). The process sets **`STUDIO_AUTH_MAGIC_LINKS=1`** so `@repo/auth` always applies staff link fixes. After changing `.env`, rebuild admin, run **`pm2 restart admin --update-env`**, request a **new** mail, and check **`pm2 logs admin`** for **`[@repo/auth]`** if a link still targets the shop.
+   **Magic-link emails** must use **`https://studio.turbomeck.cloud`**, not the shop apex. On nginx, **`turbomeck.cloud`** routes **`/api/auth/`** to the **storefront (:3000)** only. If the link in the mail is **`https://turbomeck.cloud/api/auth/callback/...`**, the sign-in request was handled by the **shop**, not admin — open **`https://studio.turbomeck.cloud`** for staff login (the login page redirects off the shop hosts when mis-opened). Staff links are rebuilt in **`@repo/auth`** on the **:3001** process. Rebuild admin and **`pm2 restart admin --update-env`** after pulling changes.
 
    The admin app forces `AUTH_SIGNIN_PATH=/` (via `next.config.ts` and PM2) so NextAuth does not send staff to `/studio` in the URL bar. Optionally set `AUTH_VERIFY_PATH` if you move the “check your email” page (default `/studio/verify`).
 

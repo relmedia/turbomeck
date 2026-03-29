@@ -16,6 +16,8 @@ export type ProductType = {
   colors: [string, ...string[]];
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T"] }] - customer must choose when adding to cart */
   attributes?: { name: string; options: string[] }[];
+  /** Set in admin for exchange (utbytes) turbos — Sweden core-return rules apply in checkout */
+  isExchangeTurbo?: boolean;
   images: Record<string, string>;
   /** All images for gallery (main + thumbnails) */
   galleryImages?: string[];

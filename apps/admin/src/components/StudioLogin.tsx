@@ -68,6 +68,19 @@ function SignInContent() {
     return () => clearInterval(id);
   }, []);
 
+  /* Staff login must run on studio host; shop apex serves :3000 and mails turbomeck.cloud links. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const adminOrigin = (process.env.NEXT_PUBLIC_ADMIN_ORIGIN || "").replace(/\/$/, "");
+    const shopHosts = (process.env.NEXT_PUBLIC_SHOP_LOGIN_HOSTS || "")
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    if (!adminOrigin || shopHosts.length === 0) return;
+    if (!shopHosts.includes(window.location.hostname)) return;
+    window.location.replace(`${adminOrigin}${window.location.pathname}${window.location.search}`);
+  }, []);
+
   const handleSubmit = form.handleSubmit(async (values) => {
     setLoading(true);
     form.setError("root", { message: "" });

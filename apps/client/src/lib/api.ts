@@ -28,6 +28,7 @@ export type ApiProduct = {
   weight: number | null;
   categoryIds: number[];
   attributes?: { name: string; options: string[] }[];
+  isExchangeTurbo?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -69,6 +70,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     weight: api.weight ?? undefined,
     categoryIds: api.categoryIds ?? [],
     attributes: api.attributes ?? [],
+    isExchangeTurbo: api.isExchangeTurbo === true,
     sizes: ["-"],
     colors: ["default"],
     images: { default: mainImg },

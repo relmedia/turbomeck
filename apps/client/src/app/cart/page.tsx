@@ -123,12 +123,23 @@ const CartPage: React.FC = () => {
 
   const isSeDelivery = shippingCountry.toUpperCase() === "SE";
 
+  const cartNeedsCoreReturn = useMemo(
+    () => cart.some((item) => item.isExchangeTurbo === true),
+    [cart]
+  );
+
   useEffect(() => {
     if (!isSeDelivery) setCoreReturnChoice(null);
   }, [isSeDelivery]);
 
+  useEffect(() => {
+    if (!cartNeedsCoreReturn) setCoreReturnChoice(null);
+  }, [cartNeedsCoreReturn]);
+
   const coreKeepFeeApplied =
-    isSeDelivery && coreReturnChoice === "keep" ? CORE_KEEP_FEE_SEK : 0;
+    isSeDelivery && cartNeedsCoreReturn && coreReturnChoice === "keep"
+      ? CORE_KEEP_FEE_SEK
+      : 0;
   const total = subtotal - discount + shipping + coreKeepFeeApplied;
   const amountToCharge = total;
 
@@ -145,7 +156,8 @@ const CartPage: React.FC = () => {
   const checkoutQuoteBody = useMemo(() => {
     if (!shippingForm) return null;
     const c = (shippingForm.country ?? "SE").toUpperCase();
-    if (c === "SE" && coreReturnChoice === null) return null;
+    const seNeedsCoreChoice = c === "SE" && cartNeedsCoreReturn;
+    if (seNeedsCoreChoice && coreReturnChoice === null) return null;
     return {
       items: cart.map((item) => ({
         productId: typeof item.id === "number" ? item.id : undefined,
@@ -159,7 +171,7 @@ const CartPage: React.FC = () => {
         appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
       country: shippingForm.country ?? "SE",
       deliveryOption,
-      commitsCoreReturnWithin14: c === "SE" ? coreReturnChoice === "return" : undefined,
+      commitsCoreReturnWithin14: seNeedsCoreChoice ? coreReturnChoice === "return" : undefined,
     };
   }, [
     shippingForm,
@@ -168,6 +180,7 @@ const CartPage: React.FC = () => {
     lastValidatedCode,
     deliveryOption,
     coreReturnChoice,
+    cartNeedsCoreReturn,
   ]);
 
   const handleApplyCoupon = () => {
@@ -263,7 +276,8 @@ const CartPage: React.FC = () => {
             discount,
             total,
             commitsCoreReturnWithin14:
-              (shippingForm!.country ?? "SE").toUpperCase() === "SE"
+              (shippingForm!.country ?? "SE").toUpperCase() === "SE" &&
+              cartNeedsCoreReturn
                 ? coreReturnChoice === "return"
                 : undefined,
             postNordTrackingId: undefined,
@@ -322,7 +336,8 @@ const CartPage: React.FC = () => {
                 discount,
                 total,
                 commitsCoreReturnWithin14:
-                  (shippingForm!.country ?? "SE").toUpperCase() === "SE"
+                  (shippingForm!.country ?? "SE").toUpperCase() === "SE" &&
+                  cartNeedsCoreReturn
                     ? coreReturnChoice === "return"
                     : undefined,
                 stripePaymentId: result.stripePaymentId,
@@ -426,7 +441,7 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
-              {isSeDelivery && (
+              {isSeDelivery && cartNeedsCoreReturn && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <p className="text-sm font-medium">{t("cart.coreReturnTitle")}</p>
                   <p className="text-xs text-muted-foreground">{t("cart.coreReturnIntro")}</p>

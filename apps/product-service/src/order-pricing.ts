@@ -113,25 +113,11 @@ export async function resolveCheckoutOrder(body: {
     productIds.push(pid);
   }
 
-  const isSe = country === "SE";
-  let commitsCoreReturnWithin14: boolean | null = null;
-  if (isSe) {
-    if (typeof body.commitsCoreReturnWithin14 !== "boolean") {
-      return {
-        ok: false,
-        status: 400,
-        error: "Välj om du skickar in din gamla turbo inom 14 dagar eller betalar kärnavgift.",
-      };
-    }
-    commitsCoreReturnWithin14 = body.commitsCoreReturnWithin14;
-  }
-
-  const coreKeepFeeSek =
-    isSe && commitsCoreReturnWithin14 === false ? CORE_KEEP_FEE_SEK : 0;
-
   const uniqueIds = [...new Set(productIds)];
   const rows = await db.select().from(products).where(inArray(products.id, uniqueIds));
   const byId = new Map(rows.map((p) => [p.id, p]));
+
+  let cartNeedsCoreReturn = false;
 
   const lineAcc: Array<{
     productId: number;
@@ -158,6 +144,10 @@ export async function resolveCheckoutOrder(body: {
       return { ok: false, status: 400, error: `Insufficient stock for product ${pid}` };
     }
 
+    if (p.isExchangeTurbo) {
+      cartNeedsCoreReturn = true;
+    }
+
     const unitPrice = Number(p.price);
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
       return { ok: false, status: 500, error: "Invalid catalog price" };
@@ -178,6 +168,24 @@ export async function resolveCheckoutOrder(body: {
       quantity: it.quantity,
     });
   }
+
+  const isSe = country === "SE";
+  let commitsCoreReturnWithin14: boolean | null = null;
+  if (isSe && cartNeedsCoreReturn) {
+    if (typeof body.commitsCoreReturnWithin14 !== "boolean") {
+      return {
+        ok: false,
+        status: 400,
+        error: "Välj om du skickar in din gamla turbo inom 14 dagar eller betalar kärnavgift.",
+      };
+    }
+    commitsCoreReturnWithin14 = body.commitsCoreReturnWithin14;
+  }
+
+  const coreKeepFeeSek =
+    isSe && cartNeedsCoreReturn && commitsCoreReturnWithin14 === false
+      ? CORE_KEEP_FEE_SEK
+      : 0;
 
   let discount = 0;
   const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";

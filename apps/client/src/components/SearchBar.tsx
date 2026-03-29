@@ -87,7 +87,7 @@ const SearchBar = () => {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        const products: ProductType[] = (Array.isArray(data) ? data : []).map((p: { id: number; slug?: string; name: string; shortDescription?: string; description?: string; price: number; image?: string | null; thumbnails?: string[] }) => {
+        const products: ProductType[] = (Array.isArray(data) ? data : []).map((p: { id: number; slug?: string; name: string; shortDescription?: string; description?: string; price: number; image?: string | null; thumbnails?: string[]; isExchangeTurbo?: boolean }) => {
           const img = resolveImageUrl(p.image || p.thumbnails?.[0] || null);
           return {
             id: p.id,
@@ -96,6 +96,7 @@ const SearchBar = () => {
             shortDescription: p.shortDescription || "",
             description: p.description || "",
             price: p.price,
+            isExchangeTurbo: p.isExchangeTurbo === true,
             images: { default: img },
             galleryImages: [img],
             sizes: ["-"] as [string, ...string[]],

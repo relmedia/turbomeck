@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, RefreshCw, Trash2, Plus, Languages, Loader2, Sparkles } from "lucide-react";
@@ -62,6 +63,16 @@ function categoryDisplayName(c: Category): string {
   return c.parentName ? `${c.parentName} › ${c.name}` : c.name;
 }
 
+function selectedCategoriesIncludeTurbo(categories: Category[], categoryIds: number[]): boolean {
+  for (const id of categoryIds) {
+    const c = categories.find((x) => x.id === id);
+    if (!c) continue;
+    const hay = `${c.parentName ?? ""} ${c.name}`.toLowerCase();
+    if (hay.includes("turbo")) return true;
+  }
+  return false;
+}
+
 type Product = {
   id: number;
   name: string;
@@ -73,6 +84,7 @@ type Product = {
   stock: number;
   weight: number | null;
   categoryIds: number[];
+  isExchangeTurbo?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -112,6 +124,7 @@ export default function ProductDetailPage() {
     attributes: { name: string; options: string[] }[];
     image: string | null;
     thumbnails: string[];
+    isExchangeTurbo: boolean;
   }>({
     name: "",
     shortDescription: "",
@@ -126,7 +139,17 @@ export default function ProductDetailPage() {
     attributes: [],
     image: null,
     thumbnails: [],
+    isExchangeTurbo: false,
   });
+
+  const showExchangeTurboToggle = selectedCategoriesIncludeTurbo(categories, formData.categoryIds);
+
+  useEffect(() => {
+    if (categories.length === 0) return;
+    if (!selectedCategoriesIncludeTurbo(categories, formData.categoryIds)) {
+      setFormData((prev) => (prev.isExchangeTurbo ? { ...prev, isExchangeTurbo: false } : prev));
+    }
+  }, [categories, formData.categoryIds]);
 
   const fetchProduct = useCallback(async () => {
     setLoading(true);
@@ -159,6 +182,7 @@ export default function ProductDetailPage() {
           : [],
         image: data.image || null,
         thumbnails: data.thumbnails ?? [],
+        isExchangeTurbo: data.isExchangeTurbo === true,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -340,6 +364,7 @@ export default function ProductDetailPage() {
           attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
           image: formData.image ?? null,
           thumbnails: Array.isArray(formData.thumbnails) ? formData.thumbnails : [],
+          isExchangeTurbo: formData.isExchangeTurbo === true,
         }),
       });
 
@@ -903,6 +928,22 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
+                {showExchangeTurboToggle && (
+                  <label className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer">
+                    <Checkbox
+                      checked={formData.isExchangeTurbo}
+                      onCheckedChange={(v) =>
+                        setFormData((prev) => ({ ...prev, isExchangeTurbo: v === true }))
+                      }
+                    />
+                    <div className="space-y-1 text-sm leading-snug">
+                      <span className="font-medium">Utbytes turbo (kärnretur)</span>
+                      <p className="text-muted-foreground">
+                        Gäller vid leverans till Sverige: kunden väljer kärnretur eller kärnavgift i kassan.
+                      </p>
+                    </div>
+                  </label>
+                )}
               </div>
             </CardContent>
           </Card>

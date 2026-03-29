@@ -88,6 +88,8 @@ export const products = pgTable("products", {
   /** Homepage slider: 1 = show in slider, 0 = hide; sliderOrder = display order (lower first) */
   featuredInSlider: integer("featured_in_slider").default(0),
   sliderOrder: integer("slider_order"),
+  /** Sweden kärnretur: product is sold as exchange turbo (core return rules apply in SE) */
+  isExchangeTurbo: boolean("is_exchange_turbo").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
