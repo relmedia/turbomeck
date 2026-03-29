@@ -67,8 +67,10 @@ type OrderDetail = {
 
 const STATUS_OPTIONS = [
   { value: "confirmed", label: "Behandlas" },
+  { value: "deposit_paid", label: "Deposition betald" },
   { value: "shipped", label: "Skickad" },
   { value: "delivered", label: "Levererad" },
+  { value: "completed", label: "Slutförd" },
   { value: "cancelled", label: "Avbruten" },
 ] as const;
 
@@ -240,6 +242,11 @@ export default function OrderDetailPage() {
         return;
       }
       toast.success("Status uppdaterad");
+      if (data.shipmentEmailSent === true) {
+        toast.info("Leveransmejl skickat till kunden");
+      } else if (data.shipmentEmailSent === false && data.shipmentEmailError) {
+        toast.warn(`Leveransmejl skickades inte: ${data.shipmentEmailError}`);
+      }
       const refetch = await fetch(`/api/orders/${id}`);
       const updated = await refetch.json();
       setOrder(updated);

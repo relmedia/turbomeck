@@ -1193,7 +1193,14 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
       locale,
     });
 
-    return res.json({ success: sent });
+    if (!sent) {
+      return res.status(503).json({
+        error: "E-post kunde inte skickas (SMTP/e-post ej konfigurerat i product-service)",
+        success: false,
+      });
+    }
+
+    return res.json({ success: true });
   } catch (error) {
     console.error("send-shipment-notification:", error);
     res.status(500).json({ error: "Failed to send shipment notification" });

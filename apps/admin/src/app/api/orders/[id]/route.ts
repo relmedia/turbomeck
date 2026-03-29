@@ -56,6 +56,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Inga fält att uppdatera" }, { status: 400 });
     }
 
+    const [existing] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
+    }
+    const prevTracking = (existing.postNordTrackingId ?? "").trim();
+
     const [updated] = await db
       .update(orders)
       .set(updates)
@@ -66,7 +72,37 @@ export async function PATCH(
       return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    const newTracking = (updated.postNordTrackingId ?? "").trim();
+    const prevStatus = (existing.status ?? "confirmed").trim().toLowerCase();
+    const newStatus = (updated.status ?? prevStatus).trim().toLowerCase();
+    const wasDeliverable = prevStatus === "shipped" || prevStatus === "delivered";
+    const isDeliverable = newStatus === "shipped" || newStatus === "delivered";
+    const becameDeliverable = isDeliverable && !wasDeliverable;
+    const trackingChanged =
+      trackingKeyPresent && !!newTracking && newTracking !== prevTracking;
+
+    const shouldSendShipmentEmail =
+      !!newTracking && isDeliverable && (trackingChanged || becameDeliverable);
+
+    let shipmentEmailSent: boolean | null = null;
+    let shipmentEmailError: string | null = null;
+    if (shouldSendShipmentEmail) {
+      try {
+        await triggerShipmentDispatchedEmail(orderId);
+        shipmentEmailSent = true;
+        console.log(`[orders PATCH] shipment email triggered for order ${orderId}`);
+      } catch (err) {
+        shipmentEmailSent = false;
+        shipmentEmailError = err instanceof Error ? err.message : String(err);
+        console.error("[orders PATCH] shipment notification failed:", err);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      shipmentEmailSent,
+      shipmentEmailError,
+    });
   } catch (err) {
     console.error("Failed to update order:", err);
     return NextResponse.json(
@@ -190,13 +226,18 @@ export async function GET(
   }
 }
 
-/** Fire-and-forget: product-service sends localized “shipped” email with PostNord link. */
+/**
+ * Calls product-service to send “shipped” email (must complete — do not float on serverless).
+ * Strips trailing /api from PRODUCT_SERVICE_URL if set by mistake.
+ */
 async function triggerShipmentDispatchedEmail(orderId: number): Promise<void> {
   const secret = process.env.INTERNAL_PRODUCT_API_SECRET?.trim();
-  const base = (process.env.PRODUCT_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
+  let base = (process.env.PRODUCT_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
+  if (base.endsWith("/api")) {
+    base = base.slice(0, -4);
+  }
   if (!secret) {
-    console.warn("[orders PATCH] INTERNAL_PRODUCT_API_SECRET missing, skip shipment email");
-    return;
+    throw new Error("INTERNAL_PRODUCT_API_SECRET is not set on admin (cannot call product-service)");
   }
   const res = await fetch(`${base}/api/orders/${orderId}/send-shipment-notification`, {
     method: "POST",
@@ -209,6 +250,10 @@ async function triggerShipmentDispatchedEmail(orderId: number): Promise<void> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Shipment notification HTTP ${res.status}: ${text || res.statusText}`);
+  }
+  const payload = (await res.json().catch(() => ({}))) as { success?: boolean };
+  if (payload.success === false) {
+    throw new Error("Product-service reported shipment email was not sent");
   }
 }
 
