@@ -46,7 +46,7 @@ export type PostNordServicePoint = {
   distance?: number;
 };
 
-const EUROPEAN_COUNTRY_CODES = [
+export const EUROPEAN_COUNTRY_CODES = [
   "SE", "NO", "DK", "FI", "DE", "NL", "BE", "FR", "ES", "IT", "AT", "CH",
   "PL", "CZ", "IE", "GB", "PT", "GR", "HU", "RO", "BG", "HR", "SK", "SI",
   "EE", "LV", "LT", "LU", "MT", "CY", "IS",

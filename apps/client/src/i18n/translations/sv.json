@@ -142,6 +142,20 @@
     "continue": "Fortsätt",
     "addressSaved": "Adress sparad på ditt konto",
     "saveAddress": "Spara adress till mitt konto för framtida beställningar",
+    "saveAddressSubmit": "Spara adress",
+    "validation": {
+      "firstNameRequired": "Förnamn krävs!",
+      "lastNameRequired": "Efternamn krävs!",
+      "emailInvalid": "Ogiltig e-postadress format!",
+      "emailRequired": "E-post krävs!",
+      "phoneMin": "Telefonnummer måste vara giltigt (minst 10 siffror med landskod)!",
+      "phoneEuropean": "Ange ett giltigt europeiskt telefonnummer (t.ex. +46709165006)",
+      "countryEuropean": "Välj ett europeiskt land",
+      "addressRequired": "Adress krävs!",
+      "cityRequired": "Ort krävs!",
+      "postalMin": "Postnummer krävs, minst 4 siffror!",
+      "postalDigits": "Endast siffror är tillåtna!"
+    },
     "countryNames": {
       "SE": "Sverige",
       "NO": "Norge",
@@ -209,7 +223,8 @@
     "orderStatusCancelled": "Avbruten",
     "writeReview": "Skriv recension",
     "trackDelivery": "Spåra leverans",
-    "showingOrders": "Visar 5 senaste av {{count}} beställningar",
+    "trackingPendingShort": "Spårning väntar",
+    "orderCount": "{{count}} beställningar",
     "stripeReceipts": "Stripe-kvitton",
     "stripeReceiptsDesc": "Klicka för att öppna Stripe:s hostade kvitto i webbläsaren.",
     "order": "Beställning",
@@ -245,7 +260,8 @@
     "deleteAccountError": "Kunde inte ta bort kontot",
     "uploadError": "Kunde inte ladda upp",
     "exportFilename": "turbomeck-mina-uppgifter",
-    "saveError": "Kunde inte spara"
+    "saveError": "Kunde inte spara",
+    "addressSaveError": "Kunde inte spara adressen. Försök igen."
   },
   "orderSuccess": {
     "title": "Betalning genomförd",
@@ -263,6 +279,9 @@
   },
   "orderDetail": {
     "orderTitle": "Beställning",
+    "sectionShipment": "Leverans & spårning",
+    "sectionSummary": "Ordersammanfattning",
+    "trackingWhenShipped": "Spårning visas här när din order har skickats.",
     "status": "Status",
     "date": "Datum",
     "trackDelivery": "Spåra leverans",
@@ -280,7 +299,13 @@
     "orderStatusConfirmed": "Bekräftad",
     "orderStatusShipped": "Skickad",
     "orderStatusDelivered": "Levererad",
-    "orderStatusCancelled": "Avbruten"
+    "orderStatusCancelled": "Avbruten",
+    "trackingTimelineTitle": "Försändelseuppdateringar",
+    "trackingLoading": "Laddar spårning…",
+    "trackingError": "Kunde inte hämta spårningsinformation.",
+    "trackingNoEvents": "Inga spårningshändelser ännu. Försök igen senare eller öppna PostNord.",
+    "trackingRefresh": "Uppdatera spårning",
+    "trackingPendingAdmin": "Spårningsnummer saknas ännu. Kontrollera senare eller kontakta oss om beställningen är markerad som skickad."
   },
   "orderReviews": {
     "yourReviews": "Dina recensioner",

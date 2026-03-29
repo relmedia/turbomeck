@@ -142,6 +142,20 @@
     "continue": "Continue",
     "addressSaved": "Address saved to your account",
     "saveAddress": "Save address to my account for future orders",
+    "saveAddressSubmit": "Save address",
+    "validation": {
+      "firstNameRequired": "First name is required.",
+      "lastNameRequired": "Last name is required.",
+      "emailInvalid": "Invalid email address.",
+      "emailRequired": "Email is required.",
+      "phoneMin": "Enter a valid number (at least 10 digits with country code).",
+      "phoneEuropean": "Enter a valid European phone number (e.g. +46709165006).",
+      "countryEuropean": "Choose a European country.",
+      "addressRequired": "Address is required.",
+      "cityRequired": "City is required.",
+      "postalMin": "Postal code is required (at least 4 digits).",
+      "postalDigits": "Only digits are allowed."
+    },
     "countryNames": {
       "SE": "Sweden",
       "NO": "Norway",
@@ -209,7 +223,8 @@
     "orderStatusCancelled": "Cancelled",
     "writeReview": "Write review",
     "trackDelivery": "Track delivery",
-    "showingOrders": "Showing 5 most recent of {{count}} orders",
+    "trackingPendingShort": "Tracking pending",
+    "orderCount": "{{count}} orders",
     "stripeReceipts": "Stripe receipts",
     "stripeReceiptsDesc": "Click to open Stripe-hosted receipt in your browser.",
     "order": "Order",
@@ -245,7 +260,8 @@
     "deleteAccountError": "Could not delete account",
     "uploadError": "Could not upload",
     "exportFilename": "turbomeck-my-data",
-    "saveError": "Could not save"
+    "saveError": "Could not save",
+    "addressSaveError": "Could not save the address. Please try again."
   },
   "orderSuccess": {
     "title": "Payment completed",
@@ -263,6 +279,9 @@
   },
   "orderDetail": {
     "orderTitle": "Order",
+    "sectionShipment": "Delivery & tracking",
+    "sectionSummary": "Order summary",
+    "trackingWhenShipped": "Tracking will appear here when your order has been dispatched.",
     "status": "Status",
     "date": "Date",
     "trackDelivery": "Track delivery",
@@ -280,7 +299,13 @@
     "orderStatusConfirmed": "Confirmed",
     "orderStatusShipped": "Shipped",
     "orderStatusDelivered": "Delivered",
-    "orderStatusCancelled": "Cancelled"
+    "orderStatusCancelled": "Cancelled",
+    "trackingTimelineTitle": "Shipment updates",
+    "trackingLoading": "Loading tracking…",
+    "trackingError": "Could not load tracking details.",
+    "trackingNoEvents": "No scan events yet. Check back soon or open PostNord.",
+    "trackingRefresh": "Refresh tracking",
+    "trackingPendingAdmin": "Tracking number not added yet. Open order details later or contact us if the order is marked shipped."
   },
   "orderReviews": {
     "yourReviews": "Your reviews",

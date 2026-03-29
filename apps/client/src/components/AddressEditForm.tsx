@@ -1,9 +1,9 @@
 "use client";
 
 import type { FC } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  shippingFormSchema,
+  EUROPEAN_COUNTRY_CODES,
   type SavedAddress,
 } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,18 +23,16 @@ import { PhoneInput, EUROPEAN_COUNTRIES, CountryFlag } from "./PhoneInput";
 import { getDefaultCountryFromBrowser } from "@/lib/utils";
 import { useTranslation } from "@/i18n/context";
 
-const addressSchema = shippingFormSchema.pick({
-  firstName: true,
-  lastName: true,
-  email: true,
-  phone: true,
-  country: true,
-  address: true,
-  city: true,
-  postalCode: true,
-});
-
-type AddressFormInputs = z.infer<typeof addressSchema>;
+type AddressFormInputs = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  country: string;
+  address: string;
+  city: string;
+  postalCode: string;
+};
 
 type AddressEditFormProps = {
   initialAddress?: SavedAddress | null;
@@ -51,6 +49,41 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
   const [error, setError] = useState<string | null>(null);
   const t = useTranslation();
 
+  const addressSchema = useMemo(
+    () =>
+      z.object({
+        firstName: z.string().min(1, t("shipping.validation.firstNameRequired")),
+        lastName: z.string().min(1, t("shipping.validation.lastNameRequired")),
+        email: z
+          .string()
+          .regex(
+            /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+            t("shipping.validation.emailInvalid"),
+          )
+          .min(1, t("shipping.validation.emailRequired")),
+        phone: z
+          .string()
+          .min(10, t("shipping.validation.phoneMin"))
+          .regex(/^\+\d{10,15}$/, t("shipping.validation.phoneEuropean")),
+        country: z
+          .string()
+          .refine(
+            (v) =>
+              EUROPEAN_COUNTRY_CODES.includes(
+                v as (typeof EUROPEAN_COUNTRY_CODES)[number],
+              ),
+            t("shipping.validation.countryEuropean"),
+          ),
+        address: z.string().min(1, t("shipping.validation.addressRequired")),
+        city: z.string().min(1, t("shipping.validation.cityRequired")),
+        postalCode: z
+          .string()
+          .min(4, t("shipping.validation.postalMin"))
+          .regex(/^\d+$/, t("shipping.validation.postalDigits")),
+      }),
+    [t],
+  );
+
   const {
     register,
     handleSubmit,
@@ -58,7 +91,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
     reset,
     formState: { errors },
   } = useForm<AddressFormInputs>({
-    resolver: zodResolver(addressSchema as any),
+    resolver: zodResolver(addressSchema as never),
     defaultValues: {
       country: "SE",
       phone: "",
@@ -82,8 +115,8 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
     try {
       await onSave(data);
       if (onCancel) onCancel();
-    } catch (err) {
-      setError("Kunde inte spara adressen. Försök igen.");
+    } catch {
+      setError(t("account.addressSaveError"));
     } finally {
       setSaving(false);
     }
@@ -101,10 +134,10 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
       )}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="addr-firstName">Förnamn</Label>
+          <Label htmlFor="addr-firstName">{t("shipping.firstName")}</Label>
           <Input
             id="addr-firstName"
-            placeholder="Förnamn"
+            placeholder={t("shipping.firstName")}
             {...register("firstName")}
             className={errors.firstName ? "border-destructive" : ""}
           />
@@ -113,10 +146,10 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="addr-lastName">Efternamn</Label>
+          <Label htmlFor="addr-lastName">{t("shipping.lastName")}</Label>
           <Input
             id="addr-lastName"
-            placeholder="Efternamn"
+            placeholder={t("shipping.lastName")}
             {...register("lastName")}
             className={errors.lastName ? "border-destructive" : ""}
           />
@@ -126,11 +159,11 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="addr-email">E-post</Label>
+        <Label htmlFor="addr-email">{t("shipping.email")}</Label>
         <Input
           id="addr-email"
           type="email"
-          placeholder="E-postadress"
+          placeholder={t("shipping.emailPlaceholder")}
           {...register("email")}
           className={errors.email ? "border-destructive" : ""}
         />
@@ -139,7 +172,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
         )}
       </div>
       <div className="space-y-2">
-        <Label>Mobilnummer</Label>
+        <Label>{t("shipping.phone")}</Label>
         <Controller
           name="phone"
           control={control}
@@ -157,7 +190,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="addr-country">Land</Label>
+        <Label htmlFor="addr-country">{t("shipping.country")}</Label>
         <Controller
           name="country"
           control={control}
@@ -167,7 +200,7 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
                 id="addr-country"
                 className={errors.country ? "border-destructive" : ""}
               >
-                <SelectValue placeholder="Välj land" />
+                <SelectValue placeholder={t("shipping.selectCountry")} />
               </SelectTrigger>
               <SelectContent>
                 {EUROPEAN_COUNTRIES.map((c) => (
@@ -187,10 +220,10 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="addr-address">Adress</Label>
+        <Label htmlFor="addr-address">{t("shipping.address")}</Label>
         <Input
           id="addr-address"
-          placeholder="Gatuadress"
+          placeholder={t("shipping.addressPlaceholder")}
           {...register("address")}
           className={errors.address ? "border-destructive" : ""}
         />
@@ -200,10 +233,10 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="addr-city">Ort</Label>
+          <Label htmlFor="addr-city">{t("shipping.city")}</Label>
           <Input
             id="addr-city"
-            placeholder="Ortens namn"
+            placeholder={t("shipping.cityPlaceholder")}
             {...register("city")}
             className={errors.city ? "border-destructive" : ""}
           />
@@ -212,10 +245,10 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="addr-postalCode">Postkod</Label>
+          <Label htmlFor="addr-postalCode">{t("shipping.postalCode")}</Label>
           <Input
             id="addr-postalCode"
-            placeholder="Postnummer"
+            placeholder={t("shipping.postalCodePlaceholder")}
             {...register("postalCode")}
             className={errors.postalCode ? "border-destructive" : ""}
           />
@@ -228,11 +261,11 @@ const AddressEditForm: FC<AddressEditFormProps> = ({
       </div>
       <div className="flex gap-2 pt-2">
         <Button type="submit" disabled={saving}>
-          {saving ? "Sparar..." : "Spara adress"}
+          {saving ? t("account.saving") : t("shipping.saveAddressSubmit")}
         </Button>
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
-            Avbryt
+            {t("common.cancel")}
           </Button>
         )}
       </div>

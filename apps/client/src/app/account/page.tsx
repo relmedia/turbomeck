@@ -569,10 +569,13 @@ export default function AccountPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {orders.slice(0, 5).map((order) => {
+                  {orders.map((order) => {
                     const trackingUrl = order.postNordTrackingId
                       ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
                       : null;
+                    const trackingPending =
+                      (order.status === "shipped" || order.status === "delivered") &&
+                      !order.postNordTrackingId;
                     const statusLabel = orderStatusLabel(order.status);
                     const stripeInfo = order.stripePaymentId
                       ? orderStripeReceipts[order.id.toString()]
@@ -710,15 +713,27 @@ export default function AccountPage() {
                               </Button>
                             </Link>
                           )}
+                          {trackingPending && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled
+                              className="pointer-events-auto cursor-not-allowed opacity-65"
+                              title={t("orderDetail.trackingPendingAdmin")}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {t("account.trackingPendingShort")}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-              {orders.length > 5 && (
+              {orders.length > 0 && (
                 <p className="text-center text-sm text-muted-foreground mt-4">
-                  {t("account.showingOrders", { count: orders.length })}
+                  {t("account.orderCount", { count: orders.length })}
                 </p>
               )}
             </CardContent>
