@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractPostNordTrackableShipmentId } from "@/lib/postnord-shipment-response-id";
 
 const API_URL = process.env.POSTNORD_SHIPPING_API_URL;
 const API_KEY = process.env.POSTNORD_SHIPPING_API_KEY;
@@ -68,7 +69,22 @@ export async function PUT(
       );
     }
 
-    const data = await res.json();
+    const data: unknown = await res.json();
+    const extracted = extractPostNordTrackableShipmentId(data);
+    if (data && typeof data === "object" && extracted) {
+      const d = data as Record<string, unknown>;
+      const hasTop =
+        (typeof d.shipmentId === "string" && d.shipmentId.trim()) ||
+        (typeof d.trackingId === "string" && d.trackingId.trim());
+      if (!hasTop) {
+        return NextResponse.json({ ...d, shipmentId: extracted });
+      }
+    } else if (data && typeof data === "object" && !extracted) {
+      console.warn(
+        "[PostNord complete-session] Could not parse trackable id; keys:",
+        Object.keys(data as object)
+      );
+    }
     return NextResponse.json(data);
   } catch (err) {
     console.error("[PostNord complete-session]", err);

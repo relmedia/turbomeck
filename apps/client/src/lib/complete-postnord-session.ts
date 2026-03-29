@@ -1,3 +1,5 @@
+import { extractPostNordTrackableShipmentId } from "./postnord-shipment-response-id";
+
 /**
  * Books the shipment after checkout (PostNord Shipping Module complete-session).
  * Call after payment succeeds; returns shipment/tracking id or null.
@@ -39,9 +41,9 @@ export async function completePostNordSessionFromCheckoutPayload(payload: {
       },
     );
     if (!res.ok) return null;
-    const data = (await res.json()) as { shipmentId?: string; trackingId?: string };
-    const id = data?.shipmentId ?? data?.trackingId ?? null;
-    return typeof id === "string" && id.trim() ? id.trim() : null;
+    const data: unknown = await res.json();
+    const id = extractPostNordTrackableShipmentId(data);
+    return id;
   } catch {
     return null;
   }
