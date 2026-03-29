@@ -949,7 +949,7 @@ export default function ProductDetailPage() {
                   }
                 />
                 <div className="space-y-1 text-sm leading-snug">
-                  <span className="font-medium">Utbytes turbo</span>
+                  <span className="font-medium">Utbytes</span>
                   <p className="text-muted-foreground">
                     Visas för svenska kunder (geolokation/leveransland) i kassan. Avmarkera för tillbehör eller
                     turbo utan kärnbyte.
@@ -982,7 +982,7 @@ export default function ProductDetailPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Utbytes turbo</span>
+                <span className="text-muted-foreground">Utbytes</span>
                 <span>{formData.isExchangeTurbo ? "Ja" : "Nej"}</span>
               </div>
               <div className="flex justify-between">
