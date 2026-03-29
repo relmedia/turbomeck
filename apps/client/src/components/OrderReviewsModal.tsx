@@ -11,12 +11,8 @@ import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, normalizeShopOrderNumber } from "@/lib/utils";
 import { toast } from "react-toastify";
-
-function orderNumberForDisplay(orderNumber: string): string {
-  return String(orderNumber).replace(/^#+/, "").trim() || String(orderNumber);
-}
 
 function OrderItemReviewForm({
   productId,
@@ -419,7 +415,7 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
         <div className="p-4 space-y-4">
           <p className="text-sm text-muted-foreground">
             {t("orderReviews.orderIntro", {
-              orderNumber: orderNumberForDisplay(order.orderNumber),
+              orderNumber: normalizeShopOrderNumber(order.orderNumber),
             })}
           </p>
           <div className="space-y-4">

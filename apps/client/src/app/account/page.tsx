@@ -51,7 +51,7 @@ import OrderDetailModal from "@/components/OrderDetailModal";
 import OrderReviewsModal from "@/components/OrderReviewsModal";
 import { type SavedAddress } from "@/types";
 import { useWishlist } from "@/hooks/useWishlist";
-import { productUrl } from "@/lib/utils";
+import { normalizeShopOrderNumber, productUrl } from "@/lib/utils";
 
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
@@ -584,7 +584,7 @@ export default function AccountPage() {
                     const stripeReceiptLoading =
                       Boolean(order.stripePaymentId) && stripeInfo === undefined;
                     const tmOrderLine = t("account.tmOrderWithNumber", {
-                      n: order.orderNumber,
+                      n: normalizeShopOrderNumber(order.orderNumber),
                     });
                     const stripeReceiptLine =
                       order.stripePaymentId &&

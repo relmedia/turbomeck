@@ -7,7 +7,7 @@ import { useLanguage, useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import OrderTrackingPanel from "@/components/OrderTrackingPanel";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, normalizeShopOrderNumber } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {
   X,
@@ -31,10 +31,6 @@ type OrderDetailModalProps = {
   order: Order | null;
   onClose: () => void;
 };
-
-function orderNumberDisplay(orderNumber: string): string {
-  return String(orderNumber).replace(/^#+/, "").trim() || String(orderNumber);
-}
 
 function DetailSection({
   title,
@@ -110,7 +106,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
               };
 
   const numberLocale = locale === "en" ? "en-GB" : "sv-SE";
-  const displayRef = orderNumberDisplay(order.orderNumber);
+  const displayRef = normalizeShopOrderNumber(order.orderNumber);
 
   const trackingUrl = order.postNordTrackingId
     ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`

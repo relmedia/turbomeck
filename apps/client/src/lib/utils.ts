@@ -106,3 +106,12 @@ export function getCategoryIdsForFilter(
   const children = categories.filter((c) => c.parentId === id)
   return [id, ...children.map((c) => c.id)]
 }
+
+/**
+ * Strip leading "#" from stored order numbers so copy like "TM-order #{{n}}" never renders "##265".
+ */
+export function normalizeShopOrderNumber(orderNumber: string | number): string {
+  const s = String(orderNumber).trim();
+  const stripped = s.replace(/^#+/u, "").trim();
+  return stripped || s;
+}
