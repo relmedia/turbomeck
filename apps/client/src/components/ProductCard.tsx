@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { toast } from "react-toastify";
@@ -146,11 +147,12 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
           {product.isExchangeTurbo === true && (
             <Badge
-              variant="secondary"
-              className="absolute top-3 left-3 z-20 max-w-[calc(100%-5rem)] truncate border border-neutral-900/30 bg-[#6ec900] text-neutral-950 shadow-[0_2px_12px_rgba(0,0,0,0.35)] ring-2 ring-white/60"
+              variant="outline"
+              className="absolute top-3 left-3 z-20 flex max-w-[min(100%-1.5rem,14rem)] items-center gap-1 truncate rounded-md border-zinc-300/90 bg-white/90 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-800 shadow-sm backdrop-blur-sm dark:border-zinc-600/80 dark:bg-zinc-950/88 dark:text-zinc-100"
               title={t("product.exchangeTurboBadge")}
             >
-              {t("product.exchangeTurboBadge")}
+              <ArrowLeftRight className="size-3 shrink-0 text-zinc-500 dark:text-zinc-400" aria-hidden />
+              <span className="truncate">{t("product.exchangeTurboBadge")}</span>
             </Badge>
           )}
 
@@ -168,8 +170,8 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
               <Button
                 variant="secondary"
                 size="icon"
-className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none shrink-0"
-                  onClick={nextImage}
+                className="h-8 w-8 shrink-0 rounded-full bg-background/80 shadow-none backdrop-blur-sm"
+                onClick={nextImage}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
