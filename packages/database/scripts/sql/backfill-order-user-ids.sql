@@ -8,13 +8,13 @@ SELECT o.id,
        u.id AS matched_user_id
 FROM orders o
 INNER JOIN "user" u ON lower(trim(o.email)) = lower(trim(u.email))
-WHERE o.user_id IS NULL
+WHERE (o.user_id IS NULL OR btrim(o.user_id) = '')
 ORDER BY o.id;
 
 -- Orders still orphaned (no user with that email)
 SELECT o.id, o.order_number, o.email
 FROM orders o
-WHERE o.user_id IS NULL
+WHERE (o.user_id IS NULL OR btrim(o.user_id) = '')
   AND NOT EXISTS (
     SELECT 1
     FROM "user" u
@@ -26,5 +26,5 @@ ORDER BY o.id;
 UPDATE orders AS o
 SET user_id = u.id
 FROM "user" AS u
-WHERE o.user_id IS NULL
+WHERE (o.user_id IS NULL OR btrim(o.user_id) = '')
   AND lower(trim(o.email)) = lower(trim(u.email));
