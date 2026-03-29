@@ -109,7 +109,7 @@ const SingleUserPage = async ({ params }: Props) => {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="/studio/users">Kunder</BreadcrumbLink>
+            <BreadcrumbLink href="/users">Kunder</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

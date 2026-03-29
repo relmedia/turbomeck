@@ -153,7 +153,7 @@ export const createShippingColumns = (): ColumnDef<ShippingRow>[] => [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={`/studio/payments/${id}`}>
+              <Link href={`/payments/${id}`}>
                 Visa order
               </Link>
             </DropdownMenuItem>

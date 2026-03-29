@@ -378,7 +378,7 @@ export default function ProductDetailPage() {
         throw new Error("Failed to delete product");
       }
 
-      router.push("/studio/products");
+      router.push("/products");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
       setDeleting(false);
@@ -400,7 +400,7 @@ export default function ProductDetailPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/studio/products">Produkter</Link>
+                <Link href="/products">Produkter</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -424,7 +424,7 @@ export default function ProductDetailPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/studio/products">Produkter</Link>
+                <Link href="/products">Produkter</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />

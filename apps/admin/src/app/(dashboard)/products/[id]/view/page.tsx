@@ -149,7 +149,7 @@ export default function ProductViewPage() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Kunde inte ta bort produkt");
-      router.push("/studio/products");
+      router.push("/products");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ett fel uppstod");
       setDeleting(false);
@@ -180,7 +180,7 @@ export default function ProductViewPage() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href={fromPage ? `/studio/products?page=${fromPage}` : "/studio/products"}>Produkter</Link>
+                <Link href={fromPage ? `/products?page=${fromPage}` : "/products"}>Produkter</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -206,7 +206,7 @@ export default function ProductViewPage() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/studio/products">Produkter</Link>
+              <Link href="/products">Produkter</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
@@ -235,7 +235,7 @@ export default function ProductViewPage() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" asChild>
-            <Link href={`/studio/products/${product.id}${fromQuery}`}>
+            <Link href={`/products/${product.id}${fromQuery}`}>
               <Pencil className="w-4 h-4 mr-2" />
               Redigera
             </Link>
@@ -508,7 +508,7 @@ export default function ProductViewPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-muted-foreground">{formatTimeAgo(r.createdAt)}</span>
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs cursor-pointer" asChild>
-                            <Link href={`/studio/reviews/${r.id}/edit`}>
+                            <Link href={`/reviews/${r.id}/edit`}>
                               <Pencil className="w-3 h-3 mr-1" />
                               Redigera
                             </Link>
@@ -583,7 +583,7 @@ export default function ProductViewPage() {
                           className="mt-1.5 w-full justify-center cursor-pointer h-8 text-xs"
                           asChild
                         >
-                          <Link href="/studio/reviews">
+                          <Link href="/reviews">
                             <List className="w-4 h-4 mr-1.5" />
                             Visa alla recensioner
                           </Link>

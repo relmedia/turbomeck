@@ -75,10 +75,12 @@ function getMagicLinkBase(): string {
 
 /** Admin Next runs on :3001 in prod; flag may be missing from bundled env. */
 function isStudioAdminProcess(): boolean {
+  const verify = process.env["AUTH_VERIFY_PATH"] || "";
   return (
     process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1" ||
     process.env["PORT"] === "3001" ||
-    (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/")
+    verify.includes("/studio/") ||
+    verify === "/verify"
   );
 }
 

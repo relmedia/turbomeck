@@ -203,7 +203,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
               <DropdownMenuContent align="end">
                 {product.id > 0 && (
                   <DropdownMenuItem asChild>
-                    <Link href={`/studio/products/${product.id}`}>Visa produkt</Link>
+                    <Link href={`/products/${product.id}`}>Visa produkt</Link>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

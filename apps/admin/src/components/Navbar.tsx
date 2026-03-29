@@ -65,7 +65,7 @@ const Navbar = () => {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/studio/account" className="cursor-pointer">
+              <Link href="/account" className="cursor-pointer">
                 <User className="size-4" />
                 Konto
               </Link>

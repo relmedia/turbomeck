@@ -49,7 +49,7 @@ export default function EditReviewPage() {
         if (!res.ok) {
           if (res.status === 404) {
             toast.error("Recension hittades inte");
-            router.push("/studio/reviews");
+            router.push("/reviews");
             return;
           }
           throw new Error("Kunde inte hämta");
@@ -63,7 +63,7 @@ export default function EditReviewPage() {
         });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Ett fel uppstod");
-        router.push("/studio/reviews");
+        router.push("/reviews");
       } finally {
         setLoading(false);
       }
@@ -88,7 +88,7 @@ export default function EditReviewPage() {
         throw new Error(err.error || "Kunde inte uppdatera");
       }
       toast.success("Recension uppdaterad");
-      router.push("/studio/reviews");
+      router.push("/reviews");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kunde inte uppdatera");
     } finally {
@@ -109,7 +109,7 @@ export default function EditReviewPage() {
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/studio/reviews">Recensioner</BreadcrumbLink>
+            <BreadcrumbLink href="/reviews">Recensioner</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -120,7 +120,7 @@ export default function EditReviewPage() {
 
       <div className="mb-6 flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/studio/reviews">
+          <Link href="/reviews">
             <ArrowLeft className="w-4 h-4 mr-1" />
             Tillbaka
           </Link>
@@ -178,7 +178,7 @@ export default function EditReviewPage() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" asChild>
-              <Link href="/studio/reviews">Avbryt</Link>
+              <Link href="/reviews">Avbryt</Link>
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Sparar..." : "Spara"}

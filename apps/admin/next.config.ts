@@ -24,11 +24,10 @@ function coerceAdminAuthOriginToStudio(raw: string): string {
   }
 }
 
-/* Staff UI is served at `/` (rewritten to `/studio` internally). NextAuth must use `/`
- * for `pages.signIn` / `pages.error`, otherwise flows redirect the browser to `/studio`. */
+/* Staff UI is served at `/` (e.g. /products). NextAuth must use `/` for `pages.signIn` / `pages.error`. */
 process.env.AUTH_SIGNIN_PATH = "/";
 process.env.AUTH_VERIFY_PATH =
-  process.env.AUTH_VERIFY_PATH?.trim() || "/studio/verify";
+  process.env.AUTH_VERIFY_PATH?.trim() || "/verify";
 
 /* Lets @repo/auth reliably treat this process as studio (avoid relying on AUTH_VERIFY_PATH in the bundle). */
 process.env.STUDIO_AUTH_MAGIC_LINKS = "1";
@@ -62,17 +61,13 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
-  // Subdomain studio.turbomeck.cloud should use / as entry (not /studio in the URL bar).
+  /** Legacy bookmarks: /studio/... → /... */
   async redirects() {
     return [
       { source: "/studio", destination: "/", permanent: true },
       { source: "/studio/", destination: "/", permanent: true },
+      { source: "/studio/:path*", destination: "/:path*", permanent: true },
     ];
-  },
-  async rewrites() {
-    return {
-      beforeFiles: [{ source: "/", destination: "/studio" }],
-    };
   },
   env: {
     /* Inlined for next-auth/react. Never default to http://localhost in production builds

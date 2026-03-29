@@ -141,7 +141,7 @@ export const createColumns = (
       const name = row.getValue("productName") as string;
       return (
         <Link
-          href={`/studio/products/${productId}`}
+          href={`/products/${productId}`}
           className="text-primary hover:underline font-medium"
         >
           {name}
@@ -272,7 +272,7 @@ export const createColumns = (
               Visa
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href={`/studio/reviews/${review.id}/edit`} className="flex items-center">
+              <Link href={`/reviews/${review.id}/edit`} className="flex items-center">
                 <Pencil className="w-4 h-4 mr-2" />
                 Redigera
               </Link>

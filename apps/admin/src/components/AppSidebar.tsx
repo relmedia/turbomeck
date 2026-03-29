@@ -54,17 +54,17 @@ const items = [
   },
   {
     title: "Startsidan slider",
-    url: "/studio/slider",
+    url: "/slider",
     icon: ImageIcon,
   },
   {
     title: "Recensioner",
-    url: "/studio/reviews",
+    url: "/reviews",
     icon: Star,
   },
   {
     title: "Inställningar",
-    url: "/studio/settings",
+    url: "/settings",
     icon: Settings,
   },
 ];
@@ -128,7 +128,7 @@ const AppSidebar = ({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/products">
+                  <Link href="/products">
                     <Package />
                     Visa alla Produkter
                   </Link>
@@ -136,7 +136,7 @@ const AppSidebar = ({
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/categories">
+                  <Link href="/categories">
                     <FolderTree />
                     Visa alla Kategorier
                   </Link>
@@ -144,7 +144,7 @@ const AppSidebar = ({
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/products/add">
+                  <Link href="/products/add">
                     <Plus />
                     Lägg till produkt
                   </Link>
@@ -175,7 +175,7 @@ const AppSidebar = ({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/users">
+                  <Link href="/users">
                     <User />
                     Visa alla Användare
                   </Link>
@@ -205,7 +205,7 @@ const AppSidebar = ({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/payments">
+                  <Link href="/payments">
                     <ShoppingBag />
                     Visa alla Transaktioner
                   </Link>
@@ -213,7 +213,7 @@ const AppSidebar = ({
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/shipping">
+                  <Link href="/shipping">
                     <Truck />
                     Leveransdetaljer
                   </Link>
@@ -221,7 +221,7 @@ const AppSidebar = ({
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="/studio/coupons">
+                  <Link href="/coupons">
                     <Tag />
                     Rabattkoder
                   </Link>
@@ -286,7 +286,7 @@ const AppSidebar = ({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/studio/account" className="cursor-pointer">
+                  <Link href="/account" className="cursor-pointer">
                     <User className="size-4" />
                     Konto
                   </Link>

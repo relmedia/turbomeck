@@ -94,7 +94,7 @@ export function CustomerReviews() {
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/studio/reviews">
+          <Link href="/reviews">
             Visa alla
             <ChevronRight className="ml-1 h-4 w-4" />
           </Link>

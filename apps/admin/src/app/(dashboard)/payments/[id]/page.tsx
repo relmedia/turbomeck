@@ -265,7 +265,7 @@ export default function OrderDetailPage() {
     return (
       <div className="space-y-4 p-4 w-full">
         <Button variant="outline" size="sm" className="bg-white" asChild>
-          <Link href="/studio/payments">
+          <Link href="/payments">
             <ChevronLeft className="h-4 w-4 mr-2" />
             Tillbaka
           </Link>
@@ -287,7 +287,7 @@ export default function OrderDetailPage() {
     <div className="space-y-4 p-4 w-full">
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" className="bg-white" asChild>
-          <Link href="/studio/payments">
+          <Link href="/payments">
             <ChevronLeft className="h-4 w-4 mr-2" />
             Tillbaka
           </Link>

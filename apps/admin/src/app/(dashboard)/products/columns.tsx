@@ -296,7 +296,7 @@ export const createColumns = (
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
-              <Link href={`/studio/products/${product.id}/view${fromQuery}`}>Visa detaljer</Link>
+              <Link href={`/products/${product.id}/view${fromQuery}`}>Visa detaljer</Link>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(String(product.id))}
@@ -305,7 +305,7 @@ export const createColumns = (
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/studio/products/${product.id}${fromQuery}`}>Redigera</Link>
+              <Link href={`/products/${product.id}${fromQuery}`}>Redigera</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DeleteProductDialog

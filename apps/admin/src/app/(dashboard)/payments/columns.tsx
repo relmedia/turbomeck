@@ -249,7 +249,7 @@ export const createColumns = (onDelete?: (id: string) => Promise<void>): ColumnD
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/studio/payments/${payment.id}`} className="flex items-center">
+              <Link href={`/payments/${payment.id}`} className="flex items-center">
                 Visa kunddata
               </Link>
             </DropdownMenuItem>

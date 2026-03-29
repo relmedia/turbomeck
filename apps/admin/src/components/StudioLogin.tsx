@@ -112,7 +112,7 @@ function SignInContent() {
         window.location.href = result.url;
         return;
       }
-      window.location.href = "/studio/verify";
+      window.location.href = "/verify";
     } catch (err) {
       form.setError("root", {
         message: err instanceof Error ? err.message : "Något gick fel",

@@ -227,19 +227,19 @@ export function RecentOrders({ hideTitle, onToolbarRender, orders: ordersProp, f
                 </DropdownMenuItem>
                 {customerId && (
                   <DropdownMenuItem asChild>
-                    <Link href={`/studio/users/${customerId}`}>Visa kund</Link>
+                    <Link href={`/users/${customerId}`}>Visa kund</Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem asChild>
-                  <Link href={`/studio/payments/${order.id}`}>
+                  <Link href={`/payments/${order.id}`}>
                     Visa betalningsinformation
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`/studio/payments/${order.id}`}>Visa leveransdetaljer</Link>
+                  <Link href={`/payments/${order.id}`}>Visa leveransdetaljer</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/studio/payments">Visa alla ordrar</Link>
+                  <Link href="/payments">Visa alla ordrar</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

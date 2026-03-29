@@ -11,25 +11,25 @@ export function PageTitle() {
   const fromPage = searchParams.get("fromPage");
 
   const getTitle = () => {
-    if (pathname === "/" || pathname === "/studio") return "Dashboard";
-    if (pathname === "/studio/products/add") return "Lägg till produkt";
-    if (pathname.startsWith("/studio/products")) return "Produkter";
-    if (pathname.startsWith("/studio/users")) return "Användare";
-    if (pathname.startsWith("/studio/payments")) return "Transaktioner";
-    if (pathname.startsWith("/studio/shipping")) return "Leveransdetaljer";
-    if (pathname.startsWith("/studio/categories")) return "Kategorier";
-    if (pathname.startsWith("/studio/coupons")) return "Kuponger";
-    if (pathname.startsWith("/studio/reviews")) return "Recensioner";
-    if (pathname.startsWith("/studio/account")) return "Konto";
-    if (pathname.startsWith("/studio/settings")) return "Inställningar";
-    if (pathname.startsWith("/studio/slider")) return "Startsidan slider";
+    if (pathname === "/") return "Dashboard";
+    if (pathname === "/products/add") return "Lägg till produkt";
+    if (pathname.startsWith("/products")) return "Produkter";
+    if (pathname.startsWith("/users")) return "Användare";
+    if (pathname.startsWith("/payments")) return "Transaktioner";
+    if (pathname.startsWith("/shipping")) return "Leveransdetaljer";
+    if (pathname.startsWith("/categories")) return "Kategorier";
+    if (pathname.startsWith("/coupons")) return "Kuponger";
+    if (pathname.startsWith("/reviews")) return "Recensioner";
+    if (pathname.startsWith("/account")) return "Konto";
+    if (pathname.startsWith("/settings")) return "Inställningar";
+    if (pathname.startsWith("/slider")) return "Startsidan slider";
     return "Dashboard";
   };
 
   const showBackButton =
-    pathname === "/studio/products/add" ||
-    /^\/studio\/products\/[^/]+$/.test(pathname) ||
-    /^\/studio\/products\/[^/]+\/view$/.test(pathname);
+    pathname === "/products/add" ||
+    /^\/products\/[^/]+$/.test(pathname) ||
+    /^\/products\/[^/]+\/view$/.test(pathname);
 
   return (
     <div className="flex items-center gap-3">
@@ -40,7 +40,7 @@ export function PageTitle() {
           onClick={() => {
             const page = fromPage ? parseInt(fromPage, 10) : 0;
             if (page > 1) {
-              window.location.href = `/studio/products?page=${page}`;
+              window.location.href = `/products?page=${page}`;
             } else {
               router.back();
             }

@@ -78,7 +78,7 @@ const ProductsPage = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button size="sm" asChild>
-            <Link href="/studio/products/add">
+            <Link href="/products/add">
               <Plus className="mr-1 h-4 w-4" />
               Lägg till produkt
             </Link>

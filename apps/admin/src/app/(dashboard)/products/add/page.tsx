@@ -14,7 +14,7 @@ export default function AddProductPage() {
           <CardTitle>Lägg till Produkt</CardTitle>
         </CardHeader>
         <CardContent>
-          <AddProductForm onSuccess={() => router.push("/studio/products")} />
+          <AddProductForm onSuccess={() => router.push("/products")} />
         </CardContent>
       </Card>
     </div>
