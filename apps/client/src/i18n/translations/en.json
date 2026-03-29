@@ -96,7 +96,8 @@
     "coreExchangeCheckoutHint": "For delivery to Sweden, you choose at checkout whether to return your old turbo within 14 days or pay the core charge per our terms.",
     "adding": "Adding...",
     "selectVariant": "Select variant before adding to cart.",
-    "viewProduct": "View product"
+    "viewProduct": "View product",
+    "exchangeTurboBadge": "Exchange turbo"
   },
   "reviews": {
     "title": "Reviews",

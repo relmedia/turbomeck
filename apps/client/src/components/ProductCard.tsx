@@ -8,12 +8,12 @@ import useCartStore from "@/stores/cartStore";
 import type { ProductType } from "@/types";
 import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
-import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Heart,
   ShoppingCart,
@@ -40,7 +40,6 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
-  const { isSweden } = useGeoCountry();
   const { addToCart } = useCartStore();
   const [reviewStats, setReviewStats] = useState<{
     averageRating: number;
@@ -144,6 +143,16 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
               onLoad={() => setImageLoaded(true)}
             />
           </motion.div>
+
+          {product.isExchangeTurbo === true && (
+            <Badge
+              variant="secondary"
+              className="absolute top-3 left-3 z-20 max-w-[calc(100%-5rem)] border border-border/80 bg-background/90 text-foreground shadow-sm backdrop-blur-sm truncate"
+              title={t("product.exchangeTurboBadge")}
+            >
+              {t("product.exchangeTurboBadge")}
+            </Badge>
+          )}
 
           {/* Navigation arrows */}
           {images.length > 1 && (

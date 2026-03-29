@@ -96,7 +96,8 @@
     "coreExchangeCheckoutHint": "För leveranser inom Sverige väljer du i kassan om du skickar in din gamla turbo inom 14 dagar eller betalar kärnavgift enligt köpvillkoren.",
     "adding": "Lägger till...",
     "selectVariant": "Välj variant innan du lägger i varukorgen.",
-    "viewProduct": "Visa produkt"
+    "viewProduct": "Visa produkt",
+    "exchangeTurboBadge": "Utbytes turbo"
   },
   "reviews": {
     "title": "Recensioner",
