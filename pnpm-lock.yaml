@@ -261,11 +261,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/sanitize-html
       '@stripe/react-stripe-js':
-        specifier: ^3.6.0
-        version: 3.10.0(@stripe/stripe-js@7.9.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
+        specifier: ^6.0.0
+        version: 6.0.0(@stripe/stripe-js@9.0.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
       '@stripe/stripe-js':
-        specifier: ^7.0.0
-        version: 7.9.0
+        specifier: ^9.0.0
+        version: 9.0.0
       '@tabler/icons-react':
         specifier: ^3.40.0
         version: 3.40.0(react@19.1.4)
@@ -2221,15 +2221,15 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
-  '@stripe/react-stripe-js@3.10.0':
-    resolution: {integrity: sha512-UPqHZwMwDzGSax0ZI7XlxR3tZSpgIiZdk3CiwjbTK978phwR/fFXeAXQcN/h8wTAjR4ZIAzdlI9DbOqJhuJdeg==}
+  '@stripe/react-stripe-js@6.0.0':
+    resolution: {integrity: sha512-vJW37/uyRAJEkD3YKCh3aISmMIMrQGR3ViVBkUVQDB7CqbRCnOUyhwDe8zKg+d6K8V4d0MUcthcQdHL4meqG7A==}
     peerDependencies:
-      '@stripe/stripe-js': '>=1.44.1 <8.0.0'
+      '@stripe/stripe-js': '>=9.0.0 <10.0.0'
       react: 19.1.4
       react-dom: 19.1.4
 
-  '@stripe/stripe-js@7.9.0':
-    resolution: {integrity: sha512-ggs5k+/0FUJcIgNY08aZTqpBTtbExkJMYMLSMwyucrhtWexVOEY1KJmhBsxf+E/Q15f5rbwBpj+t0t2AW2oCsQ==}
+  '@stripe/stripe-js@9.0.0':
+    resolution: {integrity: sha512-UtUK7LFglQSNVIOwcRBaxfzq4wkfU8CT2f2uQVEeu65jTP6wicxFshYdYCke9Tfd0PCxhOe/b8rwJjr5EiDCfQ==}
     engines: {node: '>=12.16'}
 
   '@swc/helpers@0.5.15':
@@ -6979,14 +6979,14 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
-  '@stripe/react-stripe-js@3.10.0(@stripe/stripe-js@7.9.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)':
+  '@stripe/react-stripe-js@6.0.0(@stripe/stripe-js@9.0.0)(react-dom@19.1.4(react@19.1.4))(react@19.1.4)':
     dependencies:
-      '@stripe/stripe-js': 7.9.0
+      '@stripe/stripe-js': 9.0.0
       prop-types: 15.8.1
       react: 19.1.4
       react-dom: 19.1.4(react@19.1.4)
 
-  '@stripe/stripe-js@7.9.0': {}
+  '@stripe/stripe-js@9.0.0': {}
 
   '@swc/helpers@0.5.15':
     dependencies:
