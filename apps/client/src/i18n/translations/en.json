@@ -242,6 +242,19 @@
     "exportFilename": "turbomeck-my-data",
     "saveError": "Could not save"
   },
+  "orderSuccess": {
+    "title": "Payment completed",
+    "message": "Thank you for your payment. Your order is being processed.",
+    "amountPaid": "Amount paid:",
+    "paymentMethod": "Payment method:",
+    "paymentMethodCard": "Card",
+    "dateTime": "Date & time:",
+    "backToHome": "Back to homepage",
+    "viewOrderHistory": "View order history",
+    "completingOrder": "Completing your order...",
+    "createOrderFailed": "Could not complete the order",
+    "backToCart": "Back to cart"
+  },
   "orderDetail": {
     "orderTitle": "Order",
     "status": "Status",

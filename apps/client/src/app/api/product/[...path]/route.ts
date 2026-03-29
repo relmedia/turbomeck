@@ -192,9 +192,13 @@ export async function POST(
     } else {
       body = await req.text();
     }
+    let forwardBody: BodyInit | undefined = body || undefined;
+    if (typeof body === "string" && pathStr === "orders") {
+      forwardBody = await applySessionUserIdToCheckoutBody(pathStr, body);
+    }
     const fetchInit: RequestInit = {
       method: "POST",
-      body: body || undefined,
+      body: forwardBody,
     };
     if (typeof body === "string") {
       fetchInit.headers = { "Content-Type": contentType || "application/json" };

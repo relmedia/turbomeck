@@ -542,10 +542,10 @@ export default function AccountPage() {
                 <div className="py-12 text-center">
                   <Package className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                   <p className="text-muted-foreground mb-4">
-                    Du har inte gjort några beställningar ännu.
+                    {t("account.noOrdersYet")}
                   </p>
                   <Link href="/products">
-                    <Button variant="outline">Handla nu</Button>
+                    <Button variant="outline">{t("account.shopNow")}</Button>
                   </Link>
                 </div>
               ) : (
@@ -554,16 +554,7 @@ export default function AccountPage() {
                     const trackingUrl = order.postNordTrackingId
                       ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
                       : null;
-                    const statusLabel =
-                      order.status === "confirmed"
-                        ? "Bekräftad"
-                        : order.status === "shipped"
-                          ? "Skickad"
-                          : order.status === "delivered"
-                            ? "Levererad"
-                            : order.status === "cancelled"
-                              ? "Avbruten"
-                              : order.status;
+                    const statusLabel = orderStatusLabel(order.status);
 
                     return (
                       <div
@@ -588,8 +579,10 @@ export default function AccountPage() {
                               {t("account.order")} #{order.orderNumber}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {Number(order.total ?? 0).toLocaleString("sv-SE")} kr ·{" "}
-                              {statusLabel}
+                              {Number(order.total ?? 0).toLocaleString(
+                                locale === "en" ? "en-GB" : "sv-SE",
+                              )}{" "}
+                              {t("common.kr")} · {statusLabel}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {new Date(order.createdAt).toLocaleDateString(

@@ -242,6 +242,19 @@
     "exportFilename": "turbomeck-mina-uppgifter",
     "saveError": "Kunde inte spara"
   },
+  "orderSuccess": {
+    "title": "Betalning genomförd",
+    "message": "Tack för din betalning. Din beställning behandlas.",
+    "amountPaid": "Belopp betalt:",
+    "paymentMethod": "Betalningsmetod:",
+    "paymentMethodCard": "Kort",
+    "dateTime": "Datum & tid:",
+    "backToHome": "Till startsidan",
+    "viewOrderHistory": "Visa orderhistorik",
+    "completingOrder": "Slutför beställningen...",
+    "createOrderFailed": "Kunde inte slutföra beställningen",
+    "backToCart": "Tillbaka till varukorgen"
+  },
   "orderDetail": {
     "orderTitle": "Beställning",
     "status": "Status",
