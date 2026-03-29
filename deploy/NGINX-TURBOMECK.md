@@ -65,6 +65,8 @@ Mail is sent by `@repo/auth` using **`app_settings.mail`** (JSON) in the databas
 
 2. **Public `GET /api/product` 307 to login** — If an nginx regex sends **GET** catalog requests to **3001**, fix the regex (do not include `product` in the admin-only API block on the **apex** server).
 
+3. **Account page shows 0 orders / CORS or `access-denied`** — On the **apex** (`turbomeck.cloud`), **`GET /api/orders`** must go to the **storefront (:3000)** (session-scoped list for customers). If the admin-only nginx regex includes **`orders`**, that request hits **admin (:3001)**, which rejects the shop session and may redirect to `studio.…/access-denied`, causing fetch failures. **Do not include `orders` in the apex admin API regex** — staff use **`https://studio.turbomeck.cloud/api/orders`** (all studio traffic is :3001). If you use a separate host such as **`api.turbomeck.cloud`**, route **`/api/orders`** the same way as on the apex shop (to the client app), not to admin-only upstreams.
+
 ### Smokes
 
 ```bash

@@ -40,7 +40,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-md backdrop-saturate-150 dark:bg-black/40 dark:backdrop-blur-lg"
       onClick={onClose}
     >
       <div
