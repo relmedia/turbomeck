@@ -51,16 +51,6 @@ function categoryDisplayName(c: Category): string {
   return c.parentName ? `${c.parentName} › ${c.name}` : c.name;
 }
 
-function selectedCategoriesIncludeTurbo(categories: Category[], categoryIds: number[]): boolean {
-  for (const id of categoryIds) {
-    const c = categories.find((x) => x.id === id);
-    if (!c) continue;
-    const hay = `${c.parentName ?? ""} ${c.name}`.toLowerCase();
-    if (hay.includes("turbo")) return true;
-  }
-  return false;
-}
-
 const formSchema = z.object({
   name: z.string().min(1, { message: "Produkt namn är obligatoriskt!" }),
   shortDescription: z
@@ -119,19 +109,6 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       isExchangeTurbo: false,
     },
   });
-
-  const categoryIdsWatched = form.watch("categoryIds");
-  const showExchangeTurboToggle = selectedCategoriesIncludeTurbo(
-    categories,
-    categoryIdsWatched ?? []
-  );
-
-  useEffect(() => {
-    if (categories.length === 0) return;
-    if (!selectedCategoriesIncludeTurbo(categories, categoryIdsWatched ?? [])) {
-      form.setValue("isExchangeTurbo", false);
-    }
-  }, [categories, categoryIdsWatched, form]);
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch(`${PRODUCT_API}/categories`);
@@ -761,7 +738,8 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           )}
         />
 
-        {showExchangeTurboToggle && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Kärnretur (endast Sverige i kassan)</p>
           <FormField
             control={form.control}
             name="isExchangeTurbo"
@@ -771,15 +749,16 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                   <Checkbox checked={field.value} onCheckedChange={(v) => field.onChange(v === true)} />
                 </FormControl>
                 <div className="space-y-1 leading-none">
-                  <FormLabel className="cursor-pointer">Utbytes turbo (kärnretur)</FormLabel>
+                  <FormLabel className="cursor-pointer">Detta är en utbytes turbo</FormLabel>
                   <FormDescription>
-                    Gäller vid leverans till Sverige: kunden väljer kärnretur eller kärnavgift i kassan.
+                    I kassan visas då valet kärnretur vs. kärnavgift när leveransland är Sverige. Lämna avmarkerat
+                    för övriga produkter (t.ex. tillbehör eller ny turbo utan kärnbyte).
                   </FormDescription>
                 </div>
               </FormItem>
             )}
           />
-        )}
+        </div>
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? (

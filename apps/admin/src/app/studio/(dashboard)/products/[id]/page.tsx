@@ -63,16 +63,6 @@ function categoryDisplayName(c: Category): string {
   return c.parentName ? `${c.parentName} › ${c.name}` : c.name;
 }
 
-function selectedCategoriesIncludeTurbo(categories: Category[], categoryIds: number[]): boolean {
-  for (const id of categoryIds) {
-    const c = categories.find((x) => x.id === id);
-    if (!c) continue;
-    const hay = `${c.parentName ?? ""} ${c.name}`.toLowerCase();
-    if (hay.includes("turbo")) return true;
-  }
-  return false;
-}
-
 type Product = {
   id: number;
   name: string;
@@ -141,15 +131,6 @@ export default function ProductDetailPage() {
     thumbnails: [],
     isExchangeTurbo: false,
   });
-
-  const showExchangeTurboToggle = selectedCategoriesIncludeTurbo(categories, formData.categoryIds);
-
-  useEffect(() => {
-    if (categories.length === 0) return;
-    if (!selectedCategoriesIncludeTurbo(categories, formData.categoryIds)) {
-      setFormData((prev) => (prev.isExchangeTurbo ? { ...prev, isExchangeTurbo: false } : prev));
-    }
-  }, [categories, formData.categoryIds]);
 
   const fetchProduct = useCallback(async () => {
     setLoading(true);
@@ -928,7 +909,8 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
-                {showExchangeTurboToggle && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Kärnretur (endast Sverige i kassan)</p>
                   <label className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer">
                     <Checkbox
                       checked={formData.isExchangeTurbo}
@@ -937,13 +919,14 @@ export default function ProductDetailPage() {
                       }
                     />
                     <div className="space-y-1 text-sm leading-snug">
-                      <span className="font-medium">Utbytes turbo (kärnretur)</span>
+                      <span className="font-medium">Detta är en utbytes turbo</span>
                       <p className="text-muted-foreground">
-                        Gäller vid leverans till Sverige: kunden väljer kärnretur eller kärnavgift i kassan.
+                        I kassan visas då valet kärnretur vs. kärnavgift när leveransland är Sverige. Lämna avmarkerat
+                        för övriga produkter (t.ex. tillbehör eller ny turbo utan kärnbyte).
                       </p>
                     </div>
                   </label>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -992,6 +975,10 @@ export default function ProductDetailPage() {
                         .join(", ")
                     : "—"}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Utbytes turbo</span>
+                <span>{formData.isExchangeTurbo ? "Ja" : "Nej"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Skapad</span>

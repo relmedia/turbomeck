@@ -12,8 +12,13 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Turbomeck Admin",
-  description: "Turbomeck Backend Admin Panel",
+  title: "Turbomeck Studio",
+  description: "Turbomeck Studio",
+  icons: {
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+    apple: "/logo.svg",
+    shortcut: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

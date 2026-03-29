@@ -95,7 +95,7 @@ const AppSidebar = ({
             <SidebarMenuButton asChild>
               <Link href="/" className="[&>span]:text-lg [&>span]:font-semibold">
                 <Image src="/logo.svg" alt="logo" width={24} height={24} />
-                <span>Turbomeck</span>
+                <span>Turbomeck Studio</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

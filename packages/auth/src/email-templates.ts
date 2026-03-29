@@ -148,7 +148,7 @@ export function renderTestEmail(): { html: string; text: string } {
       E-postkonfiguration verifierad
     </h2>
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: ${TEXT_COLOR};">
-      Detta är en testmail från Turbomeck-adminpanelen. Om du läser detta meddelande har e-postinställningarna konfigurerats korrekt och du kan nu ta emot transaktionsmail till dina kunder.
+      Detta är en testmail från Turbomeck Studio. Om du läser detta meddelande har e-postinställningarna konfigurerats korrekt och du kan nu ta emot transaktionsmail till dina kunder.
     </p>
     <div style="margin-top: 24px; padding: 16px; background-color: ${BG_LIGHT}; border-radius: 6px; border-left: 4px solid ${BRAND_COLOR};">
       <p style="margin: 0; font-size: 14px; color: ${MUTED_COLOR};">
@@ -159,7 +159,7 @@ export function renderTestEmail(): { html: string; text: string } {
 
   const text = `E-postkonfiguration verifierad
 
-Detta är en testmail från Turbomeck-adminpanelen. Om du läser detta meddelande har e-postinställningarna konfigurerats korrekt.`;
+Detta är en testmail från Turbomeck Studio. Om du läser detta meddelande har e-postinställningarna konfigurerats korrekt.`;
 
   return { html, text };
 }
