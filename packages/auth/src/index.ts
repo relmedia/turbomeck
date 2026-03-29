@@ -73,8 +73,35 @@ function getMagicLinkBase(): string {
   );
 }
 
+/** When admin .env uses shop apex for NEXTAUTH_URL, force studio host (matches apps/admin/next.config). */
+function coerceMagicLinkBaseForStudioProcess(baseRaw: string): string {
+  if (process.env["STUDIO_AUTH_MAGIC_LINKS"] !== "1") return baseRaw;
+  const studio =
+    process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || "studio.turbomeck.cloud";
+  const apex = new Set(
+    (process.env["ADMIN_SHOP_AUTH_HOSTNAMES"] || "turbomeck.cloud,www.turbomeck.cloud")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  try {
+    const normalized = baseRaw.replace(/\/$/, "");
+    const u = new URL(normalized.includes("://") ? normalized : `https://${normalized}`);
+    if (apex.has(u.hostname)) {
+      u.hostname = new URL(`https://${studio}`).hostname;
+      return u.origin;
+    }
+  } catch {
+    /* keep */
+  }
+  return baseRaw.replace(/\/$/, "");
+}
+
 function isAdminStudioAuthApp(): boolean {
-  return (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/");
+  return (
+    process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1" ||
+    (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/")
+  );
 }
 
 /**
@@ -105,7 +132,8 @@ function coerceAdminMagicLinkCallback(link: string, base: URL): string {
  * Auth.js may pass the storefront origin or a relative path; rewrite using this app’s PUBLIC_AUTH_ORIGIN.
  */
 function magicLinkUrlForThisApp(url: string): string {
-  const baseRaw = getMagicLinkBase();
+  let baseRaw = getMagicLinkBase();
+  if (baseRaw) baseRaw = coerceMagicLinkBaseForStudioProcess(baseRaw);
   if (!baseRaw) {
     if (process.env["NODE_ENV"] !== "production") {
       console.warn(
@@ -175,16 +203,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
             : {},
         });
-        if (
-          process.env["NODE_ENV"] === "production" &&
-          isAdminStudioAuthApp() &&
-          !getMagicLinkBase()
-        ) {
-          console.error(
-            "[@repo/auth] Admin: set NEXTAUTH_URL=https://studio… in apps/admin/.env (and PM2) so magic links are not sent as storefront URLs.",
-          );
-        }
         const link = magicLinkUrlForThisApp(url);
+        if (process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1") {
+          try {
+            const stillShop =
+              /\/\/(www\.)?turbomeck\.cloud(\/|\?|$)/i.test(link) &&
+              !link.includes("studio.turbomeck.cloud");
+            if (stillShop) {
+              console.error(
+                "[@repo/auth] Magic link still on shop host after rewrite. Check admin env / deploy.",
+                { in: url, out: link },
+              );
+            }
+          } catch {
+            /* ignore */
+          }
+        }
         const { html, text } = renderMagicLinkEmail(link);
         await transporter.sendMail({
           from: config.from || config.user || "noreply@localhost",

@@ -36,6 +36,29 @@ function loadDotenv(relDirFromRepoRoot) {
   return env;
 }
 
+/** If admin .env uses the shop apex for auth URLs, PM2 must rewrite to the studio host (see apps/admin/next.config). */
+function coerceAdminMagicLinkOrigin(env, raw) {
+  if (!raw || typeof raw !== "string") return raw;
+  const t = raw.trim();
+  const studio = (env.ADMIN_STUDIO_HOSTNAME || "studio.turbomeck.cloud").trim();
+  const apex = new Set(
+    (env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud")
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean),
+  );
+  try {
+    const url = new URL(t);
+    if (apex.has(url.hostname)) {
+      url.hostname = new URL(`https://${studio}`).hostname;
+      return url.origin;
+    }
+    return t.replace(/\/$/, "");
+  } catch {
+    return t;
+  }
+}
+
 const productServiceEnv = loadDotenv("apps/product-service");
 const clientEnv = loadDotenv("apps/client");
 const adminEnv = loadDotenv("apps/admin");
@@ -104,9 +127,19 @@ module.exports = {
         AUTH_SIGNIN_PATH: "/",
         AUTH_VERIFY_PATH: adminEnv.AUTH_VERIFY_PATH?.trim() || "/studio/verify",
         ...((): Record<string, string> => {
-          /* Prefer NEXTAUTH_URL so a mistaken storefront AUTH_URL in .env does not steal magic links. */
-          const u = (adminEnv.NEXTAUTH_URL || adminEnv.AUTH_URL || "").trim();
-          return u ? { AUTH_URL: u, PUBLIC_AUTH_ORIGIN: u } : {};
+          const raw = (
+            adminEnv.ADMIN_CANONICAL_ORIGIN ||
+            adminEnv.NEXTAUTH_URL ||
+            adminEnv.AUTH_URL ||
+            ""
+          ).trim();
+          const out = { STUDIO_AUTH_MAGIC_LINKS: "1" };
+          if (!raw) return out;
+          const fixed = coerceAdminMagicLinkOrigin(adminEnv, raw);
+          out.AUTH_URL = fixed;
+          out.NEXTAUTH_URL = fixed;
+          out.PUBLIC_AUTH_ORIGIN = fixed;
+          return out;
         })(),
         PORT: "3001",
       },

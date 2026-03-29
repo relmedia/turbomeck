@@ -1,15 +1,45 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const ADMIN_STUDIO_HOST = process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.cloud";
+const SHOP_APEX_HOSTS = new Set(
+  (process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+);
+
+/** If .env reuses the shop apex for NEXTAUTH_URL, magic links must use the studio host instead. */
+function coerceAdminAuthOriginToStudio(raw: string): string {
+  const t = raw.trim().replace(/\/$/, "");
+  try {
+    const u = new URL(t);
+    if (SHOP_APEX_HOSTS.has(u.hostname)) {
+      u.hostname = new URL(`https://${ADMIN_STUDIO_HOST}`).hostname;
+      return u.origin;
+    }
+    return t.includes("://") ? u.origin : t;
+  } catch {
+    return t;
+  }
+}
+
 /* Staff UI is served at `/` (rewritten to `/studio` internally). NextAuth must use `/`
  * for `pages.signIn` / `pages.error`, otherwise flows redirect the browser to `/studio`. */
 process.env.AUTH_SIGNIN_PATH = "/";
 process.env.AUTH_VERIFY_PATH =
   process.env.AUTH_VERIFY_PATH?.trim() || "/studio/verify";
 
-/* Auth.js uses AUTH_URL for absolute URLs in emails; keep both in sync (NEXTAUTH_URL wins if both set). */
-const adminPublicUrl = process.env.NEXTAUTH_URL?.trim() || process.env.AUTH_URL?.trim();
+/* Lets @repo/auth reliably treat this process as studio (avoid relying on AUTH_VERIFY_PATH in the bundle). */
+process.env.STUDIO_AUTH_MAGIC_LINKS = "1";
+
+/* Auth.js uses AUTH_URL for absolute URLs in emails; ADMIN_CANONICAL_ORIGIN wins when set. */
+let adminPublicUrl =
+  process.env.ADMIN_CANONICAL_ORIGIN?.trim() ||
+  process.env.NEXTAUTH_URL?.trim() ||
+  process.env.AUTH_URL?.trim();
 if (adminPublicUrl) {
+  adminPublicUrl = coerceAdminAuthOriginToStudio(adminPublicUrl);
   process.env.AUTH_URL = adminPublicUrl;
   process.env.NEXTAUTH_URL = adminPublicUrl;
 }
