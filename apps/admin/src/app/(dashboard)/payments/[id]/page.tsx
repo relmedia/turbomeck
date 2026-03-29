@@ -11,6 +11,7 @@ import {
   Package,
   Truck,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -60,7 +61,9 @@ type OrderDetail = {
   deliveryStatus: "processing" | "shipped" | "out_for_delivery" | "delivered";
   shippedDate?: string;
   servicePointName?: string;
+  servicePointId?: string;
   deliveryOption?: string;
+  country?: string;
   postNordTrackingId?: string;
   items: OrderItem[];
 };
@@ -159,6 +162,8 @@ export default function OrderDetailPage() {
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [markingCoreReceived, setMarkingCoreReceived] = useState(false);
+  const [postnordBooking, setPostnordBooking] = useState(false);
+  const [bookWeightKg, setBookWeightKg] = useState(3);
 
   useEffect(() => {
     if (!id) return;
@@ -256,6 +261,55 @@ export default function OrderDetailPage() {
       toast.error("Kunde inte spara");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePostnordEdiBook = async () => {
+    if (!id || !order) return;
+    const tid = toValidTrackingId(order.postNordTrackingId);
+    const payload: { weightKg: number; replaceExisting?: boolean } = {
+      weightKg: Math.max(0.1, Math.min(35, Number(bookWeightKg) || 3)),
+    };
+    if (tid) {
+      const ok = window.confirm(
+        "Ordern har redan ett spårningsnummer. Vill du boka en ny försändelse hos PostNord och ersätta det?"
+      );
+      if (!ok) return;
+      payload.replaceExisting = true;
+    }
+    setPostnordBooking(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/postnord-book-shipment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof data.error === "string" ? data.error : "Bokning misslyckades");
+        if (typeof data.details === "string" && data.details.length < 500) {
+          console.error("[PostNord EDI]", data.details);
+        }
+        return;
+      }
+      toast.success(`Frakt bokad — spårning: ${data.postNordTrackingId ?? ""}`);
+      if (data.postNordPrintId) {
+        toast.info(`PrintId (etikett): ${data.postNordPrintId}`);
+      }
+      if (data.shipmentEmailSent === true) {
+        toast.info("Leveransmejl skickat till kund");
+      } else if (data.shipmentEmailError) {
+        toast.warn(`Leveransmejl: ${data.shipmentEmailError}`);
+      }
+      const refetch = await fetch(`/api/orders/${id}`);
+      const updated = await refetch.json();
+      setOrder(updated);
+      setEditStatus(updated.status ?? "confirmed");
+      setEditTrackingId(toValidTrackingId(updated.postNordTrackingId));
+    } catch {
+      toast.error("Bokning misslyckades");
+    } finally {
+      setPostnordBooking(false);
     }
   };
 
@@ -503,6 +557,57 @@ export default function OrderDetailPage() {
                 style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
               />
             </div>
+            {(order.country ?? "SE").toUpperCase() === "SE" &&
+              (order.deliveryOption ?? "servicepoint").toLowerCase() === "servicepoint" &&
+              order.servicePointId && (
+                <div className="rounded-lg border border-amber-200/90 bg-amber-50/60 px-3 py-3 text-xs dark:border-amber-900/60 dark:bg-amber-950/25 space-y-2">
+                  <p className="font-medium text-amber-950 dark:text-amber-100">
+                    Boka frakt — PostNord Boknings-API (ombud)
+                  </p>
+                  <p className="text-muted-foreground leading-snug">
+                    Anropar{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POST …/v3/edi</code> med
+                    kundens ombud. Konfigurera avsändare och{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_CUSTOMER_NUMBER</code>,{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_BASIC_SERVICE_CODE</code>{" "}
+                    m.m. i <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code> (se{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env.example</code>).
+                  </p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="edi-weight" className="text-xs">
+                        Vikt (kg)
+                      </Label>
+                      <Input
+                        id="edi-weight"
+                        type="number"
+                        step="0.1"
+                        min={0.1}
+                        max={35}
+                        className="h-9 w-24"
+                        value={bookWeightKg}
+                        onChange={(e) => setBookWeightKg(parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-9 gap-2"
+                      disabled={postnordBooking}
+                      onClick={handlePostnordEdiBook}
+                    >
+                      {postnordBooking ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : null}
+                      Boka frakt (EDI)
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono break-all">
+                    Ombud: {order.servicePointId}
+                    {order.servicePointName ? ` — ${order.servicePointName}` : ""}
+                  </p>
+                </div>
+              )}
             <div className="mt-4 space-y-3 border-t pt-4">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="space-y-1.5">

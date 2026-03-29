@@ -3,6 +3,7 @@ import { db } from "@repo/database";
 import { orders, orderItems } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
 
 const VALID_STATUSES = ["confirmed", "deposit_paid", "shipped", "delivered", "cancelled", "completed"] as const;
 
@@ -190,8 +191,14 @@ export async function GET(
       orderNumber: order.orderNumber,
       placedDate: order.createdAt?.toISOString?.()?.slice(0, 10) ?? "",
       customerName: `${order.firstName} ${order.lastName}`.trim(),
+      firstName: order.firstName,
+      lastName: order.lastName,
       customerEmail: order.email,
       address: addressLine,
+      addressStreet: order.address,
+      postalCode: order.postalCode,
+      city: order.city,
+      country: order.country ?? "SE",
       phone: order.phone ?? undefined,
       paymentMethod: "Kort",
       paymentLast4,
@@ -209,6 +216,7 @@ export async function GET(
       status: order.status ?? "confirmed",
       deliveryStatus: mapToDeliveryStatus(order.status),
       servicePointName: order.servicePointName ?? undefined,
+      servicePointId: order.servicePointId ?? undefined,
       deliveryOption: order.deliveryOption ?? "servicepoint",
       postNordTrackingId: order.postNordTrackingId ?? undefined,
       items: items.map((i) => ({
@@ -223,37 +231,6 @@ export async function GET(
   } catch (err) {
     console.error("Failed to fetch order:", err);
     return NextResponse.json({ error: "Failed to fetch order" }, { status: 500 });
-  }
-}
-
-/**
- * Calls product-service to send “shipped” email (must complete — do not float on serverless).
- * Strips trailing /api from PRODUCT_SERVICE_URL if set by mistake.
- */
-async function triggerShipmentDispatchedEmail(orderId: number): Promise<void> {
-  const secret = process.env.INTERNAL_PRODUCT_API_SECRET?.trim();
-  let base = (process.env.PRODUCT_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
-  if (base.endsWith("/api")) {
-    base = base.slice(0, -4);
-  }
-  if (!secret) {
-    throw new Error("INTERNAL_PRODUCT_API_SECRET is not set on admin (cannot call product-service)");
-  }
-  const res = await fetch(`${base}/api/orders/${orderId}/send-shipment-notification`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${secret}`,
-    },
-    body: JSON.stringify({ locale: "sv" }),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Shipment notification HTTP ${res.status}: ${text || res.statusText}`);
-  }
-  const payload = (await res.json().catch(() => ({}))) as { success?: boolean };
-  if (payload.success === false) {
-    throw new Error("Product-service reported shipment email was not sent");
   }
 }
 
