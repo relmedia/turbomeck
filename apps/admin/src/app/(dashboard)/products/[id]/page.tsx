@@ -909,24 +909,6 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Kärnretur (endast Sverige i kassan)</p>
-                  <label className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer">
-                    <Checkbox
-                      checked={formData.isExchangeTurbo}
-                      onCheckedChange={(v) =>
-                        setFormData((prev) => ({ ...prev, isExchangeTurbo: v === true }))
-                      }
-                    />
-                    <div className="space-y-1 text-sm leading-snug">
-                      <span className="font-medium">Detta är en utbytes turbo</span>
-                      <p className="text-muted-foreground">
-                        I kassan visas då valet kärnretur vs. kärnavgift när leveransland är Sverige. Lämna avmarkerat
-                        för övriga produkter (t.ex. tillbehör eller ny turbo utan kärnbyte).
-                      </p>
-                    </div>
-                  </label>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -951,6 +933,29 @@ export default function ProductDetailPage() {
                 }
                 disabled={saving}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Kärnretur (kassan)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <label className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer">
+                <Checkbox
+                  checked={formData.isExchangeTurbo}
+                  onCheckedChange={(v) =>
+                    setFormData((prev) => ({ ...prev, isExchangeTurbo: v === true }))
+                  }
+                />
+                <div className="space-y-1 text-sm leading-snug">
+                  <span className="font-medium">Utbytes turbo</span>
+                  <p className="text-muted-foreground">
+                    Visas för svenska kunder (geolokation/leveransland) i kassan. Avmarkera för tillbehör eller
+                    turbo utan kärnbyte.
+                  </p>
+                </div>
+              </label>
             </CardContent>
           </Card>
 

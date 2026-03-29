@@ -24,6 +24,7 @@ import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
 import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
+import { useGeoCountry } from "@/hooks/useGeoCountry";
 
 
 const CartPage: React.FC = () => {
@@ -129,15 +130,15 @@ const CartPage: React.FC = () => {
   );
 
   useEffect(() => {
-    if (!isSeDelivery) setCoreReturnChoice(null);
-  }, [isSeDelivery]);
+    if (!isSwedenForCoreOffer) setCoreReturnChoice(null);
+  }, [isSwedenForCoreOffer]);
 
   useEffect(() => {
     if (!cartNeedsCoreReturn) setCoreReturnChoice(null);
   }, [cartNeedsCoreReturn]);
 
   const coreKeepFeeApplied =
-    isSeDelivery && cartNeedsCoreReturn && coreReturnChoice === "keep"
+    isSwedenForCoreOffer && cartNeedsCoreReturn && coreReturnChoice === "keep"
       ? CORE_KEEP_FEE_SEK
       : 0;
   const total = subtotal - discount + shipping + coreKeepFeeApplied;
@@ -441,7 +442,7 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
-              {isSeDelivery && cartNeedsCoreReturn && (
+              {isSwedenForCoreOffer && cartNeedsCoreReturn && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <p className="text-sm font-medium">{t("cart.coreReturnTitle")}</p>
                   <p className="text-xs text-muted-foreground">{t("cart.coreReturnIntro")}</p>
