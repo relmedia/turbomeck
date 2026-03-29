@@ -20,6 +20,7 @@ import {
   FileText,
   Download,
   MessageSquare,
+  ChevronRight,
 } from "lucide-react";
 import {
   Avatar,
@@ -94,7 +95,9 @@ export default function AccountPage() {
   const [wishlistProducts, setWishlistProducts] = useState<Awaited<ReturnType<typeof fetchProductsByIds>>>([]);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [receiptUrls, setReceiptUrls] = useState<Record<string, string | null>>({});
+  const [orderStripeReceipts, setOrderStripeReceipts] = useState<
+    Record<string, { receiptUrl: string | null; receiptNumber: string | null }>
+  >({});
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -232,7 +235,7 @@ export default function AccountPage() {
     const paidOrders = orders.filter((o) => o.stripePaymentId);
     if (paidOrders.length === 0) return;
     const fetchAll = async () => {
-      const map: Record<string, string | null> = {};
+      const map: Record<string, { receiptUrl: string | null; receiptNumber: string | null }> = {};
       await Promise.all(
         paidOrders.map(async (o) => {
           if (!o.stripePaymentId) return;
@@ -240,14 +243,24 @@ export default function AccountPage() {
             const res = await fetch(
               `/api/stripe/receipt-url?paymentIntentId=${encodeURIComponent(o.stripePaymentId)}`
             );
-            const data = await res.json();
-            map[o.id.toString()] = data.receiptUrl ?? null;
+            const data = (await res.json()) as {
+              receiptUrl?: string | null;
+              receiptNumber?: string | null;
+            };
+            const num =
+              typeof data.receiptNumber === "string" && data.receiptNumber.trim()
+                ? data.receiptNumber.replace(/^#/, "").trim()
+                : null;
+            map[o.id.toString()] = {
+              receiptUrl: data.receiptUrl ?? null,
+              receiptNumber: num,
+            };
           } catch {
-            map[o.id.toString()] = null;
+            map[o.id.toString()] = { receiptUrl: null, receiptNumber: null };
           }
         })
       );
-      setReceiptUrls((prev) => ({ ...prev, ...map }));
+      setOrderStripeReceipts((prev) => ({ ...prev, ...map }));
     };
     fetchAll();
   }, [orders.map((o) => o.id).join(",")]);
@@ -561,9 +574,24 @@ export default function AccountPage() {
                       ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
                       : null;
                     const statusLabel = orderStatusLabel(order.status);
-                    const receiptUrl = order.stripePaymentId
-                      ? receiptUrls[order.id.toString()]
+                    const stripeInfo = order.stripePaymentId
+                      ? orderStripeReceipts[order.id.toString()]
                       : undefined;
+                    const receiptUrl = stripeInfo?.receiptUrl;
+                    const stripeReceiptLoading =
+                      Boolean(order.stripePaymentId) && stripeInfo === undefined;
+                    const primaryRef =
+                      order.stripePaymentId && stripeInfo !== undefined
+                        ? stripeInfo.receiptNumber
+                          ? `#${stripeInfo.receiptNumber}`
+                          : `#${order.orderNumber}`
+                        : !order.stripePaymentId
+                          ? `${t("account.order")} #${order.orderNumber}`
+                          : "";
+                    const ariaRef =
+                      order.stripePaymentId && stripeInfo?.receiptNumber
+                        ? `#${stripeInfo.receiptNumber}`
+                        : `${order.orderNumber}`;
 
                     return (
                       <div
@@ -577,16 +605,31 @@ export default function AccountPage() {
                             setSelectedOrder(order);
                           }
                         }}
-                        className="group flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-4 transition-colors hover:border-border hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
+                        aria-label={t("account.openOrderDetailsAria", { ref: ariaRef })}
+                        className="group flex cursor-pointer flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-4 transition-colors hover:border-primary/30 hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="flex min-w-0 flex-1 items-start gap-3">
                           <div className="rounded-lg bg-muted p-2 shrink-0">
                             <Package className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <div className="min-w-0 space-y-0.5">
+                          <div className="min-w-0 flex-1 space-y-0.5">
                             <p className="text-sm font-semibold leading-tight">
-                              {t("account.order")} #{order.orderNumber}
+                              {stripeReceiptLoading ? (
+                                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                  {t("common.loading")}
+                                </span>
+                              ) : (
+                                primaryRef
+                              )}
                             </p>
+                            {order.stripePaymentId &&
+                              stripeInfo?.receiptNumber &&
+                              !stripeReceiptLoading && (
+                                <p className="text-xs text-muted-foreground">
+                                  {t("account.shopOrderRef", { n: order.orderNumber })}
+                                </p>
+                              )}
                             <p className="text-xs text-muted-foreground">
                               {Number(order.total ?? 0).toLocaleString(
                                 locale === "en" ? "en-GB" : "sv-SE",
@@ -607,11 +650,17 @@ export default function AccountPage() {
                                 }
                               )}
                             </p>
+                            {!stripeReceiptLoading && (
+                              <p className="flex items-center gap-0.5 text-xs font-medium text-primary/90 pt-0.5">
+                                <span>{t("account.clickOrderForDetails")}</span>
+                                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
                           {order.stripePaymentId &&
-                            (receiptUrl === undefined ? (
+                            (stripeReceiptLoading ? (
                               <Button
                                 variant="outline"
                                 size="sm"

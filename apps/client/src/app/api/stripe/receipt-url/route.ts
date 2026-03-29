@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * GET /api/stripe/receipt-url?paymentIntentId=pi_xxx
  * Proxies to payment-service for Stripe receipt URL.
- * Returns: { receiptUrl: string | null }
+ * Returns: { receiptUrl: string | null, receiptNumber: string | null } (receiptNumber from Stripe charge, for display)
  */
 export async function GET(req: NextRequest) {
   const paymentIntentId = req.nextUrl.searchParams.get("paymentIntentId");

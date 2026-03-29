@@ -87,11 +87,18 @@ app.get('/receipt-url', async (c) => {
       charge.receipt_url
         ? String(charge.receipt_url)
         : null
-    return c.json({ receiptUrl })
+    const receiptNumber =
+      charge &&
+      typeof charge === 'object' &&
+      'receipt_number' in charge &&
+      charge.receipt_number
+        ? String(charge.receipt_number).replace(/^#/, '')
+        : null
+    return c.json({ receiptUrl, receiptNumber })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Stripe error'
     console.error('[stripe receipt-url]', err)
-    return c.json({ error: message, receiptUrl: null }, 500)
+    return c.json({ error: message, receiptUrl: null, receiptNumber: null }, 500)
   }
 })
 
