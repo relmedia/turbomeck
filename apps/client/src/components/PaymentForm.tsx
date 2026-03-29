@@ -150,6 +150,8 @@ function CheckoutForm({
       <PaymentElement
         options={{
           layout: "tabs",
+          /** Hides Stripe Link wallet (can add extra third-party cookies/iframes). Card + other PMs unchanged. */
+          wallets: { link: "never" },
           fields: {
             billingDetails: {
               name: "never",
