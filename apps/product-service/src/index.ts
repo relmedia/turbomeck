@@ -12,7 +12,7 @@ import { db, products, categories, productCategories, orders, orderItems, review
 import { eq, inArray, desc, asc, sql, or } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
-import { sendOrderConfirmationEmail } from "./email.js";
+import { sendOrderConfirmationEmail, sendShipmentDispatchedEmail } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
 
@@ -1157,6 +1157,46 @@ app.post("/api/orders", async (req, res) => {
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
+/**
+ * POST /api/orders/:id/send-shipment-notification
+ * Sends “package shipped” email with PostNord tracking (called by admin after saving tracking).
+ * Body: optional { locale?: "sv" | "en" } (defaults to sv).
+ */
+app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const body = (req.body ?? {}) as { locale?: string };
+    const locale = body.locale === "en" ? "en" : "sv";
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const tid = order.postNordTrackingId?.trim();
+    if (!tid) {
+      return res.status(400).json({ error: "Order has no PostNord tracking number" });
+    }
+
+    const sent = await sendShipmentDispatchedEmail({
+      firstName: order.firstName,
+      email: order.email,
+      orderNumber: order.orderNumber,
+      trackingId: tid,
+      locale,
+    });
+
+    return res.json({ success: sent });
+  } catch (error) {
+    console.error("send-shipment-notification:", error);
+    res.status(500).json({ error: "Failed to send shipment notification" });
   }
 });
 

@@ -24,6 +24,7 @@ export async function PATCH(
     }
 
     const body = await req.json().catch(() => ({}));
+    const trackingKeyPresent = Object.prototype.hasOwnProperty.call(body, "postNordTrackingId");
     const { status, postNordTrackingId, coreReceived } = body as {
       status?: string;
       postNordTrackingId?: string;
@@ -186,6 +187,28 @@ export async function GET(
   } catch (err) {
     console.error("Failed to fetch order:", err);
     return NextResponse.json({ error: "Failed to fetch order" }, { status: 500 });
+  }
+}
+
+/** Fire-and-forget: product-service sends localized “shipped” email with PostNord link. */
+async function triggerShipmentDispatchedEmail(orderId: number): Promise<void> {
+  const secret = process.env.INTERNAL_PRODUCT_API_SECRET?.trim();
+  const base = (process.env.PRODUCT_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
+  if (!secret) {
+    console.warn("[orders PATCH] INTERNAL_PRODUCT_API_SECRET missing, skip shipment email");
+    return;
+  }
+  const res = await fetch(`${base}/api/orders/${orderId}/send-shipment-notification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${secret}`,
+    },
+    body: JSON.stringify({ locale: "sv" }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Shipment notification HTTP ${res.status}: ${text || res.statusText}`);
   }
 }
 

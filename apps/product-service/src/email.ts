@@ -15,11 +15,13 @@ function getOrderEmailLogoUrl(): string {
   return "";
 }
 
-/** Magic-link email header brand block (logo + wordmark, or “T” fallback) — from `packages/auth/src/email-templates.ts`. */
-function magicLinkStyleHeaderBrandInner(logoUrl: string): string {
+/**
+ * Order confirmation email header: logo + wordmark (or “T” fallback), horizontally centered (email-safe tables).
+ */
+function orderEmailHeaderBrandInner(logoUrl: string): string {
   return logoUrl
     ? `
-                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                    <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 14px;">
                           <img src="${logoUrl}" alt="Turbomeck" width="35" height="35" style="display: block; width: 35px; height: 35px;" />
@@ -30,7 +32,7 @@ function magicLinkStyleHeaderBrandInner(logoUrl: string): string {
                       </tr>
                     </table>`
     : `
-                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                    <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                       <tr>
                         <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
                           <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
@@ -161,6 +163,8 @@ const translations = {
     trackDelivery: "Track your delivery",
     trackingNumber: "Tracking number",
     trackAtPostNord: "Track at PostNord",
+    trackingInitialStatusNote:
+      "Your tracking number is created when the shipment is booked, but PostNord may show \"not found\" or limited status until the parcel is first scanned — that is normal.",
     orderedProducts: "Ordered Products",
     quantity: "Qty",
     subtotal: "Subtotal",
@@ -235,7 +239,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
     )
     .join("");
 
-  const headerBrandInner = magicLinkStyleHeaderBrandInner(logoUrl);
+  const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
 
   return `
 <!DOCTYPE html>
@@ -261,10 +265,10 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <!-- Success Banner -->
           <tr>
             <td style="padding: 40px 40px 24px 40px; text-align: center;">
-              <table cellpadding="0" cellspacing="0" border="0" align="center">
+              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
                 <tr>
-                  <td style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 32px; text-align: center; vertical-align: middle;">
-                    <span style="font-size: 32px; color: #16a34a; line-height: 64px;">✓</span>
+                  <td style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 50%; -webkit-border-radius: 50%; text-align: center; vertical-align: middle; line-height: 64px; mso-line-height-rule: exactly;">
+                    <span style="font-size: 30px; color: #16a34a; line-height: 64px; display: inline-block; vertical-align: middle;">✓</span>
                   </td>
                 </tr>
               </table>
@@ -411,6 +415,157 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
 </body>
 </html>
   `.trim();
+}
+
+// ——— Shipment dispatched (admin saved PostNord tracking) ———
+
+type ShipmentDispatchedEmailData = {
+  firstName: string;
+  email: string;
+  orderNumber: string;
+  trackingId: string;
+  locale?: "sv" | "en";
+};
+
+const shipmentDispatchedTranslations = {
+  sv: {
+    subject: "Din order har skickats",
+    heading: "Ditt paket är på väg!",
+    greeting: "Hej",
+    lead: "Vi har skickat ditt paket från Turbomeck. Nedan hittar du PostNords spårningsnummer och en länk där du kan följa leveransen.",
+    orderNumber: "Ordernummer",
+    trackingNumber: "Spårningsnummer",
+    trackCta: "Spåra försändelsen hos PostNord",
+    note: 'PostNord kan visa "ej hittad" eller begränsad status tills paketet scannats första gången — det är vanligt.',
+    questions: "Har du frågor? Kontakta oss på",
+    rights: "Alla rättigheter förbehållna.",
+  },
+  en: {
+    subject: "Your order has been shipped",
+    heading: "Your package is on its way!",
+    greeting: "Hi",
+    lead: "We have dispatched your package from Turbomeck. Your PostNord tracking number and a link to follow the shipment are below.",
+    orderNumber: "Order number",
+    trackingNumber: "Tracking number",
+    trackCta: "Track shipment at PostNord",
+    note: 'PostNord may show "not found" or limited status until the parcel is first scanned — that is normal.',
+    questions: "Questions? Contact us at",
+    rights: "All rights reserved.",
+  },
+};
+
+function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): string {
+  const locale = data.locale === "en" ? "en" : "sv";
+  const t = shipmentDispatchedTranslations[locale];
+  const logoUrl = getOrderEmailLogoUrl();
+  const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
+  const trackingUrl = `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`;
+  const orderNo = escapeHtml(String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber);
+  const tracking = escapeHtml(data.trackingId);
+  const firstName = escapeHtml(data.firstName);
+
+  return `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${t.subject} - Turbomeck</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 28px 32px; text-align: center;">
+              ${headerBrandInner}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 36px 40px 24px 40px; text-align: center;">
+              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+                <tr>
+                  <td style="width: 56px; height: 56px; background-color: #dbeafe; border-radius: 50%; -webkit-border-radius: 50%; text-align: center; vertical-align: middle; line-height: 56px;">
+                    <span style="font-size: 26px; line-height: 56px; display: inline-block; vertical-align: middle;">📦</span>
+                  </td>
+                </tr>
+              </table>
+              <h2 style="margin: 20px 0 12px 0; font-size: 22px; font-weight: 700; color: #111827;">${t.heading}</h2>
+              <p style="margin: 0 0 8px 0; color: #111827; font-size: 15px;">${t.greeting} ${firstName},</p>
+              <p style="margin: 0; color: #6b7280; font-size: 15px; line-height: 1.55;">${t.lead}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 28px 40px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 22px;">
+                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b7280;">${t.orderNumber}</p>
+                    <p style="margin: 0 0 16px 0; font-weight: 600; color: #111827; font-size: 17px;">#${orderNo}</p>
+                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b7280;">${t.trackingNumber}</p>
+                    <p style="margin: 0 0 18px 0; font-weight: 600; color: #1e40af; font-size: 17px; letter-spacing: 0.02em;">${tracking}</p>
+                    <a href="${trackingUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">${t.trackCta} →</a>
+                    <p style="margin: 16px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.45;">${t.note}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fafb; padding: 22px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
+                ${t.questions} <a href="mailto:info@turbomeck.se" style="color: #6ec900; text-decoration: none;">info@turbomeck.se</a>
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                © ${new Date().getFullYear()} Turbomeck. ${t.rights}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+export async function sendShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) {
+    console.warn("[email] No mail config, skipping shipment-dispatched email");
+    return false;
+  }
+
+  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    tls: skipTlsVerify
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : {},
+  });
+
+  const locale = data.locale === "en" ? "en" : "sv";
+  const t = shipmentDispatchedTranslations[locale];
+  const html = renderShipmentDispatchedEmail(data);
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck" <${config.from}>`,
+      to: data.email,
+      subject: `${t.subject} (#${String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber}) - Turbomeck`,
+      html,
+    });
+    console.log(`[email] Shipment dispatched notice sent to ${data.email} order ${data.orderNumber}`);
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send shipment-dispatched email:", error);
+    return false;
+  }
 }
 
 export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<boolean> {
