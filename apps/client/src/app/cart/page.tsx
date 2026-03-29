@@ -25,6 +25,7 @@ import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
 import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
+import { cn } from "@/lib/utils";
 
 
 const CartPage: React.FC = () => {
@@ -403,8 +404,12 @@ const CartPage: React.FC = () => {
   return (
     <div className="w-full mt-8 lg:mt-12">
       <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-        {/* LEFT COLUMN - Shopping Cart (combined) + Coupon */}
-        <div className="lg:w-2/5 space-y-6">
+        {/* LEFT COLUMN - Shopping Cart (combined) + Coupon; guests: below login on mobile */}
+        <div
+          className={`lg:w-2/5 space-y-6 ${
+            !session ? "order-2 lg:order-1" : ""
+          }`}
+        >
           {/* Shopping Cart – items + order summary + place order */}
           <div className="bg-card border rounded-lg p-6">
             <h2 className="text-lg font-bold mb-1">{t("cart.title")}</h2>
@@ -582,8 +587,10 @@ const CartPage: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Checkout Forms or Login Prompt */}
-        <div className="lg:w-3/5 space-y-4">
+        {/* RIGHT COLUMN - Checkout Forms or Login Prompt; guests: first on mobile */}
+        <div
+          className={cn("lg:w-3/5 space-y-4", !session && "order-1 lg:order-2")}
+        >
           {!session ? (
             <div className="bg-card border rounded-lg p-8 flex flex-col items-center justify-center text-center gap-4">
               <h3 className="text-lg font-semibold">{t("cart.loginToComplete")}</h3>
