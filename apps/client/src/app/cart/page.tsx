@@ -63,10 +63,23 @@ const CartPage: React.FC = () => {
     }
   }, [userId]);
 
+  const { isSweden: geoIsSweden, loading: geoCountryLoading } = useGeoCountry();
+
   const deliveryOption =
     shippingForm?.deliveryOption ?? shippingPreview?.deliveryOption ?? "servicepoint";
   const shippingCountry =
     shippingForm?.country ?? shippingPreview?.country ?? "SE";
+
+  const explicitShippingCountry = (
+    shippingForm?.country ??
+    shippingPreview?.country ??
+    ""
+  ).trim();
+  const hasExplicitShippingCountry = explicitShippingCountry.length > 0;
+  /** Kärnretur i kassan: leveransland om angivet, annars geolokation (Sverige). */
+  const isSwedenForCoreOffer = hasExplicitShippingCountry
+    ? explicitShippingCountry.toUpperCase() === "SE"
+    : geoIsSweden && !geoCountryLoading;
 
   const subtotal = cart.reduce(
     (acc, item) => acc + item.price * item.quantity,
@@ -121,8 +134,6 @@ const CartPage: React.FC = () => {
       : shippingFromApi != null
         ? shippingFromApi
         : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
-
-  const isSeDelivery = shippingCountry.toUpperCase() === "SE";
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
