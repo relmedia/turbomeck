@@ -2,6 +2,59 @@ import nodemailer from "nodemailer";
 import { db, appSettings } from "@repo/database";
 import { eq } from "drizzle-orm";
 
+/**
+ * Identical to @repo/auth `email-templates.ts` (magic link) LOGO_URL resolution.
+ */
+function getOrderEmailLogoUrl(): string {
+  const env = process.env;
+  if (env.EMAIL_LOGO_URL) return env.EMAIL_LOGO_URL;
+  const r2Base = (env.R2_PUBLIC_URL || env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
+  if (r2Base) return `${r2Base}/branding/logo.png`;
+  const appBase = (env.NEXT_PUBLIC_APP_URL || env.NEXTAUTH_URL || "").replace(/\/$/, "");
+  if (appBase) return `${appBase}/logo.png`;
+  return "";
+}
+
+/** Magic-link email header brand block (logo + wordmark, or “T” fallback) — from `packages/auth/src/email-templates.ts`. */
+function magicLinkStyleHeaderBrandInner(logoUrl: string): string {
+  return logoUrl
+    ? `
+                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 14px;">
+                          <img src="${logoUrl}" alt="Turbomeck" width="35" height="35" style="display: block; width: 35px; height: 35px;" />
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                        </td>
+                      </tr>
+                    </table>`
+    : `
+                    <table role="presentation" align="left" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
+                        </td>
+                        <td style="vertical-align: middle; padding-left: 14px;">
+                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                        </td>
+                      </tr>
+                    </table>`;
+}
+
+/** 25 % moms inkluderad i bruttopris: moms = brutto × 25/125 */
+function vatFromGrossIncl25(grossSek: number): number {
+  return Math.round(Number(grossSek) * 0.2);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 type MailConfig = {
   host: string;
   port: number;
@@ -59,6 +112,8 @@ type OrderEmailData = {
   total: number;
   trackingId?: string | null;
   locale?: "sv" | "en";
+  /** Human-readable payment method (e.g. "Visa •••• 4242") or free-order message */
+  paymentMethodDisplay: string;
   items: Array<{
     productName: string;
     productImage?: string | null;
@@ -85,6 +140,7 @@ const translations = {
     free: "Gratis",
     discount: "Rabatt",
     vatIncluded: "Varav moms (25%)",
+    lineVat: "Varav moms (25 %)",
     total: "Totalt",
     shippingAddress: "Leveransadress",
     servicePoint: "Utlämningsställe",
@@ -92,6 +148,7 @@ const translations = {
     rights: "Alla rättigheter förbehållna.",
     sweden: "Sverige",
     norway: "Norge",
+    paymentMethod: "Betalningsmetod",
   },
   en: {
     title: "Order Confirmation",
@@ -109,6 +166,7 @@ const translations = {
     free: "Free",
     discount: "Discount",
     vatIncluded: "Incl. VAT (25%)",
+    lineVat: "Of which VAT (25%)",
     total: "Total",
     shippingAddress: "Shipping Address",
     servicePoint: "Pickup Point",
@@ -116,6 +174,7 @@ const translations = {
     rights: "All rights reserved.",
     sweden: "Sweden",
     norway: "Norway",
+    paymentMethod: "Payment method",
   },
 };
 
@@ -130,17 +189,21 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   const locale = data.locale || "sv";
   const t = translations[locale];
   const dateLocale = locale === "en" ? "en-GB" : "sv-SE";
-  
+  const logoUrl = getOrderEmailLogoUrl();
+
   const trackingUrl = data.trackingId
     ? `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`
     : null;
 
-  // Calculate VAT (25% included in total)
-  const vatAmount = data.total * 0.2; // 25% VAT = 20% of gross
+  // 25 % VAT included in prices (Swedish B2C): VAT share of gross = 20 %
+  const vatAmount = vatFromGrossIncl25(data.total);
 
   const itemsHtml = data.items
     .map(
-      (item) => `
+      (item) => {
+        const lineGross = item.price * item.quantity;
+        const lineVat = vatFromGrossIncl25(lineGross);
+        return `
       <tr>
         <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -158,15 +221,19 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                 <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.quantity}: ${item.quantity}</p>
               </td>
               <td style="vertical-align: top; text-align: right; white-space: nowrap;">
-                <p style="margin: 0; font-weight: 600; color: #111827;">${(item.price * item.quantity).toLocaleString(dateLocale)} kr</p>
+                <p style="margin: 0; font-weight: 600; color: #111827;">${lineGross.toLocaleString(dateLocale)} kr</p>
+                <p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.35;">${t.lineVat}<br/>${lineVat.toLocaleString(dateLocale)} kr</p>
               </td>
             </tr>
           </table>
         </td>
       </tr>
-    `
+    `;
+      },
     )
     .join("");
+
+  const headerBrandInner = magicLinkStyleHeaderBrandInner(logoUrl);
 
   return `
 <!DOCTYPE html>
@@ -182,16 +249,10 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           
-          <!-- Header -->
+          <!-- Header brand: same markup as magic-link mail (`email-templates.ts` baseWrapper header) -->
           <tr>
-            <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px 40px; text-align: center;">
-              <table cellpadding="0" cellspacing="0" border="0" align="center">
-                <tr>
-                  <td style="font-size: 28px; font-weight: 700; letter-spacing: 3px; font-style: italic;">
-                    <span style="color: #6ec900;">TURBO</span><span style="color: #ffffff;">MECK</span>
-                  </td>
-                </tr>
-              </table>
+            <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 28px 32px; text-align: left;">
+              ${headerBrandInner}
             </td>
           </tr>
           
@@ -225,6 +286,12 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                         <td style="padding: 0; text-align: right;">
                           <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.date}</p>
                           <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827;">${new Date().toLocaleDateString(dateLocale)}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding: 16px 0 0 0; border-top: 1px solid #e5e7eb;">
+                          <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.paymentMethod}</p>
+                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 15px;">${escapeHtml(data.paymentMethodDisplay)}</p>
                         </td>
                       </tr>
                     </table>
@@ -295,7 +362,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                   <td style="padding: 4px 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${data.total.toLocaleString(dateLocale)} kr</td>
                 </tr>
                 <tr>
-                  <td style="padding: 4px 0; color: #6b7280; font-size: 12px;">${t.vatIncluded}</td>
+                  <td style="padding: 4px 0; color: #6b7280; font-size: 12px;">${t.vatIncluded} (${locale === "en" ? "order total" : "order totalt"})</td>
                   <td style="padding: 4px 0; text-align: right; color: #6b7280; font-size: 12px;">${vatAmount.toLocaleString(dateLocale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr</td>
                 </tr>
               </table>

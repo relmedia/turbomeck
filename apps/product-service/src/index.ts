@@ -100,11 +100,36 @@ async function verifySucceededBalancePaymentIntent(
   }
 }
 
+function describeStripePaymentMethod(
+  pm: Stripe.PaymentIntent["payment_method"],
+): string | null {
+  if (!pm || typeof pm === "string") return null;
+  if (typeof pm !== "object" || pm.object !== "payment_method") return null;
+  if (pm.type === "card" && pm.card) {
+    const raw = String(pm.card.display_brand || pm.card.brand || "card").replace(/_/g, " ");
+    const brand = raw.length > 0 ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Card";
+    return pm.card.last4 ? `${brand} •••• ${pm.card.last4}` : brand;
+  }
+  const byType: Record<string, string> = {
+    klarna: "Klarna",
+    link: "Link",
+    swish: "Swish",
+    twint: "TWINT",
+    eps: "EPS",
+    ideal: "iDEAL",
+    bancontact: "Bancontact",
+    sofort: "Sofort",
+  };
+  return byType[pm.type] ?? pm.type.replace(/_/g, " ");
+}
+
 /** Checkout: charge must match server-computed SEK total (after pricing resolution). */
 async function verifyCheckoutPaymentIntent(
   paymentIntentId: string,
   expectedChargeSek: number,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; paymentMethodLabel: string | null } | { ok: false; error: string }
+> {
   if (!paymentIntentId.startsWith("pi_")) {
     return { ok: false, error: "Invalid payment intent" };
   }
@@ -112,7 +137,9 @@ async function verifyCheckoutPaymentIntent(
     return { ok: false, error: "Stripe is not configured on product-service" };
   }
   try {
-    const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+    const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
+      expand: ["payment_method"],
+    });
     if (pi.status !== "succeeded") {
       return { ok: false, error: "Payment has not succeeded" };
     }
@@ -123,7 +150,10 @@ async function verifyCheckoutPaymentIntent(
     if (pi.amount !== expectedOre) {
       return { ok: false, error: "Payment amount does not match order" };
     }
-    return { ok: true };
+    return {
+      ok: true,
+      paymentMethodLabel: describeStripePaymentMethod(pi.payment_method),
+    };
   } catch {
     return { ok: false, error: "Could not verify payment with Stripe" };
   }
@@ -1009,7 +1039,9 @@ app.post("/api/orders", async (req, res) => {
     }
 
     const stripePaymentId = body.stripePaymentId?.trim() ?? "";
-    let payVerify: { ok: true } | { ok: false; error: string } = { ok: true };
+    let payVerify:
+      | { ok: true; paymentMethodLabel: string | null }
+      | { ok: false; error: string } = { ok: true, paymentMethodLabel: null };
     if (priced.stripeChargeSek > 0) {
       payVerify = await verifyCheckoutPaymentIntent(stripePaymentId, priced.stripeChargeSek);
     } else if (stripePaymentId) {
@@ -1018,6 +1050,15 @@ app.post("/api/orders", async (req, res) => {
     if (!payVerify.ok) {
       return res.status(400).json({ error: payVerify.error });
     }
+
+    const locale: "sv" | "en" = body.locale === "en" ? "en" : "sv";
+    const paymentMethodDisplay =
+      priced.stripeChargeSek <= 0
+        ? locale === "en"
+          ? "No payment required"
+          : "Ingen betalning krävs"
+        : payVerify.paymentMethodLabel ??
+          (locale === "en" ? "Paid (card or other method)" : "Betalt (kort eller annan metod)");
 
     const orderNumber = await generateOrderNumber();
 
@@ -1103,6 +1144,7 @@ app.post("/api/orders", async (req, res) => {
       total: priced.total,
       trackingId: body.postNordTrackingId,
       locale: body.locale,
+      paymentMethodDisplay,
       items: emailItems,
     }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
 

@@ -9,7 +9,7 @@ const MUTED_COLOR = "#6b7280";
 const BORDER_COLOR = "#e5e7eb";
 const BG_LIGHT = "#f9fafb";
 
-// Logo URL – prefer Cloudflare R2 (branding/logo.png), then app URL (logo.svg)
+// Logo URL – R2 PNG first; storefront uses logo.png (many mail clients ignore remote SVG)
 const LOGO_URL =
   typeof process !== "undefined" && process.env
     ? (() => {
@@ -18,7 +18,7 @@ const LOGO_URL =
         const r2Base = (env.R2_PUBLIC_URL || env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
         if (r2Base) return `${r2Base}/branding/logo.png`;
         const appBase = (env.NEXT_PUBLIC_APP_URL || env.NEXTAUTH_URL || "").replace(/\/$/, "");
-        if (appBase) return `${appBase}/logo.svg`;
+        if (appBase) return `${appBase}/logo.png`;
         return "";
       })()
     : "";

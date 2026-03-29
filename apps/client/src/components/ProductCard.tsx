@@ -147,7 +147,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
           {product.isExchangeTurbo === true && (
             <Badge
               variant="secondary"
-              className="absolute top-3 left-3 z-20 max-w-[calc(100%-5rem)] border border-border/80 bg-background/90 text-foreground shadow-sm backdrop-blur-sm truncate"
+              className="absolute top-3 left-3 z-20 max-w-[calc(100%-5rem)] truncate border border-neutral-900/30 bg-[#6ec900] text-neutral-950 shadow-[0_2px_12px_rgba(0,0,0,0.35)] ring-2 ring-white/60"
               title={t("product.exchangeTurboBadge")}
             >
               {t("product.exchangeTurboBadge")}
