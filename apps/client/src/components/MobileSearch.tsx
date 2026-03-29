@@ -220,7 +220,7 @@ export function MobileSearch() {
                               product.galleryImages?.[0] ||
                               "/logo.svg"
                             }
-                            alt={product.name}
+                            alt=""
                             fill
                             className="object-cover"
                             sizes="48px"

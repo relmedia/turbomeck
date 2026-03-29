@@ -252,7 +252,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/30 bg-muted shadow-inner">
                       <ImageWithFallback
                         src={resolveImageUrl(item.productImage)}
-                        alt={item.productName || t("orderDetail.product")}
+                        alt=""
                         fill
                         className="object-cover"
                       />

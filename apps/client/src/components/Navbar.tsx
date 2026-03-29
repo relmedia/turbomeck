@@ -96,7 +96,12 @@ const Navbar = () => {
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full overflow-hidden p-0 h-8 w-8 shrink-0 cursor-pointer">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full overflow-hidden p-0 h-8 w-8 shrink-0 cursor-pointer"
+                    aria-label={t("nav.openAccountMenu")}
+                  >
                     <Avatar className="h-8 w-8">
                       <AvatarImage
                         src={session.user.image ?? undefined}

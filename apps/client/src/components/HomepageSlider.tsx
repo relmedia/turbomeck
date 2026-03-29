@@ -678,7 +678,7 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
                       >
                         <ImageWithFallback
                           src={imgSrc}
-                          alt={product.name}
+                          alt=""
                           fill
                           priority={i === 0}
                           fetchPriority={i === 0 ? "high" : "low"}

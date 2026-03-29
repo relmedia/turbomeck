@@ -197,7 +197,7 @@ export function Card({
           <div className="aspect-[3/4] relative">
             <Image
               src={card.src}
-              alt={card.title}
+              alt=""
               fill
               className="object-cover transition-transform group-hover:scale-105"
               sizes="(max-width: 768px) 230px, 384px"

@@ -17,6 +17,7 @@
   },
   "nav": {
     "myAccount": "My account",
+    "openAccountMenu": "Open account menu",
     "deliveryAddress": "Delivery address",
     "logout": "Log out",
     "login": "Log in",
@@ -97,7 +98,11 @@
     "adding": "Adding...",
     "selectVariant": "Select variant before adding to cart.",
     "viewProduct": "View product",
-    "exchangeTurboBadge": "Exchange"
+    "exchangeTurboBadge": "Exchange",
+    "previousProductImage": "Previous image: {{name}}",
+    "nextProductImage": "Next image: {{name}}",
+    "selectGalleryThumbnail": "Select thumbnail {{n}} for {{name}}",
+    "fullscreenImage": "View image fullscreen: {{name}}"
   },
   "reviews": {
     "title": "Reviews",

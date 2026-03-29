@@ -3,7 +3,7 @@
 import { Search } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";
 import { ProductType } from "@/types";
@@ -73,6 +73,7 @@ const SearchBar = () => {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchParamsRef = useRef(searchParams);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   searchParamsRef.current = searchParams;
 
   // Sync query from URL
@@ -195,64 +196,70 @@ const SearchBar = () => {
           onFocus={() => query.trim().length >= 3 && setIsDropdownOpen(true)}
           placeholder={t("search.placeholder")}
           className="text-sm outline-0 bg-transparent w-full"
+          role="combobox"
           aria-label={t("search.placeholder")}
           aria-autocomplete="list"
+          aria-controls={listboxId}
           aria-expanded={showDropdown}
           aria-haspopup="listbox"
         />
       </div>
 
-      {showDropdown && (
-        <div
-          className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-gray-200 bg-white shadow-lg overflow-hidden"
+      <div
+        hidden={!showDropdown}
+        className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-gray-200 bg-white shadow-lg overflow-hidden"
+      >
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-label={t("search.placeholder")}
+          className="max-h-[280px] overflow-y-auto py-1 list-none m-0 p-0"
         >
           {dropdownProducts.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            <li className="px-4 py-6 text-center text-sm text-muted-foreground" role="presentation">
               {t("search.noResults")}
-            </div>
+            </li>
           ) : (
-            <>
-              <ul className="max-h-[280px] overflow-y-auto py-1" role="listbox">
-                {dropdownProducts.map((product) => (
-                  <li key={product.id} role="option">
-                    <Link
-                      href={productUrl(product)}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleSelectProduct(product);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                    >
-                      <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden bg-gray-100">
+            dropdownProducts.map((product) => (
+              <li key={product.id} role="option">
+                <Link
+                  href={productUrl(product)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSelectProduct(product);
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden bg-gray-100">
                         <ImageWithFallback
                           src={product.images?.default || product.galleryImages?.[0] || "/logo.svg"}
-                          alt={product.name}
+                          alt=""
                           fill
-                          className="object-cover"
-                          sizes="40px"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} {t("common.kr")}
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={pathname === "/products" ? `/products?search=${encodeURIComponent(query.trim())}` : `/?search=${encodeURIComponent(query.trim())}`}
-                onClick={() => setIsDropdownOpen(false)}
-                className="block px-3 py-2.5 text-sm font-medium text-center border-t border-gray-100 hover:bg-gray-50 transition-colors"
-              >
-                {t("search.viewAllResults")}
-              </Link>
-            </>
+                      className="object-cover"
+                      sizes="40px"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{product.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} {t("common.kr")}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))
           )}
-        </div>
-      )}
+        </ul>
+        {showDropdown && dropdownProducts.length > 0 && (
+          <Link
+            href={pathname === "/products" ? `/products?search=${encodeURIComponent(query.trim())}` : `/?search=${encodeURIComponent(query.trim())}`}
+            onClick={() => setIsDropdownOpen(false)}
+            className="block px-3 py-2.5 text-sm font-medium text-center border-t border-gray-100 hover:bg-gray-50 transition-colors"
+          >
+            {t("search.viewAllResults")}
+          </Link>
+        )}
+      </div>
     </div>
   );
 };

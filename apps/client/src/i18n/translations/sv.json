@@ -17,6 +17,7 @@
   },
   "nav": {
     "myAccount": "Mitt konto",
+    "openAccountMenu": "Öppna kontomeny",
     "deliveryAddress": "Leveransadress",
     "logout": "Logga ut",
     "login": "Logga in",
@@ -97,7 +98,11 @@
     "adding": "Lägger till...",
     "selectVariant": "Välj variant innan du lägger i varukorgen.",
     "viewProduct": "Visa produkt",
-    "exchangeTurboBadge": "Utbytes"
+    "exchangeTurboBadge": "Utbytes",
+    "previousProductImage": "Föregående bild: {{name}}",
+    "nextProductImage": "Nästa bild: {{name}}",
+    "selectGalleryThumbnail": "Välj miniatyrbild {{n}} för {{name}}",
+    "fullscreenImage": "Visa bild i fullskärm: {{name}}"
   },
   "reviews": {
     "title": "Recensioner",

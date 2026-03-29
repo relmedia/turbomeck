@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,10 +14,19 @@ import {
 
 interface ProductImageGalleryProps {
   images: string[];
+  /** Product name / label used for control aria-labels and dialog title. */
   alt: string;
+  /** When true, images use alt="" because the same name appears on the page (e.g. h1). */
+  decorativeImages?: boolean;
 }
 
-export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
+export function ProductImageGallery({
+  images,
+  alt,
+  decorativeImages = false,
+}: ProductImageGalleryProps) {
+  const imageAlt = decorativeImages ? "" : alt;
+  const t = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const displayImages = images.length > 0 ? images : ["/products/1g.png"];
@@ -80,7 +90,7 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                 >
                   <ImageWithFallback
                     src={src}
-                    alt={alt}
+                    alt={imageAlt}
                     fill
                     className="object-cover"
                     sizes="(max-width: 1024px) 100vw, 40vw"
@@ -94,9 +104,9 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
               size="icon"
               className="absolute right-2 top-2 h-8 w-8 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
               onClick={() => setFullscreenOpen(true)}
-              aria-label="Visa bild i fullskärm"
+              aria-label={t("product.fullscreenImage", { name: alt })}
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-4 h-4" aria-hidden />
             </Button>
             {displayImages.length > 1 && (
               <>
@@ -109,8 +119,9 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                       i === 0 ? displayImages.length - 1 : i - 1
                     )
                   }
+                  aria-label={t("product.previousProductImage", { name: alt })}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" aria-hidden />
                 </Button>
                 <Button
                   variant="secondary"
@@ -121,8 +132,9 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                       i === displayImages.length - 1 ? 0 : i + 1
                     )
                   }
+                  aria-label={t("product.nextProductImage", { name: alt })}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden />
                 </Button>
                 {/* Dot indicators for mobile */}
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 sm:hidden">
@@ -136,7 +148,7 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                           ? "bg-white w-4"
                           : "bg-white/50"
                       }`}
-                      aria-label={`Visa bild ${i + 1}`}
+                      aria-label={t("product.selectGalleryThumbnail", { n: i + 1, name: alt })}
                     />
                   ))}
                 </div>
@@ -160,13 +172,19 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                       key={`${src}-${i}`}
                       type="button"
                       onClick={() => setSelectedIndex(i)}
+                      aria-label={t("product.selectGalleryThumbnail", { n: i + 1, name: alt })}
+                      aria-current={i === selectedIndex ? "true" : undefined}
                       className={`relative aspect-square rounded-md overflow-hidden transition-all duration-200 ease-out min-w-0 bg-neutral-200 cursor-pointer ${
                         i === selectedIndex ? "opacity-100" : "opacity-60 hover:opacity-80"
                       }`}
                     >
                       <ImageWithFallback
                         src={src}
-                        alt={`${alt} - bild ${i + 1}`}
+                        alt={
+                          decorativeImages
+                            ? ""
+                            : `${alt} - bild ${i + 1}`
+                        }
                         fill
                         className="object-cover"
                         sizes="80px"
@@ -199,7 +217,7 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={displayImages[selectedIndex] ?? displayImages[0] ?? "/products/1g.png"}
-              alt={alt}
+              alt={imageAlt}
               className="max-w-full max-h-[90vh] w-auto h-auto object-contain block"
               referrerPolicy="no-referrer"
               onClick={(e) => e.stopPropagation()}
@@ -215,8 +233,9 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                   e.stopPropagation();
                   setSelectedIndex((i) => (i === 0 ? displayImages.length - 1 : i - 1));
                 }}
+                aria-label={t("product.previousProductImage", { name: alt })}
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5" aria-hidden />
               </Button>
               <Button
                 variant="secondary"
@@ -226,8 +245,9 @@ export function ProductImageGallery({ images, alt }: ProductImageGalleryProps) {
                   e.stopPropagation();
                   setSelectedIndex((i) => (i === displayImages.length - 1 ? 0 : i + 1));
                 }}
+                aria-label={t("product.nextProductImage", { name: alt })}
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5" aria-hidden />
               </Button>
             </>
           )}

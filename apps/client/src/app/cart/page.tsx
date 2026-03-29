@@ -648,7 +648,7 @@ function CartItemRow({
       <div className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-muted">
         <ImageWithFallback
           src={imageSrc}
-          alt={item.name}
+          alt=""
           fill
           className="object-cover"
           sizes="80px"

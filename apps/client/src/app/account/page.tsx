@@ -484,10 +484,11 @@ export default function AccountPage() {
                       <Link
                         href={productUrl(product)}
                         className="relative w-16 h-16 shrink-0 rounded-md overflow-hidden bg-muted"
+                        aria-label={product.name}
                       >
                         <ImageWithFallback
                           src={product.galleryImages?.[0] ?? product.images?.default ?? "/logo.svg"}
-                          alt={product.name}
+                          alt=""
                           fill
                           className="object-cover"
                           sizes="64px"

@@ -101,6 +101,7 @@ export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: 
           <ProductImageGallery
             images={product.galleryImages ?? [product.images?.default || "/products/1g.png"]}
             alt={product.name}
+            decorativeImages
           />
         </div>
         <ProductDetailContent

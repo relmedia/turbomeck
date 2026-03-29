@@ -63,7 +63,7 @@ function OrderItemReviewForm({
         <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
           <ImageWithFallback
             src={resolveImageUrl(productImage)}
-            alt={productName}
+            alt=""
             fill
             className="object-cover"
             sizes="56px"
@@ -178,7 +178,7 @@ function OrderItemReviewCard({
           <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
             <ImageWithFallback
               src={resolveImageUrl(item.productImage)}
-              alt={item.productName}
+              alt=""
               fill
               className="object-cover"
               sizes="56px"
@@ -247,7 +247,7 @@ function OrderItemReviewCard({
         <div className="relative w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
           <ImageWithFallback
             src={resolveImageUrl(item.productImage)}
-            alt={item.productName}
+            alt=""
             fill
             className="object-cover"
             sizes="56px"

@@ -137,7 +137,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
           >
             <ImageWithFallback
               src={cardImageSrc}
-              alt={`${product.name} - View ${currentImageIndex + 1}`}
+              alt=""
               fill
               priority={priority}
               className="object-cover"
@@ -162,18 +162,20 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
               <Button
                 variant="secondary"
                 size="icon"
-className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none shrink-0"
-                  onClick={prevImage}
+                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none shrink-0"
+                onClick={prevImage}
+                aria-label={t("product.previousProductImage", { name: product.name })}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" aria-hidden />
               </Button>
               <Button
                 variant="secondary"
                 size="icon"
                 className="h-8 w-8 shrink-0 rounded-full bg-background/80 shadow-none backdrop-blur-sm"
                 onClick={nextImage}
+                aria-label={t("product.nextProductImage", { name: product.name })}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           )}
@@ -189,8 +191,8 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
             onClick={handleWishlist}
             aria-label={
               isInWishlist(Number(product.id))
-                ? "Ta bort från önskelista"
-                : "Lägg till i önskelista"
+                ? t("wishlist.removeFromWishlist")
+                : t("wishlist.addToWishlist")
             }
           >
             <Heart
@@ -198,6 +200,7 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                 "h-4 w-4",
                 isInWishlist(Number(product.id)) && "fill-rose-500"
               )}
+              aria-hidden
             />
           </Button>
 
@@ -220,7 +223,7 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                       e.stopPropagation();
                       setCurrentImageIndex(index);
                     }}
-                    aria-label={`View image ${index + 1}`}
+                    aria-label={t("slider.goToSlide", { n: index + 1 })}
                   />
                 ))}
               </div>
@@ -331,6 +334,8 @@ className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-none sh
                         e.stopPropagation();
                         setSelectedSize(size);
                       }}
+                      aria-label={`${t("common.size")} ${size === "-" ? "–" : size}`}
+                      aria-pressed={selectedSize === size}
                     >
                       {size === "-" ? "–" : size.toUpperCase()}
                     </button>
