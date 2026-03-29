@@ -195,6 +195,8 @@
     "totalSpent": "Total spent",
     "delivered": "Delivered",
     "recentOrders": "Recent orders",
+    "orderHistory": "Your orders",
+    "orderHistoryDesc": "Open an order for full details and delivery. Stripe receipts appear when available for card payments.",
     "loadingOrders": "Loading orders...",
     "noOrdersYet": "You haven't placed any orders yet.",
     "shopNow": "Shop now",

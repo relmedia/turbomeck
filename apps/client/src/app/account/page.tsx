@@ -10,7 +10,6 @@ import {
   Package,
   ExternalLink,
   ShoppingBag,
-  Star,
   CreditCard,
   MapPin,
   Heart,
@@ -30,7 +29,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -529,9 +534,10 @@ export default function AccountPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Star className="w-4 h-4" />
-                {t("account.recentOrders")}
+                <ShoppingBag className="w-4 h-4 shrink-0 text-muted-foreground" />
+                {t("account.orderHistory")}
               </CardTitle>
+              <CardDescription>{t("account.orderHistoryDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -555,6 +561,9 @@ export default function AccountPage() {
                       ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
                       : null;
                     const statusLabel = orderStatusLabel(order.status);
+                    const receiptUrl = order.stripePaymentId
+                      ? receiptUrls[order.id.toString()]
+                      : undefined;
 
                     return (
                       <div
@@ -568,23 +577,27 @@ export default function AccountPage() {
                             setSelectedOrder(order);
                           }
                         }}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 cursor-pointer hover:bg-muted/50 rounded-lg border border-border transition-colors"
+                        className="group flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-4 transition-colors hover:border-border hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-muted shrink-0">
-                            <Package className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <div className="rounded-lg bg-muted p-2 shrink-0">
+                            <Package className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-sm font-semibold leading-tight">
                               {t("account.order")} #{order.orderNumber}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {Number(order.total ?? 0).toLocaleString(
                                 locale === "en" ? "en-GB" : "sv-SE",
                               )}{" "}
-                              {t("common.kr")} · {statusLabel}
+                              {t("common.kr")}
+                              <span className="text-border mx-1.5">·</span>
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground/80">
+                                {statusLabel}
+                              </span>
                             </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground">
                               {new Date(order.createdAt).toLocaleDateString(
                                 locale === "en" ? "en-GB" : "sv-SE",
                                 {
@@ -596,7 +609,32 @@ export default function AccountPage() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2 sm:shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+                          {order.stripePaymentId &&
+                            (receiptUrl === undefined ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled
+                                className="pointer-events-none opacity-70"
+                              >
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                {t("account.receipt")}
+                              </Button>
+                            ) : receiptUrl ? (
+                              <Button variant="outline" size="sm" asChild>
+                                <a
+                                  href={receiptUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <FileText className="mr-1 h-3 w-3" />
+                                  {t("account.receipt")}
+                                  <ExternalLink className="ml-1 h-3 w-3 opacity-70" />
+                                </a>
+                              </Button>
+                            ) : null)}
                           <Button
                             variant="outline"
                             size="sm"
@@ -637,116 +675,6 @@ export default function AccountPage() {
           </Card>
         </div>
 
-        {orders.filter((o) => o.stripePaymentId).length > 0 && (
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  {t("account.stripeReceipts")}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {t("account.stripeReceiptsDesc")}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left font-medium">{t("account.order")}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t("account.date")}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t("account.recipient")}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t("account.delivery")}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t("account.subtotal")}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t("account.shipping")}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t("account.discount")}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t("account.total")}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t("account.status")}</th>
-                        <th className="px-4 py-3 text-center font-medium">{t("account.receipt")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders
-                        .filter((o) => o.stripePaymentId)
-                        .map((order) => {
-                          const receiptUrl = receiptUrls[order.id.toString()];
-                          return (
-                            <tr
-                              key={order.id}
-                              className="border-b last:border-b-0 hover:bg-muted/30 transition-colors"
-                            >
-                              <td className="px-4 py-3 font-medium">#{order.orderNumber}</td>
-                              <td className="px-4 py-3 text-muted-foreground">
-                                {new Date(order.createdAt).toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
-                              </td>
-                              <td className="px-4 py-3">
-                                {order.firstName} {order.lastName}
-                                <span className="block text-xs text-muted-foreground truncate max-w-[140px]">
-                                  {order.email}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-muted-foreground max-w-[120px]">
-                                {order.servicePointName || (
-                                  <>
-                                    {order.address}
-                                    <span className="block text-xs">
-                                      {order.postalCode} {order.city}
-                                    </span>
-                                  </>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                {Number(order.subtotal ?? 0).toLocaleString("sv-SE")} kr
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                {Number(order.shippingCost ?? 0).toLocaleString("sv-SE")} kr
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                {Number(order.discount ?? 0) > 0
-                                  ? `-${Number(order.discount ?? 0).toLocaleString("sv-SE")} kr`
-                                  : "—"}
-                              </td>
-                              <td className="px-4 py-3 text-right font-medium">
-                                {Number(order.total ?? 0).toLocaleString("sv-SE")} kr
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs">
-                                  {orderStatusLabel(order.status)}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                {receiptUrl === undefined ? (
-                                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground inline-block" />
-                                ) : receiptUrl ? (
-                                  <a
-                                    href={receiptUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {t("account.view")}
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
 
       <OrderDetailModal

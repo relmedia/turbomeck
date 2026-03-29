@@ -195,6 +195,8 @@
     "totalSpent": "Totalt köpt",
     "delivered": "Levererade",
     "recentOrders": "Senaste beställningar",
+    "orderHistory": "Dina beställningar",
+    "orderHistoryDesc": "Öppna en beställning för fullständig information och leveransadress. Kvitto (Stripe) visas när det finns för kortbetalning.",
     "loadingOrders": "Laddar beställningar...",
     "noOrdersYet": "Du har inte gjort några beställningar ännu.",
     "shopNow": "Handla nu",
