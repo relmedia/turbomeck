@@ -1,6 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@repo/auth";
 import { LOCALE_COOKIE_NAME } from "@/i18n/context";
 import {
   internalProductApiAuthHeaders,
@@ -36,10 +37,31 @@ function assertStorefrontMutationAllowed(
 }
 
 function withInternalAuth(init: RequestInit = {}): RequestInit {
-  const auth = internalProductApiAuthHeaders();
+  const headers = internalProductApiAuthHeaders();
   const h = new Headers(init.headers);
-  h.set("Authorization", auth.Authorization);
+  h.set("Authorization", headers.Authorization);
   return { ...init, headers: h };
+}
+
+/**
+ * Checkout must attach the signed-in user on the server so orders show up under /account
+ * (client-sent userId can be missing — e.g. Stripe return + sessionStorage snapshot, or session still loading).
+ * Guests: strip any spoofed userId.
+ */
+async function applySessionUserIdToCheckoutBody(pathStr: string, body: string): Promise<string> {
+  if (pathStr !== "orders" || !body.trim()) return body;
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const session = await auth();
+    if (session?.user?.id) {
+      parsed.userId = session.user.id;
+    } else {
+      delete parsed.userId;
+    }
+    return JSON.stringify(parsed);
+  } catch {
+    return body;
+  }
 }
 
 function parseUpstreamJson(text: string, pathStr: string): unknown {

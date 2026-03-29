@@ -249,7 +249,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           
-          <!-- Header brand: same markup as magic-link mail (`email-templates.ts` baseWrapper header) -->
+          <!-- Header brand: same markup as magic-link mail (packages/auth email-templates baseWrapper header) -->
           <tr>
             <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 28px 32px; text-align: left;">
               ${headerBrandInner}

@@ -165,23 +165,41 @@ export default function AccountPage() {
       setLoading(false);
       return;
     }
-    Promise.all([
-      fetch(`/api/user/me`).then((r) => r.json()),
-      fetchOrders(),
-    ])
-      .then(([profileData, ordersData]) => {
-        setProfile(profileData);
-        setOrders(ordersData ?? []);
-        const addr = profileData?.savedAddress;
-        const full = addr?.firstName && addr?.lastName
-          ? `${addr.firstName} ${addr.lastName}`.trim()
-          : null;
-        if (full && profileData?.name !== full) {
-          fetch("/api/account/sync-name", { method: "POST" }).catch(() => {});
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const profileRes = await fetch(`/api/user/me`);
+        const profileData = profileRes.ok ? await profileRes.json() : null;
+        if (!cancelled && profileData) {
+          setProfile(profileData);
+          const addr = profileData?.savedAddress;
+          const full =
+            addr?.firstName && addr?.lastName
+              ? `${addr.firstName} ${addr.lastName}`.trim()
+              : null;
+          if (full && profileData?.name !== full) {
+            fetch("/api/account/sync-name", { method: "POST" }).catch(() => {});
+          }
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } catch {
+        /* profile optional for orders list */
+      }
+      try {
+        const ordersData = await fetchOrders();
+        if (!cancelled) {
+          setOrders(Array.isArray(ordersData) ? ordersData : []);
+        }
+      } catch (e) {
+        console.error("[account] Failed to fetch orders", e);
+        if (!cancelled) setOrders([]);
+      }
+    })().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [status, session?.user?.id]);
 
   useEffect(() => {

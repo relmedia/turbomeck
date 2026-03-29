@@ -21,7 +21,8 @@
     "db:products": "tsx scripts/products-summary.ts",
     "db:migrate-categories": "tsx scripts/migrate-to-product-categories.ts",
     "db:set-admin": "tsx scripts/set-admin-role.ts",
-    "db:set-password": "tsx scripts/set-admin-password.ts"
+    "db:set-password": "tsx scripts/set-admin-password.ts",
+    "db:ensure-exchange-turbo": "tsx scripts/ensure-is-exchange-turbo.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
