@@ -73,9 +73,23 @@ function getMagicLinkBase(): string {
   );
 }
 
+/** Admin Next runs on :3001 in prod; flag may be missing from bundled env. */
+function isStudioAdminProcess(): boolean {
+  return (
+    process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1" ||
+    process.env["PORT"] === "3001" ||
+    (process.env["AUTH_VERIFY_PATH"] || "").includes("/studio/")
+  );
+}
+
+function defaultStudioOrigin(): string {
+  const host = process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || "studio.turbomeck.cloud";
+  return `https://${host}`;
+}
+
 /** When admin .env uses shop apex for NEXTAUTH_URL, force studio host (matches apps/admin/next.config). */
 function coerceMagicLinkBaseForStudioProcess(baseRaw: string): string {
-  if (process.env["STUDIO_AUTH_MAGIC_LINKS"] !== "1") return baseRaw;
+  if (!isStudioAdminProcess()) return baseRaw;
   const studio =
     process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || "studio.turbomeck.cloud";
   const apex = new Set(
@@ -134,6 +148,16 @@ function coerceAdminMagicLinkCallback(link: string, base: URL): string {
 function magicLinkUrlForThisApp(url: string): string {
   let baseRaw = getMagicLinkBase();
   if (baseRaw) baseRaw = coerceMagicLinkBaseForStudioProcess(baseRaw);
+  if (!baseRaw && isStudioAdminProcess()) {
+    baseRaw = defaultStudioOrigin();
+    if (process.env["NODE_ENV"] === "production") {
+      console.error(
+        "[@repo/auth] Admin (:3001): NEXTAUTH_URL/PUBLIC_AUTH_ORIGIN missing — using",
+        baseRaw,
+        "for magic links. Set NEXTAUTH_URL in apps/admin/.env.",
+      );
+    }
+  }
   if (!baseRaw) {
     if (process.env["NODE_ENV"] !== "production") {
       console.warn(
@@ -204,7 +228,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             : {},
         });
         const link = magicLinkUrlForThisApp(url);
-        if (process.env["STUDIO_AUTH_MAGIC_LINKS"] === "1") {
+        if (isStudioAdminProcess()) {
           try {
             const stillShop =
               /\/\/(www\.)?turbomeck\.cloud(\/|\?|$)/i.test(link) &&
@@ -212,7 +236,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (stillShop) {
               console.error(
                 "[@repo/auth] Magic link still on shop host after rewrite. Check admin env / deploy.",
-                { in: url, out: link },
+                { in: url, out: link, port: process.env["PORT"] },
               );
             }
           } catch {
