@@ -2,6 +2,10 @@
 
 import type { FC } from "react";
 import { MapPin, Loader2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import type { PostNordServicePoint } from "@/types";
+import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
+import { useLanguage, useTranslation } from "@/i18n/context";
 
 const WEEKDAY_SV: Record<string, string> = {
   Monday: "Måndag",
@@ -13,15 +17,13 @@ const WEEKDAY_SV: Record<string, string> = {
   Sunday: "Söndag",
 };
 
-function translateOpeningHours(hours: string): string {
+function translateOpeningHours(hours: string, locale: string): string {
+  if (locale === "en") return hours;
   return hours.replace(
     /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi,
     (m) => WEEKDAY_SV[m.charAt(0).toUpperCase() + m.slice(1).toLowerCase()] ?? m
   );
 }
-import { useState, useCallback } from "react";
-import type { PostNordServicePoint } from "@/types";
-import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
 
 type ServicePointPickerProps = {
   postalCode: string;
@@ -40,6 +42,8 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
   onSelect,
   disabled = false,
 }) => {
+  const { locale } = useLanguage();
+  const t = useTranslation();
   const [points, setPoints] = useState<PostNordServicePoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,11 +54,11 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
 
   const searchServicePoints = useCallback(async () => {
     if (!postalCode || postalCode.length < 3) {
-      setError("Ange postnummer först (minst 3 tecken)");
+      setError(t("shipping.servicePointPostalRequired"));
       return;
     }
     if (!isSupported) {
-      setError("PostNord ombud finns för Sverige, Norge och Danmark");
+      setError(t("shipping.servicePointUnsupportedCountry"));
       return;
     }
     setLoading(true);
@@ -69,30 +73,31 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error ?? "Kunde inte hämta ombud");
+        throw new Error(data.error ?? t("shipping.servicePointFetchError"));
       }
       setPoints(data.servicePoints ?? []);
       if (!data.servicePoints?.length) {
-        setError("Inga PostNord-ombud hittades i närheten");
+        setError(t("shipping.servicePointNoneFound"));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Något gick fel");
+      setError(e instanceof Error ? e.message : t("shipping.servicePointGenericError"));
       setPoints([]);
     } finally {
       setLoading(false);
     }
-  }, [postalCode, city, country, isSupported]);
+  }, [postalCode, city, country, isSupported, t]);
 
   return (
     <div className="flex flex-col gap-2 mt-2 p-3 border border-gray-200 rounded-lg bg-gray-50/50">
       <p className="text-xs text-gray-600 font-medium">
-        Leverans till PostNord-ombud (valfritt)
+        {t("shipping.servicePointHeading")}
+      </p>
+      <p className="text-[11px] text-muted-foreground">
+        {t("shipping.servicePointRequiredWhenPickup")}
       </p>
 
       {!isSupported && (
-        <p className="text-xs text-amber-600">
-          PostNord ombud finns för Sverige, Norge och Danmark. För andra länder välj hemleverans.
-        </p>
+        <p className="text-xs text-amber-600">{t("shipping.servicePointCountryHint")}</p>
       )}
 
       {!selectedPoint ? (
@@ -108,12 +113,10 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
             ) : (
               <MapPin className="w-4 h-4" />
             )}
-            {loading ? "Söker..." : "Hitta PostNord-ombud"}
+            {loading ? t("shipping.searchingServicePoints") : t("shipping.findServicePointButton")}
           </button>
 
-          {error && (
-            <p className="text-xs text-red-500">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500">{error}</p>}
 
           {points.length > 0 && (
             <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
@@ -135,7 +138,7 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
                   </p>
                   {point.openingHours && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {translateOpeningHours(point.openingHours)}
+                      {translateOpeningHours(point.openingHours, locale)}
                     </p>
                   )}
                 </button>
@@ -158,7 +161,7 @@ const ServicePointPicker: FC<ServicePointPickerProps> = ({
             onClick={() => onSelect(null)}
             className="text-xs text-gray-500 hover:text-red-600"
           >
-            Ändra
+            {t("shipping.changeServicePoint")}
           </button>
         </div>
       )}

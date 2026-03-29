@@ -26,6 +26,7 @@ import type { SavedAddress } from "@/types";
 import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { cn } from "@/lib/utils";
+import type { PostNordShippingSelection } from "@/components/PostNordShippingModule";
 
 
 const CartPage: React.FC = () => {
@@ -37,11 +38,8 @@ const CartPage: React.FC = () => {
     deliveryOption?: "home" | "servicepoint";
     country?: string;
   }>({});
-  const [postNordSelection, setPostNordSelection] = useState<{
-    price?: number;
-    sessionId?: string;
-    displayName?: string;
-  } | null>(null);
+  const [postNordSelection, setPostNordSelection] =
+    useState<PostNordShippingSelection | null>(null);
   const [shippingFromApi, setShippingFromApi] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(false);
@@ -248,17 +246,8 @@ const CartPage: React.FC = () => {
           onDeliveryChange={handleDeliveryChange}
           defaultAddress={savedAddress}
           showSaveAddressOption={!!userId}
-          onPostNordSelection={(sel) =>
-            setPostNordSelection(
-              sel
-                ? {
-                    price: sel.price,
-                    sessionId: sel.sessionId,
-                    displayName: sel.displayName,
-                  }
-                : null
-            )
-          }
+          postNordSelection={postNordSelection}
+          onPostNordSelection={(sel) => setPostNordSelection(sel)}
           cartItems={cart}
         />
       ),
@@ -609,12 +598,19 @@ const CartPage: React.FC = () => {
               >
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={section.id === 3 && !shippingForm}
+                  title={
+                    section.id === 3 && !shippingForm
+                      ? t("cart.completeShippingBeforePayment")
+                      : undefined
+                  }
+                  onClick={() => {
+                    if (section.id === 3 && !shippingForm) return;
                     setExpandedSection(
                       expandedSection === section.id ? expandedSection : section.id
-                    )
-                  }
-                  className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors"
+                    );
+                  }}
+                  className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
                 >
                   {section.title}
                   {expandedSection === section.id ? (

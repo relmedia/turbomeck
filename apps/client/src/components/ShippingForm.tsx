@@ -11,7 +11,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Package, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getDefaultCountryFromBrowser } from "@/lib/utils";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ type ShippingFormProps = {
   defaultAddress?: Partial<ShippingFormInputs>;
   /** If true, show "Spara adress till mitt konto" checkbox (user must be logged in) */
   showSaveAddressOption?: boolean;
+  /** Parent holds latest PostNord widget selection (required to enable Continue when widget is active) */
+  postNordSelection?: PostNordShippingSelection | null;
 };
 
 const ShippingForm: FC<ShippingFormProps> = ({
@@ -61,6 +63,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
   cartItems = [],
   defaultAddress,
   showSaveAddressOption = false,
+  postNordSelection = null,
 }) => {
   const { locale } = useLanguage();
   const t = useTranslation();
@@ -72,6 +75,11 @@ const ShippingForm: FC<ShippingFormProps> = ({
     useState<PostNordServicePoint | null>(null);
   const [detectedCountry, setDetectedCountry] = useState<string>("SE");
   const [postNordFailed, setPostNordFailed] = useState(false);
+
+  const handlePostNordError = useCallback(() => {
+    setPostNordFailed(true);
+    onPostNordSelection?.(null);
+  }, [onPostNordSelection]);
 
   useEffect(() => {
     setDetectedCountry(getDefaultCountryFromBrowser());
@@ -166,12 +174,38 @@ const ShippingForm: FC<ShippingFormProps> = ({
           city: "",
           countryCode: country,
         });
+      } else {
+        setSelectedServicePoint(null);
       }
     },
     [country, onPostNordSelection]
   );
 
+  const isDeliveryComplete = useMemo(() => {
+    if (POSTNORD_ENABLED && !postNordFailed) {
+      const s = postNordSelection;
+      return Boolean(
+        s?.sessionId?.trim() &&
+          s.price != null &&
+          Number.isFinite(Number(s.price))
+      );
+    }
+    if (deliveryOption === "home") return true;
+    if (deliveryOption === "servicepoint") {
+      if (isPostNordCountry) return selectedServicePoint != null;
+      return true;
+    }
+    return false;
+  }, [
+    postNordFailed,
+    postNordSelection,
+    deliveryOption,
+    isPostNordCountry,
+    selectedServicePoint,
+  ]);
+
   const handleShippingForm: SubmitHandler<ShippingFormInputs> = async (data) => {
+    if (!isDeliveryComplete) return;
     setShippingForm({
       ...data,
       deliveryOption,
@@ -220,6 +254,89 @@ const ShippingForm: FC<ShippingFormProps> = ({
       className="flex flex-col gap-4"
       onSubmit={handleSubmit(handleShippingForm)}
     >
+      <div className="space-y-2">
+        <Label htmlFor="country">{t("shipping.country")}</Label>
+        <Controller
+          name="country"
+          control={control}
+          render={({ field }) => (
+            <Select
+              value={field.value}
+              onValueChange={(v) => {
+                field.onChange(v);
+                onDeliveryChange?.(deliveryOption, v ?? "SE");
+              }}
+            >
+              <SelectTrigger
+                id="country"
+                className={errors.country ? "border-destructive" : ""}
+              >
+                <SelectValue placeholder={t("shipping.selectCountry")} />
+              </SelectTrigger>
+              <SelectContent>
+                {EUROPEAN_COUNTRIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    <span className="flex items-center gap-2">
+                      <CountryFlag code={c.code} />
+                      <span>{t(`shipping.countryNames.${c.code}`)}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {errors.country && (
+          <p className="text-xs text-destructive">{errors.country.message}</p>
+        )}
+      </div>
+
+      {/* Leveranssätt först (manuellt läge: radioknappar; PostNord-läge: instruktion) */}
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/25 p-4">
+        <p className="text-sm font-medium">{t("shipping.deliveryMethod")}</p>
+        {POSTNORD_ENABLED && !postNordFailed ? (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {t("shipping.postNordChooseAfterAddress")}
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="deliveryOption"
+                checked={deliveryOption === "home"}
+                onChange={() => {
+                  setDeliveryOption("home");
+                  setSelectedServicePoint(null);
+                  onPostNordSelection?.(null);
+                }}
+                className="w-4 h-4 accent-primary"
+              />
+              <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-sm">{t("shipping.homeDelivery")}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="deliveryOption"
+                checked={deliveryOption === "servicepoint"}
+                onChange={() => {
+                  setDeliveryOption("servicepoint");
+                  onPostNordSelection?.(null);
+                }}
+                className="w-4 h-4 accent-primary"
+              />
+              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-sm">
+                {isPostNordCountry
+                  ? t("shipping.postNordServicepoint")
+                  : t("shipping.postNordAbroad")}
+              </span>
+            </label>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="firstName">{t("shipping.firstName")}</Label>
@@ -277,43 +394,6 @@ const ShippingForm: FC<ShippingFormProps> = ({
         />
         {errors.phone && (
           <p className="text-xs text-destructive">{errors.phone.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="country">{t("shipping.country")}</Label>
-          <Controller
-          name="country"
-          control={control}
-          render={({ field }) => (
-            <Select
-              value={field.value}
-              onValueChange={(v) => {
-                field.onChange(v);
-                onDeliveryChange?.(deliveryOption, v ?? "SE");
-              }}
-            >
-              <SelectTrigger
-                id="country"
-                className={errors.country ? "border-destructive" : ""}
-              >
-                <SelectValue placeholder="Välj land" />
-              </SelectTrigger>
-              <SelectContent>
-                {EUROPEAN_COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    <span className="flex items-center gap-2">
-                      <CountryFlag code={c.code} />
-                      <span>{t(`shipping.countryNames.${c.code}`)}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
-        {errors.country && (
-          <p className="text-xs text-destructive">{errors.country.message}</p>
         )}
       </div>
 
@@ -379,52 +459,17 @@ const ShippingForm: FC<ShippingFormProps> = ({
           </label>
         ))}
 
-      {/* PostNord Shipping Module or fallback delivery options */}
       <div className="flex flex-col gap-3 pt-4 border-t border-border">
-        <p className="text-sm font-medium">{t("shipping.deliveryMethod")}</p>
-
         {POSTNORD_ENABLED && !postNordFailed ? (
           <PostNordShippingModule
             formData={formValues}
             cartItems={cartItems}
             language={locale === "en" ? "en" : "sv"}
             onShippingChange={handlePostNordSelect}
-            onError={() => setPostNordFailed(true)}
+            onError={handlePostNordError}
           />
         ) : (
           <>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="deliveryOption"
-                  checked={deliveryOption === "home"}
-                  onChange={() => {
-                    setDeliveryOption("home");
-                    setSelectedServicePoint(null);
-                  }}
-                  className="w-4 h-4 accent-primary"
-                />
-                <Package className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">{t("shipping.homeDelivery")}</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="deliveryOption"
-                  checked={deliveryOption === "servicepoint"}
-                  onChange={() => setDeliveryOption("servicepoint")}
-                  className="w-4 h-4 accent-primary"
-                />
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {isPostNordCountry
-                    ? t("shipping.postNordServicepoint")
-                    : t("shipping.postNordAbroad")}
-                </span>
-              </label>
-            </div>
-
             {deliveryOption === "servicepoint" &&
               (isPostNordCountry ? (
                 <ServicePointPicker
@@ -435,7 +480,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
                   onSelect={setSelectedServicePoint}
                 />
               ) : (
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground">
                   {t("shipping.deliveryToAddress")}
                 </p>
               ))}
@@ -443,9 +488,15 @@ const ShippingForm: FC<ShippingFormProps> = ({
         )}
       </div>
 
+      {isValid && !isDeliveryComplete && (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          {t("shipping.deliveryIncomplete")}
+        </p>
+      )}
+
       <Button
         type="submit"
-        disabled={!isValid}
+        disabled={!isValid || !isDeliveryComplete}
         className="w-full cursor-pointer"
       >
         {t("shipping.continue")}
