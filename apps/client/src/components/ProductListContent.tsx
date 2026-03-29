@@ -51,7 +51,7 @@ export function ProductListContent({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-y-10 gap-x-4 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-8 lg:grid-cols-4">
         {products.length > 0 ? (
           products.map((product, i) => (
             <ProductCard
