@@ -583,18 +583,21 @@ export default function AccountPage() {
                     const receiptUrl = stripeInfo?.receiptUrl;
                     const stripeReceiptLoading =
                       Boolean(order.stripePaymentId) && stripeInfo === undefined;
-                    const primaryRef =
-                      order.stripePaymentId && stripeInfo !== undefined
-                        ? stripeInfo.receiptNumber
-                          ? `#${stripeInfo.receiptNumber}`
-                          : `#${order.orderNumber}`
-                        : !order.stripePaymentId
-                          ? `${t("account.order")} #${order.orderNumber}`
-                          : "";
+                    const tmOrderLine = t("account.tmOrderWithNumber", {
+                      n: order.orderNumber,
+                    });
+                    const stripeReceiptLine =
+                      order.stripePaymentId &&
+                      stripeInfo !== undefined &&
+                      stripeInfo.receiptNumber
+                        ? t("account.stripeReceiptWithNumber", {
+                            n: stripeInfo.receiptNumber,
+                          })
+                        : null;
                     const ariaRef =
                       order.stripePaymentId && stripeInfo?.receiptNumber
-                        ? `#${stripeInfo.receiptNumber}`
-                        : `${order.orderNumber}`;
+                        ? `${tmOrderLine}, ${stripeReceiptLine ?? ""}`
+                        : tmOrderLine;
 
                     return (
                       <div
@@ -616,23 +619,20 @@ export default function AccountPage() {
                             <Package className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <div className="min-w-0 flex-1 space-y-0.5">
-                            <p className="text-sm font-semibold leading-tight">
-                              {stripeReceiptLoading ? (
-                                <span className="inline-flex items-center gap-2 text-muted-foreground">
-                                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                                  {t("common.loading")}
-                                </span>
-                              ) : (
-                                primaryRef
-                              )}
+                            <p className="text-sm font-semibold leading-tight text-foreground">
+                              {tmOrderLine}
                             </p>
-                            {order.stripePaymentId &&
-                              stripeInfo?.receiptNumber &&
-                              !stripeReceiptLoading && (
-                                <p className="text-xs text-muted-foreground">
-                                  {t("account.shopOrderRef", { n: order.orderNumber })}
-                                </p>
-                              )}
+                            {order.stripePaymentId && stripeReceiptLoading && (
+                              <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                {t("common.loading")}
+                              </p>
+                            )}
+                            {stripeReceiptLine && !stripeReceiptLoading && (
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {stripeReceiptLine}
+                              </p>
+                            )}
                             <p className="text-xs text-muted-foreground">
                               {Number(order.total ?? 0).toLocaleString(
                                 locale === "en" ? "en-GB" : "sv-SE",

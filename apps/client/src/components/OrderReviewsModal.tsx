@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "react-toastify";
 
+function orderNumberForDisplay(orderNumber: string): string {
+  return String(orderNumber).replace(/^#+/, "").trim() || String(orderNumber);
+}
+
 function OrderItemReviewForm({
   productId,
   productName,
@@ -231,10 +235,10 @@ function OrderItemReviewCard({
         </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={loading}>
-            {loading ? "Sparar..." : "Spara ändringar"}
+            {loading ? t("account.saving") : t("orderReviews.saveChanges")}
           </Button>
           <Button type="button" variant="outline" onClick={handleCancel} disabled={loading}>
-            Avbryt
+            {t("common.cancel")}
           </Button>
         </div>
       </form>
@@ -403,18 +407,20 @@ export default function OrderReviewsModal({ order, onClose }: OrderReviewsModalP
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between z-10">
-          <h2 className="text-lg font-semibold">Skriv recension</h2>
+          <h2 className="text-lg font-semibold">{t("orderReviews.writeReview")}</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-md hover:bg-muted transition-colors"
-            aria-label="Stäng"
+            aria-label={t("common.close")}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            {t("orderReviews.orderIntro", { orderNumber: order.orderNumber })}
+            {t("orderReviews.orderIntro", {
+              orderNumber: orderNumberForDisplay(order.orderNumber),
+            })}
           </p>
           <div className="space-y-4">
             {unreviewedItems.map((item) => (
