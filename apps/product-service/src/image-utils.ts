@@ -5,8 +5,25 @@ import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
 
 const TARGET_SIZE = 1200;
 
+/** Max dimension fed to background-removal (model & memory; avoids huge inputs). */
+const REMOVE_BG_MAX_EDGE = 2048;
+
 /** AVIF output tuned for product photos (good compression, acceptable CPU). */
 const AVIF_OPTIONS = { quality: 62, effort: 4 } as const;
+
+/**
+ * `@imgly/background-removal-node` only accepts a small set of raster formats.
+ * Product images are often AVIF/WebP; normalize to PNG before calling the model.
+ */
+async function toPngForBackgroundRemoval(imageBuffer: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  return sharp(imageBuffer)
+    .rotate()
+    .resize(REMOVE_BG_MAX_EDGE, REMOVE_BG_MAX_EDGE, { fit: "inside", withoutEnlargement: true })
+    .ensureAlpha()
+    .png({ compressionLevel: 6 })
+    .toBuffer();
+}
 
 /** Result of processing a product image - either file path or buffer for R2 upload. */
 export type ProcessProductImageResult =
@@ -122,26 +139,34 @@ export async function removeBackgroundFromImageUrl(imageUrl: string): Promise<{
     throw new Error(`Invalid image URL, could not extract filename: ${imageUrl}`);
   }
 
-  let blob: Blob;
-  try {
-    blob = await removeBackground(normalizedUrl, {
-      model: "medium",
-      output: { format: "image/png", quality: 0.95 },
-    });
-  } catch (urlErr) {
-    // Fallback: fetch image and pass buffer (handles URL fetch failures)
-    const res = await fetch(normalizedUrl, { headers: { "User-Agent": "Turbomeck-RemoveBg/1.0" } });
-    if (!res.ok) {
-      throw new Error(
-        `Kunde inte hämta bilden (HTTP ${res.status}). Kontrollera att URL:en är giltig: ${normalizedUrl}`
-      );
-    }
-    const imageBuffer = Buffer.from(await res.arrayBuffer());
-    blob = await removeBackground(imageBuffer, {
-      model: "medium",
-      output: { format: "image/png", quality: 0.95 },
-    });
+  const res = await fetch(normalizedUrl, { headers: { "User-Agent": "Turbomeck-RemoveBg/1.0" } });
+  if (!res.ok) {
+    throw new Error(
+      `Kunde inte hämta bilden (HTTP ${res.status}). Kontrollera att URL:en är giltig: ${normalizedUrl}`
+    );
   }
+  const rawBuffer = Buffer.from(await res.arrayBuffer());
+  let pngBuffer: Buffer;
+  try {
+    pngBuffer = await toPngForBackgroundRemoval(rawBuffer);
+  } catch (convErr) {
+    const hint =
+      convErr instanceof Error && /svg|SVG/i.test(convErr.message)
+        ? " (SVG kräver en fristående bildfil; ladda upp PNG/JPEG/WebP/AVIF.)"
+        : "";
+    throw new Error(
+      `Kunde inte läsa bildformatet${hint}${
+        convErr instanceof Error ? `: ${convErr.message}` : ""
+      }`
+    );
+  }
+  // Buffer/Uint8Array are converted inside imgly to `new Blob([x])` with no type → empty
+  // mime → "Unsupported format". Must pass a Blob with an explicit image/* type.
+  const inputBlob = new Blob([pngBuffer], { type: "image/png" });
+  const blob = await removeBackground(inputBlob, {
+    model: "medium",
+    output: { format: "image/png", quality: 0.95 },
+  });
   const noBgBuffer = Buffer.from(await blob.arrayBuffer());
   const finalBuffer = await encodeProductImageToAvif(noBgBuffer);
   const outputFilename = filename.replace(/\.[^.]+$/, ".avif");
