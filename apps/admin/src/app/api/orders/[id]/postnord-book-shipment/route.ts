@@ -3,12 +3,17 @@ import { db } from "@repo/database";
 import { orders } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { buildEdiInstructionToServicePoint, postEdiBooking } from "@/lib/postnord-booking-edi";
+import {
+  buildEdiInstructionForLabelPdf,
+  buildEdiInstructionToServicePoint,
+  postEdiBooking,
+} from "@/lib/postnord-booking-edi";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
 
 /**
  * POST /api/orders/[id]/postnord-book-shipment
  * Books domestic parcel to service point via PostNord Booking API (POST /v3/edi).
+ * Stores a merged EDI + idInformation snapshot for GET …/postnord-label-pdf (labels/pdf).
  * Requires env: POSTNORD_API_KEY, POSTNORD_EDI_CUSTOMER_NUMBER, consignor address vars.
  */
 export async function POST(
@@ -115,11 +120,14 @@ export async function POST(
     );
   }
 
+  const labelSnapshot = buildEdiInstructionForLabelPdf(shipmentInformation, booked.rawBookingJson);
+
   await db
     .update(orders)
     .set({
       postNordTrackingId: booked.trackableId,
       status: "shipped",
+      postNordLabelSnapshot: labelSnapshot ?? null,
     })
     .where(eq(orders.id, orderId));
 
@@ -137,6 +145,7 @@ export async function POST(
     success: true,
     postNordTrackingId: booked.trackableId,
     postNordPrintId: booked.printId,
+    postNordLabelAvailable: labelSnapshot != null,
     weightKg,
     shipmentEmailSent,
     shipmentEmailError,

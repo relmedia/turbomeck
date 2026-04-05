@@ -221,6 +221,72 @@ export type PostnordEdiBookResult =
     }
   | { ok: false; status: number; message: string; details?: string };
 
+/**
+ * Merge the outbound EDI instruction with `idInformation` from the booking response
+ * so PostNord can render the label PDF (see POST /rest/shipment/v3/edi/labels/pdf).
+ */
+export function buildEdiInstructionForLabelPdf(
+  shipmentInformation: Record<string, unknown>,
+  bookingResponse: unknown
+): Record<string, unknown> | null {
+  if (bookingResponse == null || typeof bookingResponse !== "object") return null;
+  const idInformation = (bookingResponse as Record<string, unknown>).idInformation;
+  if (!Array.isArray(idInformation) || idInformation.length === 0) return null;
+  return {
+    ...shipmentInformation,
+    idInformation,
+  };
+}
+
+export type PostnordEdiLabelPdfResult =
+  | { ok: true; body: ArrayBuffer; contentType: string }
+  | { ok: false; status: number; message: string; details?: string };
+
+/**
+ * Fetch shipping label PDF (or ZPL) from PostNord after a successful EDI booking.
+ * `ediBody` must be the merged instruction from {@link buildEdiInstructionForLabelPdf}.
+ */
+function isLikelyPdf(buf: ArrayBuffer): boolean {
+  if (buf.byteLength < 4) return false;
+  const u8 = new Uint8Array(buf, 0, 4);
+  return u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46; // %PDF
+}
+
+export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise<PostnordEdiLabelPdfResult> {
+  const apiKey = process.env.POSTNORD_API_KEY?.trim();
+  if (!apiKey) {
+    return { ok: false, status: 503, message: "POSTNORD_API_KEY is not set" };
+  }
+
+  const host = ediHost();
+  const url = new URL(`https://${host}/rest/shipment/v3/edi/labels/pdf`);
+  url.searchParams.set("apikey", apiKey);
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/pdf,*/*" },
+    body: JSON.stringify(ediBody),
+  });
+
+  const body = await res.arrayBuffer();
+  const ct = (res.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() || "";
+
+  if (res.ok && body.byteLength > 0 && (ct.includes("pdf") || isLikelyPdf(body))) {
+    return { ok: true, body, contentType: "application/pdf" };
+  }
+
+  const details =
+    body.byteLength > 0 && body.byteLength < 12000
+      ? new TextDecoder().decode(body)
+      : undefined;
+  return {
+    ok: false,
+    status: res.status,
+    message: "PostNord label API did not return a PDF",
+    details: details?.slice(0, 4000),
+  };
+}
+
 export async function postEdiBooking(shipmentInformation: Record<string, unknown>): Promise<PostnordEdiBookResult> {
   const apiKey = process.env.POSTNORD_API_KEY?.trim();
   if (!apiKey) {

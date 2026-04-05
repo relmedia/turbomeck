@@ -201,6 +201,11 @@ export const orders = pgTable("orders", {
   /** When commitsCoreReturnWithin14, deadline for receiving the old part */
   coreReturnDeadline: timestamp("core_return_deadline", { mode: "date" }),
   postNordTrackingId: text("post_nord_tracking_id"),
+  /**
+   * Merged EDI instruction + `idInformation` from PostNord Booking API 201 response.
+   * Used to re-fetch the shipping label PDF via POST /rest/shipment/v3/edi/labels/pdf.
+   */
+  postNordLabelSnapshot: jsonb("post_nord_label_snapshot").$type<Record<string, unknown> | null>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

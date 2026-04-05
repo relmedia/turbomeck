@@ -65,6 +65,8 @@ type OrderDetail = {
   deliveryOption?: string;
   country?: string;
   postNordTrackingId?: string;
+  /** True when PostNord EDI booking stored a label snapshot (PDF can be downloaded). */
+  hasPostNordLabel?: boolean;
   items: OrderItem[];
 };
 
@@ -293,6 +295,9 @@ export default function OrderDetailPage() {
         return;
       }
       toast.success(`Frakt bokad — spårning: ${data.postNordTrackingId ?? ""}`);
+      if (data.postNordLabelAvailable === false) {
+        toast.warn("Ingen etikett-snapshot sparades — PDF kan saknas. Kontrollera bokningssvaret hos PostNord.");
+      }
       if (data.postNordPrintId) {
         toast.info(`PrintId (etikett): ${data.postNordPrintId}`);
       }
@@ -659,7 +664,9 @@ export default function OrderDetailPage() {
                 </Button>
               </div>
             </div>
-            {(order.shippedDate || toValidTrackingId(order.postNordTrackingId)) && (
+            {(order.shippedDate ||
+              toValidTrackingId(order.postNordTrackingId) ||
+              order.hasPostNordLabel) && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
                   Skickad
@@ -678,6 +685,14 @@ export default function OrderDetailPage() {
                   >
                     Spårningsnr: {toValidTrackingId(order.postNordTrackingId)} →
                   </a>
+                )}
+                {order.hasPostNordLabel && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-white" asChild>
+                    <a href={`/api/orders/${id}/postnord-label-pdf`} target="_blank" rel="noopener noreferrer">
+                      <Printer className="h-3.5 w-3.5" aria-hidden />
+                      Fraktetikett PDF
+                    </a>
+                  </Button>
                 )}
               </div>
             )}

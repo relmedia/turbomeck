@@ -219,6 +219,10 @@ export async function GET(
       servicePointId: order.servicePointId ?? undefined,
       deliveryOption: order.deliveryOption ?? "servicepoint",
       postNordTrackingId: order.postNordTrackingId ?? undefined,
+      hasPostNordLabel:
+        order.postNordLabelSnapshot != null &&
+        typeof order.postNordLabelSnapshot === "object" &&
+        !Array.isArray(order.postNordLabelSnapshot),
       items: items.map((i) => ({
         productName: i.productName,
         productImage: i.productImage ?? "/products/1g.png",
