@@ -2,6 +2,9 @@ import nodemailer from "nodemailer";
 import { db, appSettings } from "@repo/database";
 import { eq } from "drizzle-orm";
 
+/** Customer-facing contact address in transactional emails */
+export const SHOP_CONTACT_EMAIL = "shop@turbomeck.se";
+
 /**
  * Identical to @repo/auth `email-templates.ts` (magic link) LOGO_URL resolution.
  */
@@ -55,6 +58,53 @@ function escapeHtml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeHtmlAttr(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+/**
+ * Mail clients need absolute https URLs. Relative paths use R2 public base from env.
+ */
+function toAbsoluteProductImageUrl(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const t = String(raw).trim();
+  if (!t) return null;
+  if (t.startsWith("https://") || t.startsWith("http://")) return t;
+  if (t.startsWith("//")) return `https:${t}`;
+  const base = (process.env.R2_PUBLIC_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
+  if (!base) return null;
+  const path = t.startsWith("/") ? t : `/${t}`;
+  return `${base}${path}`;
+}
+
+function isLocalhostUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(url);
+}
+
+/**
+ * Many email clients do not render AVIF/WebP in <img>. Optionally route through product-service
+ * JPEG proxy when EMAIL_IMAGE_PROXY_BASE_URL or PRODUCT_SERVICE_PUBLIC_URL is a public https URL.
+ */
+export function resolveProductImageUrlForEmail(raw: string | null | undefined): string | null {
+  const absolute = toAbsoluteProductImageUrl(raw);
+  if (!absolute) return null;
+  const needsRasterFallback = /\.(avif|webp)(\?|#|$)/i.test(absolute);
+  const proxyBase = (
+    process.env.EMAIL_IMAGE_PROXY_BASE_URL ||
+    process.env.PRODUCT_SERVICE_PUBLIC_URL ||
+    ""
+  ).replace(/\/$/, "");
+  const proxyOk =
+    !!proxyBase &&
+    proxyBase.startsWith("https://") &&
+    !isLocalhostUrl(proxyBase) &&
+    !isLocalhostUrl(absolute);
+  if (needsRasterFallback && proxyOk) {
+    return `${proxyBase}/api/email/img?u=${encodeURIComponent(absolute)}`;
+  }
+  return absolute;
 }
 
 type MailConfig = {
@@ -209,6 +259,8 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
       (item) => {
         const lineGross = item.price * item.quantity;
         const lineVat = vatFromGrossIncl25(lineGross);
+        const imgSrc = resolveProductImageUrlForEmail(item.productImage);
+        const imgAttr = imgSrc ? escapeHtmlAttr(imgSrc) : "";
         return `
       <tr>
         <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
@@ -216,8 +268,8 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
             <tr>
               <td width="80" style="vertical-align: top;">
                 ${
-                  item.productImage
-                    ? `<img src="${item.productImage}" alt="${item.productName}" width="64" height="64" style="display: block; border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
+                  imgSrc
+                    ? `<img src="${imgAttr}" alt="${escapeHtml(item.productName)}" width="64" height="64" style="display: block; width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
                     : `<div style="width: 64px; height: 64px; background: #f3f4f6; border-radius: 8px;"></div>`
                 }
               </td>
@@ -262,13 +314,19 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
             </td>
           </tr>
           
-          <!-- Success Banner -->
+          <!-- Success Banner (nested table + 9999px radius = “pill/circle” in Gmail/Apple; Outlook still may show square) -->
           <tr>
             <td style="padding: 40px 40px 24px 40px; text-align: center;">
-              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+              <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto;">
                 <tr>
-                  <td style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 50%; -webkit-border-radius: 50%; text-align: center; vertical-align: middle; line-height: 64px; mso-line-height-rule: exactly;">
-                    <span style="font-size: 30px; color: #16a34a; line-height: 64px; display: inline-block; vertical-align: middle;">✓</span>
+                  <td style="padding: 0; text-align: center;">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto; border-radius: 9999px; overflow: hidden; background-color: #dcfce7;">
+                      <tr>
+                        <td width="64" height="64" style="width: 64px; height: 64px; max-width: 64px; max-height: 64px; background-color: #dcfce7; border-radius: 9999px; -webkit-border-radius: 9999px; text-align: center; vertical-align: middle; mso-line-height-rule: exactly; line-height: 64px;">
+                          <span style="font-size: 30px; color: #16a34a; line-height: 64px; display: inline-block; vertical-align: middle;">✓</span>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
@@ -400,7 +458,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
           <tr>
             <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
-                ${t.questions} <a href="mailto:info@turbomeck.se" style="color: #6ec900; text-decoration: none;">info@turbomeck.se</a>
+                ${t.questions} <a href="mailto:${SHOP_CONTACT_EMAIL}" style="color: #6ec900; text-decoration: none;">${SHOP_CONTACT_EMAIL}</a>
               </p>
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                 © ${new Date().getFullYear()} Turbomeck. ${t.rights}
@@ -484,10 +542,16 @@ function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): strin
           </tr>
           <tr>
             <td style="padding: 36px 40px 24px 40px; text-align: center;">
-              <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
+              <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto;">
                 <tr>
-                  <td style="width: 56px; height: 56px; background-color: #dbeafe; border-radius: 50%; -webkit-border-radius: 50%; text-align: center; vertical-align: middle; line-height: 56px;">
-                    <span style="font-size: 26px; line-height: 56px; display: inline-block; vertical-align: middle;">📦</span>
+                  <td style="padding: 0; text-align: center;">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto; border-radius: 9999px; overflow: hidden; background-color: #dbeafe;">
+                      <tr>
+                        <td width="56" height="56" style="width: 56px; height: 56px; max-width: 56px; max-height: 56px; background-color: #dbeafe; border-radius: 9999px; -webkit-border-radius: 9999px; text-align: center; vertical-align: middle; line-height: 56px; mso-line-height-rule: exactly;">
+                          <span style="font-size: 26px; line-height: 56px; display: inline-block; vertical-align: middle;">📦</span>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
@@ -515,7 +579,7 @@ function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): strin
           <tr>
             <td style="background-color: #f9fafb; padding: 22px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
-                ${t.questions} <a href="mailto:info@turbomeck.se" style="color: #6ec900; text-decoration: none;">info@turbomeck.se</a>
+                ${t.questions} <a href="mailto:${SHOP_CONTACT_EMAIL}" style="color: #6ec900; text-decoration: none;">${SHOP_CONTACT_EMAIL}</a>
               </p>
               <p style="margin: 0; font-size: 12px; color: #9ca3af;">
                 © ${new Date().getFullYear()} Turbomeck. ${t.rights}

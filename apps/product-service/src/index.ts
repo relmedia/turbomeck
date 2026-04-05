@@ -15,6 +15,7 @@ import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-s
 import { sendOrderConfirmationEmail, sendShipmentDispatchedEmail } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
+import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -333,6 +334,44 @@ app.post("/api/remove-background", async (req, res) => {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Failed to remove background",
     });
+  }
+});
+
+/**
+ * GET /api/email/img?u=<encoded https url>
+ * Small JPEG for order emails. Many clients don't render AVIF/WebP in <img>.
+ * URL host must match R2_PUBLIC_URL allowlist (same SSRF rules as remove-background).
+ */
+app.get("/api/email/img", async (req, res) => {
+  const raw = req.query.u;
+  if (typeof raw !== "string" || !raw.trim()) {
+    return res.status(400).send("Missing u");
+  }
+  let sourceUrl: URL;
+  try {
+    sourceUrl = assertAllowedRemoveBackgroundUrl(raw.trim());
+  } catch {
+    return res.status(403).send("Forbidden");
+  }
+  try {
+    const r = await fetch(sourceUrl.toString(), {
+      headers: { "User-Agent": "Turbomeck-EmailImage/1.0" },
+    });
+    if (!r.ok) {
+      return res.status(502).send("Bad source");
+    }
+    const buf = Buffer.from(await r.arrayBuffer());
+    const sharp = (await import("sharp")).default;
+    const jpeg = await sharp(buf)
+      .resize(128, 128, { fit: "cover", position: "center" })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(jpeg);
+  } catch (error) {
+    console.error("/api/email/img:", error);
+    res.status(500).send("Error");
   }
 });
 
