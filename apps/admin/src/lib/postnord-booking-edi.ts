@@ -71,7 +71,9 @@ function parseAdditionalCodes(): string[] {
 export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePointInput): Record<string, unknown> {
   const customerNo = process.env.POSTNORD_EDI_CUSTOMER_NUMBER?.trim();
   if (!customerNo) {
-    throw new Error("POSTNORD_EDI_CUSTOMER_NUMBER is required for Booking API (your PostNord avsändarnummer / party id)");
+    throw new Error(
+      "Sätt POSTNORD_EDI_CUSTOMER_NUMBER: PostNord kräver ert avsändarnummer (party id) i själva EDI-bokningen för avsändare/fraktbetalare. API-nyckeln (apikey) styr bara åtkomst till API:t och ersätter inte detta nummer — det kommer från ert PostNord-avtal / kundintegration."
+    );
   }
 
   const issuerCode = process.env.POSTNORD_EDI_ISSUER_CODE?.trim() || "Z11";
