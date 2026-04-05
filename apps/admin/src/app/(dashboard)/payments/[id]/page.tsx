@@ -85,6 +85,20 @@ function toValidTrackingId(val: unknown): string {
   return s && s.toLowerCase() !== "null" ? s : "";
 }
 
+const POSTNORD_BOOKING_COUNTRY_SET = new Set(
+  typeof process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES === "string" &&
+    process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES.trim()
+    ? process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES.split(/[\s,]+/)
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean)
+    : ["SE", "NO", "DK"],
+);
+
+/** Must match POSTNORD_EDI_DESTINATION_COUNTRIES on the server (use NEXT_PUBLIC_* for custom lists). */
+function isPostNordServicePointBookingCountry(country: string | null | undefined): boolean {
+  return POSTNORD_BOOKING_COUNTRY_SET.has((country ?? "").toUpperCase());
+}
+
 const DELIVERY_STEPS = [
   { id: "processing", label: "Behandlas", icon: Package },
   { id: "shipped", label: "Skickad", icon: Truck },
@@ -562,7 +576,7 @@ export default function OrderDetailPage() {
                 style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
               />
             </div>
-            {(order.country ?? "SE").toUpperCase() === "SE" &&
+            {isPostNordServicePointBookingCountry(order.country) &&
               (order.deliveryOption ?? "servicepoint").toLowerCase() === "servicepoint" &&
               order.servicePointId && (
                 <div className="rounded-lg border border-amber-200/90 bg-amber-50/60 px-3 py-3 text-xs dark:border-amber-900/60 dark:bg-amber-950/25 space-y-2">
@@ -570,13 +584,13 @@ export default function OrderDetailPage() {
                     Boka frakt — PostNord Boknings-API (ombud)
                   </p>
                   <p className="text-muted-foreground leading-snug">
-                    Anropar{" "}
+                    Gäller Sverige, Norge och Danmark (ombud i kassan). Anropar{" "}
                     <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POST …/v3/edi</code> med
-                    kundens ombud. Konfigurera avsändare och{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_CUSTOMER_NUMBER</code>,{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_BASIC_SERVICE_CODE</code>{" "}
-                    m.m. i <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code> (se{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env.example</code>).
+                    kundens ombud. Stäm av{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_BASIC_SERVICE_CODE</code> /{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_ISSUER_CODE</code> mot PostNord för respektive linje, samt{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_CUSTOMER_NUMBER</code> och avsändaradress i{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code>.
                   </p>
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1">

@@ -12,6 +12,24 @@ import {
   extractPostNordTrackableShipmentId,
 } from "./postnord-shipment-response-id";
 
+let cachedEdiDestinationCountries: Set<string> | null = null;
+
+function getEdiDestinationCountries(): Set<string> {
+  if (!cachedEdiDestinationCountries) {
+    const raw = process.env.POSTNORD_EDI_DESTINATION_COUNTRIES?.trim();
+    const parts = raw
+      ? raw.split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean)
+      : ["SE", "NO", "DK"];
+    cachedEdiDestinationCountries = new Set(parts);
+  }
+  return cachedEdiDestinationCountries;
+}
+
+/** Markets where “Boka frakt (EDI)” is allowed (storefront ombud countries by default). */
+export function isPostNordEdiDestinationCountry(country: string | null | undefined): boolean {
+  return getEdiDestinationCountries().has((country ?? "").toUpperCase());
+}
+
 export type PostnordBookToServicePointInput = {
   orderReference: string;
   consigneeFirstName: string;

@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import {
   buildEdiInstructionForLabelPdf,
   buildEdiInstructionToServicePoint,
+  isPostNordEdiDestinationCountry,
   postEdiBooking,
 } from "@/lib/postnord-booking-edi";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
@@ -65,9 +66,12 @@ export async function POST(
   }
 
   const country = (order.country ?? "SE").toUpperCase();
-  if (country !== "SE") {
+  if (!isPostNordEdiDestinationCountry(country)) {
     return NextResponse.json(
-      { error: "Nuvarande implementation: endast Sverige (SE) + ombud. Använd manuell frakt för utrikes." },
+      {
+        error:
+          "PostNord EDI-bokning är inte aktiverad för detta land. Använd komma-separerade ISO-koder i POSTNORD_EDI_DESTINATION_COUNTRIES (standard: SE,NO,DK) och stäm av basicServiceCode med PostNord.",
+      },
       { status: 400 }
     );
   }
