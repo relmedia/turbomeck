@@ -6,6 +6,8 @@
  * Production: api2.postnord.com · Sandbox: atapi2.postnord.com
  */
 
+import { getPostNordBearerTokenNullable } from "./postnord-oauth";
+
 export function getPostNordTrackApiHost(): string {
   return process.env.POSTNORD_USE_TEST_API === "true"
     ? "atapi2.postnord.com"
@@ -51,6 +53,24 @@ export async function fetchPostNordTrackingJson(
     return { ok: false, status: 503, data: { error: "POSTNORD_API_KEY not configured" } };
   }
 
+  let bearer: string | null = null;
+  try {
+    bearer = await getPostNordBearerTokenNullable();
+  } catch (e) {
+    if (process.env.POSTNORD_CLIENT_ID?.trim()) {
+      return {
+        ok: false,
+        status: 503,
+        data: {
+          error: e instanceof Error ? e.message : "PostNord OAuth misslyckades (kontrollera client_id/secret och token-URL)",
+        },
+      };
+    }
+  }
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
+
   const preferred = getPostNordTrackShipmentApiVersion();
   const chain: string[] =
     preferred === "v2" ? ["v2"] : [preferred, "v2"];
@@ -61,7 +81,7 @@ export async function fetchPostNordTrackingJson(
   for (let i = 0; i < chain.length; i++) {
     const ver = chain[i]!;
     const url = buildPostNordFindByIdentifierUrl(trackingId, locale, apiKey, ver);
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(url, { headers });
     const data = await res.json().catch(() => null);
     lastStatus = res.status;
     lastData = data;

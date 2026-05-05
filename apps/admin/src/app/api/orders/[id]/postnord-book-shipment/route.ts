@@ -13,9 +13,9 @@ import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatche
 
 /**
  * POST /api/orders/[id]/postnord-book-shipment
- * Books domestic parcel to service point via PostNord Booking API (POST /v3/edi).
- * Stores a merged EDI + idInformation snapshot for GET …/postnord-label-pdf (labels/pdf).
- * Requires env: POSTNORD_API_KEY, POSTNORD_EDI_CUSTOMER_NUMBER, consignor address vars.
+ * Books parcel to customer’s service point via PostNord Booking API.
+ * Stores merged instruction + idInformation for GET …/postnord-label-pdf (label PDF).
+ * Requires POSTNORD_API_KEY; IAM/OAuth per PostNord; product codes from your agreement (.env.example).
  */
 export async function POST(
   req: Request,
@@ -70,7 +70,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "PostNord EDI-bokning är inte aktiverad för detta land. Använd komma-separerade ISO-koder i POSTNORD_EDI_DESTINATION_COUNTRIES (standard: SE,NO,DK) och stäm av basicServiceCode med PostNord.",
+          "PostNord ombudsfrakt är inte aktiverad för detta land. Länder styrs med POSTNORD_EDI_DESTINATION_COUNTRIES (standard SE, NO, DK).",
       },
       { status: 400 }
     );

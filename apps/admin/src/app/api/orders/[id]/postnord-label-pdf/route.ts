@@ -12,7 +12,7 @@ function safeFilenamePart(s: string): string {
 /**
  * GET /api/orders/[id]/postnord-label-pdf
  * Returns the shipping label PDF from PostNord Booking API (labels/pdf) using the
- * snapshot stored when the order was booked via EDI.
+ * snapshot stored when the order was booked with PostNord.
  */
 export async function GET(
   _req: Request,
@@ -39,7 +39,7 @@ export async function GET(
     return NextResponse.json(
       {
         error:
-          "Ingen etikett-data för denna order. Boka frakt med PostNord (EDI) igen, eller ordern skapades innan etikettlagring aktiverades.",
+          "Ingen etikett-data för denna order. Boka frakt via admin igen, eller ordern skapades innan etikettlagring aktiverades.",
       },
       { status: 404 }
     );

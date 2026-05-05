@@ -37,3 +37,6 @@ debug-*.log
 # Misc
 .DS_Store
 *.pem
+*.example
+*.example
+apps/admin/.env.example

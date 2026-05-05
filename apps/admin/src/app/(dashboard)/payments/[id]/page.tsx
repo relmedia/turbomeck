@@ -65,7 +65,7 @@ type OrderDetail = {
   deliveryOption?: string;
   country?: string;
   postNordTrackingId?: string;
-  /** True when PostNord EDI booking stored a label snapshot (PDF can be downloaded). */
+  /** True when PostNord booking stored a label snapshot (PDF can be downloaded). */
   hasPostNordLabel?: boolean;
   items: OrderItem[];
 };
@@ -94,7 +94,7 @@ const POSTNORD_BOOKING_COUNTRY_SET = new Set(
     : ["SE", "NO", "DK"],
 );
 
-/** Must match POSTNORD_EDI_DESTINATION_COUNTRIES on the server (use NEXT_PUBLIC_* for custom lists). */
+/** Must match server-side allowed countries (NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES or SE,NO,DK). */
 function isPostNordServicePointBookingCountry(country: string | null | undefined): boolean {
   return POSTNORD_BOOKING_COUNTRY_SET.has((country ?? "").toUpperCase());
 }
@@ -280,7 +280,7 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handlePostnordEdiBook = async () => {
+  const handlePostnordBook = async () => {
     if (!id || !order) return;
     const tid = toValidTrackingId(order.postNordTrackingId);
     const payload: { weightKg: number; replaceExisting?: boolean } = {
@@ -304,7 +304,7 @@ export default function OrderDetailPage() {
       if (!res.ok) {
         toast.error(typeof data.error === "string" ? data.error : "Bokning misslyckades");
         if (typeof data.details === "string" && data.details.length < 500) {
-          console.error("[PostNord EDI]", data.details);
+          console.error("[PostNord bokning]", data.details);
         }
         return;
       }
@@ -584,21 +584,18 @@ export default function OrderDetailPage() {
                     Boka frakt — PostNord Boknings-API (ombud)
                   </p>
                   <p className="text-muted-foreground leading-snug">
-                    Gäller Sverige, Norge och Danmark (ombud i kassan). Anropar{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POST …/v3/edi</code> med
-                    kundens ombud. Stäm av{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_BASIC_SERVICE_CODE</code> /{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_ISSUER_CODE</code> mot PostNord för respektive linje, samt{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">POSTNORD_EDI_CUSTOMER_NUMBER</code> och avsändaradress i{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">.env</code>.
+                    Skapar en försändelse till kundens valda ombud i Sverige, Norge eller Danmark. Kräver
+                    giltig PostNord-uppkoppling (API-nyckel och det PostNord begär för ert avtal,
+                    till exempel OAuth). Vid fel: se svar-texten och{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">apps/admin/.env.example</code>.
                   </p>
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1">
-                      <Label htmlFor="edi-weight" className="text-xs">
+                      <Label htmlFor="postnord-book-weight-kg" className="text-xs">
                         Vikt (kg)
                       </Label>
                       <Input
-                        id="edi-weight"
+                        id="postnord-book-weight-kg"
                         type="number"
                         step="0.1"
                         min={0.1}
@@ -613,12 +610,12 @@ export default function OrderDetailPage() {
                       size="sm"
                       className="h-9 gap-2"
                       disabled={postnordBooking}
-                      onClick={handlePostnordEdiBook}
+                      onClick={handlePostnordBook}
                     >
                       {postnordBooking ? (
                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                       ) : null}
-                      Boka frakt (EDI)
+                      Boka frakt
                     </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground font-mono break-all">

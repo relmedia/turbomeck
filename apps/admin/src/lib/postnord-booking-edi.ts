@@ -1,16 +1,17 @@
 /**
- * PostNord Booking API — minimal EDI Instruction for domestic parcel to service point.
+ * PostNord Booking API — shipment instruction for parcel to service point (ombud).
  * @see https://api2.postnord.com/rest/shipment/v3/edi?apikey=…
  * @see https://portal.postnord.com/se/sv/resurser/integrationer/api/boknings-api/
  *
- * Service codes (basicServiceCode / additionalServiceCode) depend on your agreement.
- * Confirm with PostNord kundintegration (Sweden: kundintegration.se@postnord.com).
+ * IAM-style: avsändarnummer (`POSTNORD_EDI_CUSTOMER_NUMBER`) and full consignor address are optional
+ * when PostNord ties the sender to your contract; include them if your agreement requires it.
  */
 
 import {
   extractPostNordPrintId,
   extractPostNordTrackableShipmentId,
 } from "./postnord-shipment-response-id";
+import { getPostNordBearerTokenNullable } from "./postnord-oauth";
 
 let cachedEdiDestinationCountries: Set<string> | null = null;
 
@@ -25,7 +26,7 @@ function getEdiDestinationCountries(): Set<string> {
   return cachedEdiDestinationCountries;
 }
 
-/** Markets where “Boka frakt (EDI)” is allowed (storefront ombud countries by default). */
+/** Markets where PostNord service-point booking is allowed (default SE, NO, DK). */
 export function isPostNordEdiDestinationCountry(country: string | null | undefined): boolean {
   return getEdiDestinationCountries().has((country ?? "").toUpperCase());
 }
@@ -66,15 +67,10 @@ function parseAdditionalCodes(): string[] {
 }
 
 /**
- * Build EDI Instruction JSON (shipmentInformation body for POST /v3/edi).
+ * Build booking instruction JSON (body for POST /rest/shipment/v3/edi).
  */
 export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePointInput): Record<string, unknown> {
-  const customerNo = process.env.POSTNORD_EDI_CUSTOMER_NUMBER?.trim();
-  if (!customerNo) {
-    throw new Error(
-      "Sätt POSTNORD_EDI_CUSTOMER_NUMBER: PostNord kräver ert avsändarnummer (party id) i själva EDI-bokningen för avsändare/fraktbetalare. API-nyckeln (apikey) styr bara åtkomst till API:t och ersätter inte detta nummer — det kommer från ert PostNord-avtal / kundintegration."
-    );
-  }
+  const customerNo = process.env.POSTNORD_EDI_CUSTOMER_NUMBER?.trim() ?? "";
 
   const issuerCode = process.env.POSTNORD_EDI_ISSUER_CODE?.trim() || "Z11";
   const partyIdType = process.env.POSTNORD_EDI_PARTY_ID_TYPE?.trim() || "160";
@@ -91,10 +87,34 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
   const cPhone = process.env.POSTNORD_CONSIGNOR_PHONE?.trim();
   const cEmail = process.env.POSTNORD_CONSIGNOR_EMAIL?.trim();
 
-  if (!cStreet || !cPostal || !cCity) {
-    throw new Error(
-      "Set POSTNORD_CONSIGNOR_STREET, POSTNORD_CONSIGNOR_POSTAL_CODE, POSTNORD_CONSIGNOR_CITY for avsändare (EDI)"
-    );
+  const hasFullConsignorAddress = !!(cStreet && cPostal && cCity);
+
+  function buildFreightRelatedParty(): Record<string, unknown> {
+    const party: Record<string, unknown> = {
+      nameIdentification: {
+        companyName: company,
+        name: company,
+      },
+      legalEntity: { businessType: "B" },
+    };
+    if (hasFullConsignorAddress) {
+      party.address = {
+        streets: [cStreet],
+        postalCode: cPostal.replace(/\s/g, ""),
+        city: cCity,
+        countryCode: cCountry,
+      };
+    }
+    const contact: Record<string, string> = { contactName: company };
+    if (cEmail) contact.emailAddress = cEmail;
+    if (cPhone) contact.phoneNo = cPhone;
+    party.contact = contact;
+
+    const block: Record<string, unknown> = { issuerCode, party };
+    if (customerNo) {
+      block.partyIdentification = { partyId: customerNo, partyIdType };
+    }
+    return block;
   }
 
   const testIndicator = process.env.POSTNORD_EDI_TEST === "true" || process.env.POSTNORD_USE_TEST_API === "true";
@@ -105,6 +125,9 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
 
   const consigneeName = `${input.consigneeFirstName} ${input.consigneeLastName}`.trim();
   const cc = (input.consigneeCountry || "SE").toUpperCase();
+
+  const consignorBlock = buildFreightRelatedParty();
+  const freightPayerBlock = buildFreightRelatedParty();
 
   return {
     messageDate: now,
@@ -134,31 +157,7 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
           },
         ],
         parties: {
-          consignor: {
-            issuerCode,
-            partyIdentification: {
-              partyId: customerNo,
-              partyIdType: partyIdType,
-            },
-            party: {
-              nameIdentification: {
-                companyName: company,
-                name: company,
-              },
-              address: {
-                streets: [cStreet],
-                postalCode: cPostal.replace(/\s/g, ""),
-                city: cCity,
-                countryCode: cCountry,
-              },
-              contact: {
-                contactName: company,
-                emailAddress: cEmail ?? undefined,
-                phoneNo: cPhone ?? undefined,
-              },
-              legalEntity: { businessType: "B" },
-            },
-          },
+          consignor: consignorBlock,
           consignee: {
             party: {
               nameIdentification: {
@@ -178,31 +177,7 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
               legalEntity: { businessType: "P" },
             },
           },
-          freightPayer: {
-            issuerCode,
-            partyIdentification: {
-              partyId: customerNo,
-              partyIdType: partyIdType,
-            },
-            party: {
-              nameIdentification: {
-                companyName: company,
-                name: company,
-              },
-              address: {
-                streets: [cStreet],
-                postalCode: cPostal.replace(/\s/g, ""),
-                city: cCity,
-                countryCode: cCountry,
-              },
-              contact: {
-                contactName: company,
-                emailAddress: cEmail ?? undefined,
-                phoneNo: cPhone ?? undefined,
-              },
-              legalEntity: { businessType: "B" },
-            },
-          },
+          freightPayer: freightPayerBlock,
           deliveryParty: {
             partyIdentification: {
               partyId: input.servicePointId.trim(),
@@ -282,9 +257,25 @@ export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise
   const url = new URL(`https://${host}/rest/shipment/v3/edi/labels/pdf`);
   url.searchParams.set("apikey", apiKey);
 
+  const headers: Record<string, string> = {
+    Accept: "application/pdf,*/*",
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const bearer = await getPostNordBearerTokenNullable();
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  } catch (e) {
+    return {
+      ok: false,
+      status: 503,
+      message: e instanceof Error ? e.message : "PostNord OAuth misslyckades",
+    };
+  }
+
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/pdf,*/*" },
+    headers,
     body: JSON.stringify(ediBody),
   });
 
@@ -317,9 +308,25 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
   const url = new URL(`https://${host}/rest/shipment/v3/edi`);
   url.searchParams.set("apikey", apiKey);
 
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const bearer = await getPostNordBearerTokenNullable();
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  } catch (e) {
+    return {
+      ok: false,
+      status: 503,
+      message: e instanceof Error ? e.message : "PostNord OAuth misslyckades",
+    };
+  }
+
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(shipmentInformation),
   });
 
