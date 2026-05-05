@@ -15,7 +15,12 @@ export function describePostNordNetworkError(endpointLabel: string, err: unknown
   const top = err.message.trim();
   if (top === "fetch failed" || top === "Failed to fetch") {
     const hint = causeMsg || "inget svar — vanligast: brandvägg, DNS, eller servern saknar internet";
-    return `${endpointLabel}: Ingen HTTPS-kontakt med PostNord (${hint}). Inte relaterad till saknad client_secret (den ger ett OAuth-svarskod, inte fetch failed).`;
+    let extra = "";
+    if (/ENOTFOUND/i.test(causeMsg) || /ENOTFOUND/i.test(top)) {
+      extra =
+        " Produktions-token ska till gate.ess.postnord.com (PostNord dokumentation). Åtgärd: byt DNS på servern till t.ex. Cloudflare 1.1.1.1 eller Google 8.8.8.8, starta om nät/resolver och testa: dig gate.ess.postnord.com @1.1.1.1";
+    }
+    return `${endpointLabel}: Ingen HTTPS-kontakt med PostNord (${hint}). Inte saknad client_secret (den ger HTTP 401/400 från token-URL:en med JSON).${extra}`;
   }
   return causeMsg ? `${endpointLabel}: ${top} (${causeMsg})` : `${endpointLabel}: ${top}`;
 }
