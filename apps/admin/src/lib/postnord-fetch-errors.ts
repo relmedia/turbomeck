@@ -18,7 +18,7 @@ export function describePostNordNetworkError(endpointLabel: string, err: unknown
     let extra = "";
     if (/ENOTFOUND/i.test(causeMsg) || /ENOTFOUND/i.test(top)) {
       extra =
-        " Produktions-token ska till gate.ess.postnord.com (PostNord dokumentation). Åtgärd: byt DNS på servern till t.ex. Cloudflare 1.1.1.1 eller Google 8.8.8.8, starta om nät/resolver och testa: dig gate.ess.postnord.com @1.1.1.1";
+        " dig fungerar men Node inte? Det är libc/getaddrinfo som ger ENOTFOUND. Lös genom att sätta POSTNORD_DNS_SERVERS=1.1.1.1,8.8.8.8 i apps/admin/.env (PostNord-anrop går då via dns.Resolver direkt — påverkar inte resten av appen) och starta om: `pm2 restart admin --update-env`.";
     }
     return `${endpointLabel}: Ingen HTTPS-kontakt med PostNord (${hint}). Inte saknad client_secret (den ger HTTP 401/400 från token-URL:en med JSON).${extra}`;
   }

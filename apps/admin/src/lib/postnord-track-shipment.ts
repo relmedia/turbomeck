@@ -7,6 +7,7 @@
  */
 
 import { getPostNordBearerTokenNullable } from "./postnord-oauth";
+import { postnordFetch } from "./postnord-node-dns";
 
 export function getPostNordTrackApiHost(): string {
   return process.env.POSTNORD_USE_TEST_API === "true"
@@ -81,7 +82,7 @@ export async function fetchPostNordTrackingJson(
   for (let i = 0; i < chain.length; i++) {
     const ver = chain[i]!;
     const url = buildPostNordFindByIdentifierUrl(trackingId, locale, apiKey, ver);
-    const res = await fetch(url, { headers });
+    const res = await postnordFetch(url, { headers });
     const data = await res.json().catch(() => null);
     lastStatus = res.status;
     lastData = data;

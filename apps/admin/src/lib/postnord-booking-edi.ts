@@ -13,6 +13,7 @@ import {
 } from "./postnord-shipment-response-id";
 import { getPostNordBearerTokenNullable } from "./postnord-oauth";
 import { describePostNordNetworkError } from "./postnord-fetch-errors";
+import { postnordFetch } from "./postnord-node-dns";
 
 let cachedEdiDestinationCountries: Set<string> | null = null;
 
@@ -276,7 +277,7 @@ export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise
 
   let res: Response;
   try {
-    res = await fetch(url.toString(), {
+    res = await postnordFetch(url.toString(), {
       method: "POST",
       headers,
       body: JSON.stringify(ediBody),
@@ -336,7 +337,7 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
 
   let res: Response;
   try {
-    res = await fetch(url.toString(), {
+    res = await postnordFetch(url.toString(), {
       method: "POST",
       headers,
       body: JSON.stringify(shipmentInformation),

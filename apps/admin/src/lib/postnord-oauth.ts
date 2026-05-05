@@ -4,6 +4,7 @@
  */
 
 import { describePostNordNetworkError } from "./postnord-fetch-errors";
+import { postnordFetch } from "./postnord-node-dns";
 
 let cachedToken: { key: string; value: string; expiresAtMs: number } | null = null;
 
@@ -46,7 +47,7 @@ export async function getPostNordBearerTokenNullable(): Promise<string | null> {
   const tokenUrl = postnordOAuthTokenUrl();
   let res: Response;
   try {
-    res = await fetch(tokenUrl, {
+    res = await postnordFetch(tokenUrl, {
       method: "POST",
       headers: {
         Accept: "application/json",
