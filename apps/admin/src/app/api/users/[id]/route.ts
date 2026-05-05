@@ -1,3 +1,4 @@
+import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
@@ -53,6 +54,11 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { id } = await params;
     const body = await req.json();
@@ -101,6 +107,58 @@ export async function PATCH(
     return NextResponse.json(
       { error: "Failed to update user" },
       { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/users/[id] - Admin remove a user.
+ *
+ * Removes the user row + cascaded rows in `account`, `session`,
+ * `password_reset_token`, and `reviews`. Orders carry a plain text `user_id`
+ * (no FK), so historical orders are preserved with the original user id for
+ * audit purposes.
+ *
+ * The currently signed-in admin cannot delete themselves – locking yourself
+ * out of the panel by self-delete would be very easy to do by accident.
+ */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json({ error: "Ogiltigt användar-ID" }, { status: 400 });
+    }
+    if (id === session.user.id) {
+      return NextResponse.json(
+        { error: "Du kan inte ta bort ditt eget konto." },
+        { status: 400 },
+      );
+    }
+
+    const [deleted] = await db
+      .delete(users)
+      .where(eq(users.id, id))
+      .returning({ id: users.id, email: users.email, name: users.name });
+    if (!deleted) {
+      return NextResponse.json({ error: "Användare hittades inte" }, { status: 404 });
+    }
+    console.log(
+      `[users DELETE] user ${deleted.id} (${deleted.email ?? deleted.name ?? "—"}) deleted by ${session.user.email ?? session.user.id}`,
+    );
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete user:", err);
+    return NextResponse.json(
+      { error: "Kunde inte ta bort användare" },
+      { status: 500 },
     );
   }
 }

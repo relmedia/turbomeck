@@ -1,9 +1,20 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ChevronLeft,
   Printer,
@@ -12,6 +23,7 @@ import {
   Truck,
   CheckCircle2,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -183,9 +195,12 @@ function payBalanceStorefrontUrl(order: Pick<OrderDetail, "orderId" | "viewToken
 
 export default function OrderDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editStatus, setEditStatus] = useState<string>("");
   const [editTrackingId, setEditTrackingId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -397,6 +412,31 @@ export default function OrderDetailPage() {
   }
 
   const stepIndex = DELIVERY_STEPS.findIndex((s) => s.id === order.deliveryStatus);
+
+  const handleDeleteOrder = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Kunde inte ta bort order",
+        );
+      }
+      toast.success(
+        `Order ${order.orderNumber ?? `#${order.orderId}`} har tagits bort`,
+      );
+      setDeleteDialogOpen(false);
+      router.push("/payments");
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Kunde inte ta bort order",
+      );
+      setDeleting(false);
+    }
+  };
+
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", minimumFractionDigits: 2 }).format(amount);
   const formatDate = (dateStr: string) =>
@@ -411,10 +451,54 @@ export default function OrderDetailPage() {
             Tillbaka
           </Link>
         </Button>
-        <Button variant="outline" size="sm">
-          <Printer className="mr-2 h-4 w-4" />
-          Skriv ut
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            <Printer className="mr-2 h-4 w-4" />
+            Skriv ut
+          </Button>
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Ta bort
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Ta bort order?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Du håller på att ta bort order{" "}
+                  <span className="font-medium text-foreground">
+                    {order.orderNumber ?? `#${order.orderId}`}
+                  </span>{" "}
+                  för {order.customerName}. Orderrader och tillhörande data
+                  raderas permanent. Denna åtgärd kan inte ångras.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Avbryt</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteOrder}
+                  disabled={deleting}
+                  className="bg-destructive text-white hover:bg-destructive/90"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Tar bort...
+                    </>
+                  ) : (
+                    "Ta bort permanent"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

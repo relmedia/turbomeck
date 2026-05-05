@@ -118,6 +118,11 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { id } = await params;
     const orderId = parseInt(id, 10);
@@ -128,10 +133,13 @@ export async function DELETE(
     const [deleted] = await db
       .delete(orders)
       .where(eq(orders.id, orderId))
-      .returning({ id: orders.id });
+      .returning({ id: orders.id, orderNumber: orders.orderNumber });
     if (!deleted) {
       return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
     }
+    console.log(
+      `[orders DELETE] order ${deleted.id} (${deleted.orderNumber}) deleted by ${session.user.email ?? session.user.id}`,
+    );
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Failed to delete order:", err);

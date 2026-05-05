@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import AddUser from "@/components/AddUser";
-import { User, columns } from "./columns";
+import { User, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { Plus, RefreshCw } from "lucide-react";
 
 const UsersPage = () => {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id ?? null;
+
   const [userList, setUserList] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +33,37 @@ const UsersPage = () => {
       setLoading(false);
     }
   }, []);
+
+  const handleDeleteUser = useCallback(
+    async (id: string) => {
+      if (currentUserId && id === currentUserId) {
+        toast.error("Du kan inte ta bort ditt eget konto.");
+        throw new Error("self-delete-forbidden");
+      }
+      try {
+        const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof data.error === "string" ? data.error : "Kunde inte ta bort",
+          );
+        }
+        toast.success("Användare borttagen");
+        await fetchUsers();
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Kunde inte ta bort användare",
+        );
+        throw err;
+      }
+    },
+    [currentUserId, fetchUsers],
+  );
+
+  const columns = useMemo(
+    () => createColumns({ currentUserId, onDelete: handleDeleteUser }),
+    [currentUserId, handleDeleteUser],
+  );
 
   useEffect(() => {
     fetchUsers();
