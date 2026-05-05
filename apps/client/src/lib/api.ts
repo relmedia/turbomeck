@@ -304,13 +304,42 @@ export type ReviewsResponse = {
   totalCount: number;
 };
 
+const EMPTY_REVIEWS: ReviewsResponse = {
+  reviews: [],
+  averageRating: 0,
+  totalCount: 0,
+};
+
+/**
+ * Reviews aggregate is best-effort: a transient empty body (e.g. dev HMR
+ * cancellation) or upstream hiccup must NOT crash the product page. We read
+ * `res.text()` first and only call `JSON.parse` when there's something to parse.
+ */
 export async function fetchReviews(productId: number): Promise<ReviewsResponse> {
-  const res = await fetch(
-    `${PRODUCT_API}/reviews?productId=${productId}`,
-    productApiRequestInit({ cache: "no-store" }),
-  );
-  if (!res.ok) throw new Error("Failed to fetch reviews");
-  return res.json();
+  const url = `${PRODUCT_API}/reviews?productId=${productId}`;
+  let res: Response;
+  try {
+    res = await fetch(url, productApiRequestInit({ cache: "no-store" }));
+  } catch (err) {
+    console.warn(`[reviews] network error for ${url}:`, err);
+    return EMPTY_REVIEWS;
+  }
+  if (!res.ok) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[reviews] HTTP ${res.status} for ${url}`);
+    }
+    return EMPTY_REVIEWS;
+  }
+  const text = await res.text();
+  if (!text.trim()) return EMPTY_REVIEWS;
+  try {
+    return JSON.parse(text) as ReviewsResponse;
+  } catch {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[reviews] invalid JSON from ${url}:`, text.slice(0, 200));
+    }
+    return EMPTY_REVIEWS;
+  }
 }
 
 export type MyReview = {
@@ -323,17 +352,27 @@ export type MyReview = {
   editedAt: string | null;
 };
 
+async function safeJson<T>(res: Response, fallback: T): Promise<T> {
+  const text = await res.text();
+  if (!text.trim()) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchMyReviewedProductIds(): Promise<number[]> {
   const res = await fetch("/api/reviews/me", { cache: "no-store" });
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await safeJson<{ productIds?: number[] }>(res, {});
   return data.productIds ?? [];
 }
 
 export async function fetchMyReviews(): Promise<MyReview[]> {
   const res = await fetch("/api/reviews/me", { cache: "no-store" });
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await safeJson<{ reviews?: MyReview[] }>(res, {});
   return data.reviews ?? [];
 }
 

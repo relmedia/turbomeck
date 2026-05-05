@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
 
-const VALID_STATUSES = ["confirmed", "deposit_paid", "shipped", "delivered", "cancelled", "completed"] as const;
+const VALID_STATUSES = ["confirmed", "shipped", "delivered", "cancelled", "completed"] as const;
 
 /** PATCH /api/orders/[id] - Admin update order status and tracking */
 export async function PATCH(
@@ -243,6 +243,7 @@ function mapToDeliveryStatus(
 ): "processing" | "shipped" | "out_for_delivery" | "delivered" {
   switch (status) {
     case "confirmed":
+    // Legacy: older orders may still carry "deposit_paid"; map it to processing.
     case "deposit_paid":
       return "processing";
     case "shipped":

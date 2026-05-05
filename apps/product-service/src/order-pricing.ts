@@ -16,6 +16,29 @@ export type OrderItemInput = {
 
 type ProductRow = typeof products.$inferSelect;
 
+/**
+ * A "stale" snapshot URL is one captured before we migrated images to R2:
+ *   - bare path `/uploads/...`
+ *   - absolute URL pointing at the dev hosts (`localhost:3001` / `:3002`).
+ * For new orders we never want to persist these as `order_items.product_image`
+ * — fall back to the live `products.image` (R2) instead.
+ */
+function isStaleProductImageUrl(url: string | null | undefined): boolean {
+  if (!url) return true;
+  const u = url.trim();
+  if (!u) return true;
+  if (u.startsWith("/uploads/") || u.startsWith("uploads/")) return true;
+  if (
+    u.includes("localhost:3001/uploads/") ||
+    u.includes("localhost:3002/uploads/") ||
+    u.includes("127.0.0.1:3001/uploads/") ||
+    u.includes("127.0.0.1:3002/uploads/")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function variantAllowed(product: ProductRow, variant: string | undefined | null): boolean {
   const rawAttrs = product.attributes;
   const attrs = Array.isArray(rawAttrs) ? rawAttrs : [];
@@ -159,10 +182,15 @@ export async function resolveCheckoutOrder(body: {
     const wkg = Number.isFinite(w) && w > 0 ? w : 1;
     totalWeightKg += wkg * it.quantity;
 
+    const submittedImage = it.productImage;
+    const safeImage = isStaleProductImageUrl(submittedImage)
+      ? (p.image ?? null)
+      : (submittedImage ?? p.image ?? null);
+
     lineAcc.push({
       productId: pid,
       productName: p.name,
-      productImage: it.productImage ?? p.image ?? null,
+      productImage: safeImage,
       variant: it.variant ?? null,
       unitPrice,
       quantity: it.quantity,

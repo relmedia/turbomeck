@@ -13,6 +13,22 @@ export type MailSettings = {
   user: string;
   password: string;
   from: string;
+  /**
+   * Optional: set the TLS SNI / cert verification name when the SMTP host is a
+   * vanity DNS name (e.g. smtp.example.com) but the cert is for the underlying
+   * shared server (e.g. prime4.inleed.net).
+   */
+  tlsServername?: string;
+};
+
+const DEFAULTS: MailSettings = {
+  host: "",
+  port: 587,
+  secure: false,
+  user: "",
+  password: "",
+  from: "",
+  tlsServername: "",
 };
 
 export async function GET() {
@@ -27,17 +43,10 @@ export async function GET() {
       .where(eq(appSettings.key, MAIL_KEY))
       .limit(1);
     if (!row[0]) {
-      return NextResponse.json({
-        host: "",
-        port: 587,
-        secure: false,
-        user: "",
-        password: "",
-        from: "",
-      } satisfies MailSettings);
+      return NextResponse.json(DEFAULTS);
     }
-    const parsed = JSON.parse(row[0].value) as MailSettings;
-    return NextResponse.json(parsed);
+    const parsed = JSON.parse(row[0].value) as Partial<MailSettings>;
+    return NextResponse.json({ ...DEFAULTS, ...parsed } satisfies MailSettings);
   } catch (err) {
     console.error("Failed to fetch mail settings:", err);
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
@@ -50,7 +59,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const body = (await req.json()) as MailSettings;
+    const body = (await req.json()) as Partial<MailSettings>;
     const value = JSON.stringify({
       host: body.host ?? "",
       port: Number(body.port) || 587,
@@ -58,6 +67,7 @@ export async function POST(req: Request) {
       user: body.user ?? "",
       password: body.password ?? "",
       from: body.from ?? "",
+      tlsServername: (body.tlsServername ?? "").trim(),
     });
     await db
       .insert(appSettings)

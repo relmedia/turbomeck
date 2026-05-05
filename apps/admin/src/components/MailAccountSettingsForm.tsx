@@ -14,6 +14,7 @@ export type MailSettings = {
   user: string;
   password: string;
   from: string;
+  tlsServername: string;
 };
 
 const defaults: MailSettings = {
@@ -23,6 +24,7 @@ const defaults: MailSettings = {
   user: "",
   password: "",
   from: "",
+  tlsServername: "",
 };
 
 export default function MailAccountSettingsForm() {
@@ -45,6 +47,7 @@ export default function MailAccountSettingsForm() {
           user: data.user ?? "",
           password: data.password ?? "",
           from: data.from ?? "",
+          tlsServername: data.tlsServername ?? "",
         });
       })
       .catch(() => toast.error("Kunde inte hämta inställningar"))
@@ -205,6 +208,27 @@ export default function MailAccountSettingsForm() {
           value={form.from}
           onChange={(e) => setForm((p) => ({ ...p, from: e.target.value }))}
         />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="mail-tls-servername">
+          TLS-värdnamn (avancerat)
+        </Label>
+        <Input
+          id="mail-tls-servername"
+          type="text"
+          placeholder="ex. prime4.inleed.net"
+          value={form.tlsServername}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, tlsServername: e.target.value }))
+          }
+        />
+        <p className="text-xs text-muted-foreground">
+          Lämna tomt om SMTP-värden har ett giltigt certifikat. Sätt detta om
+          servern svarar med ett certifikat utställt på en annan värd
+          (t.ex. delad SMTP hos Inleed/Loopia/One.com). Värdet används enbart
+          för TLS-verifiering – anslutningen går fortfarande till SMTP-värden
+          ovan.
+        </p>
       </div>
       <div className="rounded-lg border border-dashed p-4 space-y-3">
         <Label htmlFor="test-email-to">Skicka testmail</Label>

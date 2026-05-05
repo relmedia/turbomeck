@@ -111,9 +111,13 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
   });
 
   const fetchCategories = useCallback(async () => {
-    const res = await fetch(`${PRODUCT_API}/categories`);
-    const data = res.ok ? await res.json() : [];
-    setCategories(data);
+    try {
+      const res = await fetch(`${PRODUCT_API}/categories`);
+      const raw: unknown = res.ok ? await res.json().catch(() => null) : null;
+      setCategories(Array.isArray(raw) ? raw : []);
+    } catch {
+      setCategories([]);
+    }
   }, []);
 
   useEffect(() => {

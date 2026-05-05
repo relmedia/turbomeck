@@ -72,7 +72,6 @@ type OrderDetail = {
 
 const STATUS_OPTIONS = [
   { value: "confirmed", label: "Behandlas" },
-  { value: "deposit_paid", label: "Deposition betald" },
   { value: "shipped", label: "Skickad" },
   { value: "delivered", label: "Levererad" },
   { value: "completed", label: "Slutförd" },
@@ -585,50 +584,66 @@ export default function OrderDetailPage() {
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-0">
           <div className="flex flex-col gap-4">
-            <div className="mb-2 flex w-full justify-between">
+            <div
+              className="mb-2 grid w-full gap-2"
+              style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
+            >
               {DELIVERY_STEPS.map((step, i) => {
                 const Icon = step.icon;
-                const isComplete = i <= stepIndex;
+                const isComplete = i < stepIndex;
+                const isCurrent = i === stepIndex;
+                const isDone = isComplete || isCurrent;
                 return (
                   <div
                     key={step.id}
-                    className="flex shrink-0 flex-col items-center"
+                    className="flex items-center justify-center gap-2"
                   >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                          isComplete ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {isComplete ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                      </div>
-                      <p className={`text-xs ${isComplete ? "font-medium" : "text-muted-foreground"}`}>
-                        {step.label}
-                      </p>
+                    <div
+                      className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                        isComplete
+                          ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/25"
+                          : isCurrent
+                            ? "bg-sky-500 text-white shadow-md shadow-sky-500/30 ring-4 ring-sky-500/15"
+                            : "border-2 border-muted-foreground/20 bg-background text-muted-foreground/60"
+                      }`}
+                    >
+                      {isComplete ? (
+                        <CheckCircle2 className="h-4 w-4" strokeWidth={2.25} />
+                      ) : (
+                        <Icon className="h-4 w-4" strokeWidth={isCurrent ? 2.25 : 1.75} />
+                      )}
+                      {isCurrent && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 rounded-full ring-2 ring-sky-400/50 animate-ping"
+                        />
+                      )}
                     </div>
+                    <p
+                      className={`text-xs transition-colors ${
+                        isComplete
+                          ? "font-medium text-emerald-700 dark:text-emerald-400"
+                          : isCurrent
+                            ? "font-medium text-sky-700 dark:text-sky-400"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {step.label}
+                    </p>
                   </div>
                 );
               })}
             </div>
-            <div className="flex h-1 w-full overflow-hidden rounded-full bg-muted">
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
               <div
-                className="h-full bg-foreground transition-all"
+                className="h-full rounded-full bg-linear-to-r from-emerald-500 to-sky-500 transition-all duration-500"
                 style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
               />
             </div>
             {isPostNordServicePointBookingCountry(order.country) &&
               (order.deliveryOption ?? "servicepoint").toLowerCase() === "servicepoint" &&
               order.servicePointId && (
-                <div className="rounded-lg border border-amber-200/90 bg-amber-50/60 px-3 py-3 text-xs dark:border-amber-900/60 dark:bg-amber-950/25 space-y-2">
-                  <p className="font-medium text-amber-950 dark:text-amber-100">
-                    Boka frakt — PostNord Boknings-API (ombud)
-                  </p>
-                  <p className="text-muted-foreground leading-snug">
-                    Skapar en försändelse till kundens valda ombud i Sverige, Norge eller Danmark. Kräver
-                    giltig PostNord-uppkoppling (API-nyckel och det PostNord begär för ert avtal,
-                    till exempel OAuth). Vid fel: se svar-texten och{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[11px]">apps/admin/.env.example</code>.
-                  </p>
+                <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1">
                       <Label htmlFor="postnord-book-weight-kg" className="text-xs">

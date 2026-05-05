@@ -26,16 +26,13 @@ import {
 } from "@/components/ui/select";
 import { PhoneInput } from "./PhoneInput";
 import ServicePointPicker from "./ServicePointPicker";
-import PostNordShippingModule, {
-  type PostNordShippingSelection,
-} from "./PostNordShippingModule";
+import PostNordDeliveryOptions from "./PostNordDeliveryOptions";
+import type {
+  PostNordAddress,
+  PostNordDeliveryOptionsSelection,
+} from "@/lib/postnord-delivery-options-types";
 import { EUROPEAN_COUNTRIES, CountryFlag } from "./PhoneInput";
 import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
-
-/** Show PostNord widget when URL is configured (falls back to manual options on error) */
-const POSTNORD_ENABLED =
-  typeof process.env.NEXT_PUBLIC_POSTNORD_SHIPPING_MODULE_URL === "string" &&
-  process.env.NEXT_PUBLIC_POSTNORD_SHIPPING_MODULE_URL.length > 0;
 
 type ShippingFormProps = {
   setShippingForm: (data: ShippingFormInputs) => void;
@@ -44,26 +41,28 @@ type ShippingFormProps = {
     deliveryOption: "home" | "servicepoint",
     country: string
   ) => void;
-  /** Called when user selects a shipping option from PostNord widget (price in SEK) */
-  onPostNordSelection?: (selection: PostNordShippingSelection | null) => void;
+  /** Called when user picks a structured Delivery Options API alternative. */
+  onDeliveryOptionsSelection?: (
+    selection: PostNordDeliveryOptionsSelection | null,
+  ) => void;
+  /**
+   * Reserved for future use (e.g. weight-aware option filtering).
+   * Currently unused — the new Delivery Options API doesn't take cart contents.
+   */
   cartItems?: CartItemType[];
   /** Pre-fill form when user has a saved address (e.g. from Clerk metadata) */
   defaultAddress?: Partial<ShippingFormInputs>;
   /** If true, show "Spara adress till mitt konto" checkbox (user must be logged in) */
   showSaveAddressOption?: boolean;
-  /** Parent holds latest PostNord widget selection (required to enable Continue when widget is active) */
-  postNordSelection?: PostNordShippingSelection | null;
 };
 
 const ShippingForm: FC<ShippingFormProps> = ({
   setShippingForm,
   onSuccess,
   onDeliveryChange,
-  onPostNordSelection,
-  cartItems = [],
+  onDeliveryOptionsSelection,
   defaultAddress,
   showSaveAddressOption = false,
-  postNordSelection = null,
 }) => {
   const { locale } = useLanguage();
   const t = useTranslation();
@@ -73,13 +72,9 @@ const ShippingForm: FC<ShippingFormProps> = ({
   >("servicepoint");
   const [selectedServicePoint, setSelectedServicePoint] =
     useState<PostNordServicePoint | null>(null);
+  const [postNordDeliveryOption, setPostNordDeliveryOption] =
+    useState<PostNordDeliveryOptionsSelection | null>(null);
   const [detectedCountry, setDetectedCountry] = useState<string>("SE");
-  const [postNordFailed, setPostNordFailed] = useState(false);
-
-  const handlePostNordError = useCallback(() => {
-    setPostNordFailed(true);
-    onPostNordSelection?.(null);
-  }, [onPostNordSelection]);
 
   useEffect(() => {
     setDetectedCountry(getDefaultCountryFromBrowser());
@@ -162,45 +157,88 @@ const ShippingForm: FC<ShippingFormProps> = ({
     return () => clearTimeout(timer);
   }, [postalCode, city, setValue]);
 
-  const handlePostNordSelect = useCallback(
-    (selection: PostNordShippingSelection | null) => {
-      onPostNordSelection?.(selection);
-      if (selection?.servicePointId && selection?.displayName) {
-        setSelectedServicePoint({
-          servicePointId: selection.servicePointId,
-          name: selection.displayName,
-          address: "",
-          postalCode: "",
-          city: "",
-          countryCode: country,
-        });
+  /**
+   * Translate a PostNord Delivery Options selection into the form's existing
+   * delivery state, so the rest of the cart payload (deliveryOption +
+   * servicePoint) stays unchanged.
+   *
+   *   - service-point / parcel-locker → "servicepoint" + populated location
+   *   - home / groupage / mailbox / express-mailbox → "home" + clear location
+   */
+  const handleDeliveryOptionsSelect = useCallback(
+    (selection: PostNordDeliveryOptionsSelection | null) => {
+      setPostNordDeliveryOption(selection);
+      onDeliveryOptionsSelection?.(selection);
+
+      if (!selection) {
+        setSelectedServicePoint(null);
+        return;
+      }
+
+      const isPickup =
+        selection.type === "service-point" ||
+        selection.type === "parcel-locker";
+
+      if (isPickup) {
+        setDeliveryOption("servicepoint");
+        if (selection.servicePointId && selection.locationName) {
+          setSelectedServicePoint({
+            servicePointId: selection.servicePointId,
+            name: selection.locationName,
+            address: selection.locationAddress
+              ? [
+                  selection.locationAddress.streetName,
+                  selection.locationAddress.streetNumber,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : "",
+            postalCode: selection.locationAddress?.postCode ?? "",
+            city: selection.locationAddress?.city ?? "",
+            countryCode:
+              selection.locationAddress?.countryCode ?? country,
+          });
+        } else {
+          setSelectedServicePoint(null);
+        }
       } else {
+        setDeliveryOption("home");
         setSelectedServicePoint(null);
       }
     },
-    [country, onPostNordSelection]
+    [country, onDeliveryOptionsSelection],
   );
 
+  const recipient = useMemo<PostNordAddress | null>(() => {
+    const street = (watch("address") ?? "").trim();
+    const post = (watch("postalCode") ?? "").trim();
+    const cityVal = (watch("city") ?? "").trim();
+    const countryVal = country.toUpperCase();
+    if (!street || !post || !cityVal || !countryVal) return null;
+    const m = street.match(/^(.*?)(?:\s+(\d+\w?))?$/);
+    return {
+      streetName: m?.[1]?.trim() || street,
+      ...(m?.[2] ? { streetNumber: m[2].trim() } : {}),
+      postCode: post,
+      city: cityVal,
+      countryCode: countryVal,
+    };
+    // `watch` is referentially stable; values are read inside so we depend
+    // on the live values rather than `watch` itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch("address"), watch("postalCode"), watch("city"), country]);
+
   const isDeliveryComplete = useMemo(() => {
-    if (POSTNORD_ENABLED && !postNordFailed) {
-      const s = postNordSelection;
-      return Boolean(
-        s?.sessionId?.trim() &&
-          s.price != null &&
-          Number.isFinite(Number(s.price))
-      );
+    if (isPostNordCountry) {
+      return Boolean(postNordDeliveryOption?.deliveryOptionId);
     }
     if (deliveryOption === "home") return true;
-    if (deliveryOption === "servicepoint") {
-      if (isPostNordCountry) return selectedServicePoint != null;
-      return true;
-    }
+    if (deliveryOption === "servicepoint") return selectedServicePoint != null;
     return false;
   }, [
-    postNordFailed,
-    postNordSelection,
-    deliveryOption,
     isPostNordCountry,
+    postNordDeliveryOption,
+    deliveryOption,
     selectedServicePoint,
   ]);
 
@@ -236,17 +274,6 @@ const ShippingForm: FC<ShippingFormProps> = ({
     } else {
       router.push("/cart?step=3", { scroll: false });
     }
-  };
-
-  const formValues = {
-    firstName: watch("firstName"),
-    lastName: watch("lastName"),
-    email: watch("email"),
-    phone: watch("phone"),
-    country: watch("country"),
-    address: watch("address"),
-    city: watch("city"),
-    postalCode: watch("postalCode"),
   };
 
   return (
@@ -291,10 +318,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
         )}
       </div>
 
-      {/* Leveranssätt först (manuellt läge: radioknappar; PostNord-läge: instruktion) */}
+      {/* Leveranssätt: PostNord Delivery Options API i Norden, manuellt läge i övriga länder. */}
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/25 p-4">
         <p className="text-sm font-medium">{t("shipping.deliveryMethod")}</p>
-        {POSTNORD_ENABLED && !postNordFailed ? (
+        {isPostNordCountry ? (
           <p className="text-sm text-muted-foreground leading-relaxed">
             {t("shipping.postNordChooseAfterAddress")}
           </p>
@@ -308,7 +335,6 @@ const ShippingForm: FC<ShippingFormProps> = ({
                 onChange={() => {
                   setDeliveryOption("home");
                   setSelectedServicePoint(null);
-                  onPostNordSelection?.(null);
                 }}
                 className="w-4 h-4 accent-primary"
               />
@@ -322,16 +348,11 @@ const ShippingForm: FC<ShippingFormProps> = ({
                 checked={deliveryOption === "servicepoint"}
                 onChange={() => {
                   setDeliveryOption("servicepoint");
-                  onPostNordSelection?.(null);
                 }}
                 className="w-4 h-4 accent-primary"
               />
               <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm">
-                {isPostNordCountry
-                  ? t("shipping.postNordServicepoint")
-                  : t("shipping.postNordAbroad")}
-              </span>
+              <span className="text-sm">{t("shipping.postNordAbroad")}</span>
             </label>
           </div>
         )}
@@ -460,31 +481,25 @@ const ShippingForm: FC<ShippingFormProps> = ({
         ))}
 
       <div className="flex flex-col gap-3 pt-4 border-t border-border">
-        {POSTNORD_ENABLED && !postNordFailed ? (
-          <PostNordShippingModule
-            formData={formValues}
-            cartItems={cartItems}
+        {isPostNordCountry ? (
+          <PostNordDeliveryOptions
+            recipient={recipient}
             language={locale === "en" ? "en" : "sv"}
-            onShippingChange={handlePostNordSelect}
-            onError={handlePostNordError}
+            selectedDeliveryOptionId={postNordDeliveryOption?.deliveryOptionId ?? null}
+            onSelectionChange={handleDeliveryOptionsSelect}
+          />
+        ) : deliveryOption === "servicepoint" ? (
+          <ServicePointPicker
+            postalCode={postalCode ?? ""}
+            city={city ?? ""}
+            country={country}
+            selectedPoint={selectedServicePoint}
+            onSelect={setSelectedServicePoint}
           />
         ) : (
-          <>
-            {deliveryOption === "servicepoint" &&
-              (isPostNordCountry ? (
-                <ServicePointPicker
-                  postalCode={postalCode ?? ""}
-                  city={city ?? ""}
-                  country={country}
-                  selectedPoint={selectedServicePoint}
-                  onSelect={setSelectedServicePoint}
-                />
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {t("shipping.deliveryToAddress")}
-                </p>
-              ))}
-          </>
+          <p className="text-xs text-muted-foreground">
+            {t("shipping.deliveryToAddress")}
+          </p>
         )}
       </div>
 

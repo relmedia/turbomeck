@@ -7,18 +7,11 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db, users, accounts, sessions, verificationTokens, appSettings } from "@repo/database";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
 import type { DefaultSession } from "next-auth";
 import { renderMagicLinkEmail } from "./email-templates";
+import { buildSmtpTransport, type MailTransportConfig } from "./smtp-transport";
 
-type MailConfig = {
-  host: string;
-  port: number;
-  secure: boolean;
-  user: string;
-  password: string;
-  from: string;
-};
+type MailConfig = MailTransportConfig;
 
 /** VPS/bootstrap: set when `app_settings.mail` is not configured yet (e.g. before first admin login). */
 function getMailConfigFromEnv(): MailConfig | null {
@@ -32,7 +25,16 @@ function getMailConfigFromEnv(): MailConfig | null {
   const user = process.env.SMTP_USER?.trim() ?? "";
   const password = process.env.SMTP_PASSWORD?.trim() ?? "";
   const from = process.env.MAIL_FROM?.trim() || user || "noreply@localhost";
-  return { host, port: Number.isFinite(port) ? port : 587, secure, user, password, from };
+  const tlsServername = process.env.SMTP_TLS_SERVERNAME?.trim();
+  return {
+    host,
+    port: Number.isFinite(port) ? port : 587,
+    secure,
+    user,
+    password,
+    from,
+    ...(tlsServername ? { tlsServername } : {}),
+  };
 }
 
 async function getMailConfig(): Promise<MailConfig | null> {
@@ -213,16 +215,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.error("[Auth] Mail settings not configured. Configure SMTP in admin Settings.");
           throw new Error("E-post är inte konfigurerad. Kontakta administratören.");
         }
-        const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-        const transporter = nodemailer.createTransport({
-          host: config.host,
-          port: config.port || 587,
-          secure: config.secure,
-          auth: config.user ? { user: config.user, pass: config.password } : undefined,
-          tls: skipTlsVerify
-            ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-            : {},
-        });
+        const transporter = buildSmtpTransport(config);
         const link = magicLinkUrlForThisApp(url);
         if (isStudioAdminProcess()) {
           try {

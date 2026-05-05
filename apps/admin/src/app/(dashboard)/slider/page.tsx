@@ -22,13 +22,32 @@ export default function SliderPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<number, boolean>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchProducts = () => {
     setLoading(true);
+    setLoadError(null);
     fetch(`${PRODUCT_API}/products`)
-      .then((r) => r.json())
-      .then((data: Product[]) => setProducts(data))
-      .catch(() => setProducts([]))
+      .then(async (r) => {
+        const data: unknown = await r.json().catch(() => null);
+        if (!r.ok || !Array.isArray(data)) {
+          const msg =
+            (data && typeof data === "object" && "error" in data
+              ? String((data as { error: unknown }).error)
+              : null) ??
+            `Kunde inte ladda produkter (HTTP ${r.status}).`;
+          setProducts([]);
+          setLoadError(msg);
+          return;
+        }
+        setProducts(data as Product[]);
+      })
+      .catch((err: unknown) => {
+        setProducts([]);
+        setLoadError(
+          err instanceof Error ? err.message : "Kunde inte ansluta till produkt-tjänsten."
+        );
+      })
       .finally(() => setLoading(false));
   };
 
@@ -95,6 +114,20 @@ export default function SliderPage() {
     return (
       <div className="flex items-center justify-center py-12">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          <p className="font-medium">Kunde inte ladda produkter</p>
+          <p className="mt-1 text-destructive/80">{loadError}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchProducts}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Försök igen
+        </Button>
       </div>
     );
   }

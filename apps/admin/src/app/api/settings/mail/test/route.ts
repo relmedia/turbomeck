@@ -1,6 +1,6 @@
 import { auth } from "@repo/auth";
+import { buildSmtpTransport } from "@repo/auth/smtp-transport";
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 
 type MailSettings = {
   host: string;
@@ -9,6 +9,7 @@ type MailSettings = {
   user: string;
   password: string;
   from: string;
+  tlsServername?: string;
 };
 
 /** POST /api/settings/mail/test - Test SMTP connection with provided credentials */
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     const secure = Boolean(body.secure);
     const user = body.user ?? "";
     const password = body.password ?? "";
+    const tlsServername = (body.tlsServername ?? "").trim();
 
     if (!host) {
       return NextResponse.json(
@@ -33,13 +35,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const transporter = nodemailer.createTransport({
+    const transporter = buildSmtpTransport({
       host,
       port,
       secure,
-      auth: user ? { user, pass: password } : undefined,
-      // Allow self-signed certs in dev
-      tls: { rejectUnauthorized: process.env.NODE_ENV === "production" },
+      user,
+      password,
+      from: body.from ?? "",
+      ...(tlsServername ? { tlsServername } : {}),
+      ...(process.env.NODE_ENV !== "production" ? { rejectUnauthorized: false } : {}),
     });
 
     await transporter.verify();

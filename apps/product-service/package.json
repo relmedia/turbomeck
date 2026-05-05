@@ -12,6 +12,9 @@
     "migrate-images": "tsx --env-file=.env scripts/migrate-images-from-turbomeck.ts",
     "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts",
     "set-r2-cors": "tsx --env-file=.env scripts/set-r2-cors.ts",
+    "diagnose-r2": "tsx --env-file=.env scripts/diagnose-r2.ts",
+    "rewrite-png-to-avif": "tsx --env-file=.env scripts/rewrite-png-to-avif.ts",
+    "refresh-order-item-images": "tsx --env-file=.env scripts/refresh-order-item-images.ts",
     "upload-logo": "tsx --env-file=.env scripts/upload-logo-to-r2.ts",
     "reprocess-r2-images": "tsx --env-file=.env scripts/reprocess-r2-images.ts",
     "migrate-products-to-avif": "tsx --env-file=.env scripts/migrate-products-to-avif.ts"

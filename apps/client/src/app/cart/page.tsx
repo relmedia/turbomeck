@@ -26,8 +26,7 @@ import type { SavedAddress } from "@/types";
 import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { cn } from "@/lib/utils";
-import type { PostNordShippingSelection } from "@/components/PostNordShippingModule";
-import { completePostNordSessionFromCheckoutPayload } from "@/lib/complete-postnord-session";
+import type { PostNordDeliveryOptionsSelection } from "@/lib/postnord-delivery-options-types";
 
 
 const CartPage: React.FC = () => {
@@ -39,8 +38,8 @@ const CartPage: React.FC = () => {
     deliveryOption?: "home" | "servicepoint";
     country?: string;
   }>({});
-  const [postNordSelection, setPostNordSelection] =
-    useState<PostNordShippingSelection | null>(null);
+  const [postNordDeliveryOption, setPostNordDeliveryOption] =
+    useState<PostNordDeliveryOptionsSelection | null>(null);
   const [shippingFromApi, setShippingFromApi] = useState<number | null>(null);
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(false);
@@ -129,11 +128,9 @@ const CartPage: React.FC = () => {
   }, [totalWeightKg, deliveryOption, shippingCountry]);
 
   const shipping =
-    postNordSelection?.price != null
-      ? postNordSelection.price
-      : shippingFromApi != null
-        ? shippingFromApi
-        : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
+    shippingFromApi != null
+      ? shippingFromApi
+      : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
@@ -247,9 +244,7 @@ const CartPage: React.FC = () => {
           onDeliveryChange={handleDeliveryChange}
           defaultAddress={savedAddress}
           showSaveAddressOption={!!userId}
-          postNordSelection={postNordSelection}
-          onPostNordSelection={(sel) => setPostNordSelection(sel)}
-          cartItems={cart}
+          onDeliveryOptionsSelection={setPostNordDeliveryOption}
         />
       ),
     },
@@ -284,25 +279,14 @@ const CartPage: React.FC = () => {
                 ? coreReturnChoice === "return"
                 : undefined,
             postNordTrackingId: undefined,
-            postNordSessionId: postNordSelection?.sessionId,
             locale: locale as "sv" | "en",
             items: mapItemsForCheckout(),
           })}
           onComplete={async (result) => {
-            let postNordTrackingId: string | null = null;
-            if (postNordSelection?.sessionId && shippingForm) {
-              postNordTrackingId = await completePostNordSessionFromCheckoutPayload({
-                postNordSessionId: postNordSelection.sessionId,
-                firstName: shippingForm.firstName,
-                lastName: shippingForm.lastName,
-                email: shippingForm.email,
-                phone: shippingForm.phone,
-                address: shippingForm.address,
-                city: shippingForm.city,
-                postalCode: shippingForm.postalCode,
-                country: shippingForm.country,
-              });
-            }
+            // Booking is now driven by the server-side EDI/booking call (admin /payments page)
+            // using the selected `postNordDeliveryOption.serviceCode` + servicePointId, so the
+            // legacy session-based `complete-session` step is no longer required.
+            const postNordTrackingId: string | null = null;
 
             try {
               const order = await createOrder({
@@ -608,11 +592,23 @@ const CartPage: React.FC = () => {
                     <ChevronDown className="w-4 h-4" />
                   )}
                 </button>
-                {expandedSection === section.id && (
-                  <div className="px-4 pb-4 border-t border-border pt-4">
-                    {section.content}
-                  </div>
-                )}
+                {/*
+                  Always render section.content so React state inside
+                  (ShippingForm address fields, selected PostNord delivery
+                  option, service point, etc.) is preserved when the user
+                  toggles between the shipping (step 1) and payment (step 3)
+                  accordions. Hiding via CSS instead of unmounting avoids
+                  losing the customer's chosen shipping details.
+                */}
+                <div
+                  className={
+                    expandedSection === section.id
+                      ? "px-4 pb-4 border-t border-border pt-4"
+                      : "hidden"
+                  }
+                >
+                  {section.content}
+                </div>
               </div>
             ))
           )}

@@ -1,12 +1,17 @@
-import cron from "node-cron";
-import { syncShippingStatus } from "./src/lib/sync-shipping-status";
-
 /**
- * Runs syncShippingStatus every 2 hours.
- * Only runs in Node.js runtime (not Edge).
+ * Next.js instrumentation hook. Runs in BOTH Node.js and Edge runtimes, so anything
+ * that imports Node-only modules (node:dns, node:http, etc.) MUST be loaded via a
+ * dynamic import gated on NEXT_RUNTIME === "nodejs". Static top-level imports get
+ * pulled into the Edge bundle and trigger
+ *   "A Node.js module is loaded ('node:dns') which is not supported in the Edge Runtime."
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  const [{ default: cron }, { syncShippingStatus }] = await Promise.all([
+    import("node-cron"),
+    import("./src/lib/sync-shipping-status"),
+  ]);
 
   cron.schedule("0 */2 * * *", async () => {
     try {
