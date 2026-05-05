@@ -12,6 +12,7 @@ import {
   extractPostNordTrackableShipmentId,
 } from "./postnord-shipment-response-id";
 import { getPostNordBearerTokenNullable } from "./postnord-oauth";
+import { describePostNordNetworkError } from "./postnord-fetch-errors";
 
 let cachedEdiDestinationCountries: Set<string> | null = null;
 
@@ -273,11 +274,20 @@ export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise
     };
   }
 
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(ediBody),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(ediBody),
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      status: 503,
+      message: describePostNordNetworkError("Etikett-PDF API", e),
+    };
+  }
 
   const body = await res.arrayBuffer();
   const ct = (res.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() || "";
@@ -324,11 +334,20 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     };
   }
 
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(shipmentInformation),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(shipmentInformation),
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      status: 503,
+      message: describePostNordNetworkError("Boknings-API", e),
+    };
+  }
 
   const text = await res.text();
   let data: unknown;

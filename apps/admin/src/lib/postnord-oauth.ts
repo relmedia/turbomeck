@@ -3,6 +3,8 @@
  * @see https://postnord-ab-production.3scale.net/api/docs/general-information
  */
 
+import { describePostNordNetworkError } from "./postnord-fetch-errors";
+
 let cachedToken: { key: string; value: string; expiresAtMs: number } | null = null;
 
 function postnordOAuthTokenUrl(): string {
@@ -42,14 +44,19 @@ export async function getPostNordBearerTokenNullable(): Promise<string | null> {
   if (scope) body.set("scope", scope);
 
   const tokenUrl = postnordOAuthTokenUrl();
-  const res = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+    });
+  } catch (e) {
+    throw new Error(describePostNordNetworkError("OAuth token", e));
+  }
 
   const json = (await res.json().catch(() => ({}))) as {
     access_token?: string;
