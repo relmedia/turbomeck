@@ -79,6 +79,22 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Avbruten" },
 ] as const;
 
+type PostNordPrintoutOption = {
+  labelType: string;
+  paperSize: string[];
+  rotate?: string[];
+  definePrintout?: string[];
+  customs?: string[];
+  format: string;
+};
+type PostNordLabelOptionsResponse = {
+  requestedIds: string[];
+  options: {
+    summaryPrintoutLabelOptions?: PostNordPrintoutOption[];
+    printoutLabelOptions?: { id: string; printoutOptions: PostNordPrintoutOption[] }[];
+  };
+};
+
 function toValidTrackingId(val: unknown): string {
   if (val == null) return "";
   const s = String(val).trim();
@@ -180,6 +196,9 @@ export default function OrderDetailPage() {
   const [markingCoreReceived, setMarkingCoreReceived] = useState(false);
   const [postnordBooking, setPostnordBooking] = useState(false);
   const [bookWeightKg, setBookWeightKg] = useState(3);
+  const [labelOptions, setLabelOptions] = useState<PostNordLabelOptionsResponse | null>(null);
+  const [labelOptionsLoading, setLabelOptionsLoading] = useState(false);
+  const [labelOptionsError, setLabelOptionsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -195,6 +214,27 @@ export default function OrderDetailPage() {
       .catch(() => setOrder(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const fetchLabelOptions = async () => {
+    if (!id) return;
+    setLabelOptionsLoading(true);
+    setLabelOptionsError(null);
+    try {
+      const res = await fetch(`/api/orders/${id}/postnord-label-options?format=PDF&rotate=0&definePrintout=ALL`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLabelOptionsError(typeof data.error === "string" ? data.error : "Kunde inte hämta etikettalternativ");
+        setLabelOptions(null);
+        return;
+      }
+      setLabelOptions(data as PostNordLabelOptionsResponse);
+    } catch {
+      setLabelOptionsError("Kunde inte hämta etikettalternativ");
+      setLabelOptions(null);
+    } finally {
+      setLabelOptionsLoading(false);
+    }
+  };
 
   const fetchTrackingStatus = async () => {
     const tid = toValidTrackingId(order?.postNordTrackingId) || editTrackingId.trim();
@@ -704,6 +744,72 @@ export default function OrderDetailPage() {
                       Fraktetikett PDF
                     </a>
                   </Button>
+                )}
+                {toValidTrackingId(order.postNordTrackingId) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1 bg-white"
+                    onClick={fetchLabelOptions}
+                    disabled={labelOptionsLoading}
+                  >
+                    {labelOptionsLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Printer className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    Etikettalternativ
+                  </Button>
+                )}
+              </div>
+            )}
+            {(labelOptionsError || labelOptions) && (
+              <div className="mt-2 rounded-md border bg-muted/40 p-3 text-xs">
+                {labelOptionsError && (
+                  <p className="text-destructive">{labelOptionsError}</p>
+                )}
+                {labelOptions && (
+                  <div className="space-y-2">
+                    <p className="font-medium">
+                      Tillgängliga etikettformat
+                      {labelOptions.requestedIds.length > 0 && (
+                        <span className="ml-1 text-muted-foreground font-normal break-all">
+                          ({labelOptions.requestedIds.join(", ")})
+                        </span>
+                      )}
+                    </p>
+                    {labelOptions.options.summaryPrintoutLabelOptions &&
+                      labelOptions.options.summaryPrintoutLabelOptions.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Gemensamma alternativ
+                          </p>
+                          <ul className="space-y-1">
+                            {labelOptions.options.summaryPrintoutLabelOptions.map((opt, i) => (
+                              <li key={`sum-${i}`} className="font-mono break-all">
+                                {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    {labelOptions.options.printoutLabelOptions?.map((row) => (
+                      <div key={row.id} className="space-y-1">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          ID {row.id}
+                        </p>
+                        <ul className="space-y-1">
+                          {row.printoutOptions.map((opt, i) => (
+                            <li key={`row-${row.id}-${i}`} className="font-mono break-all">
+                              {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
+                              {opt.rotate?.length ? ` · rotate=${opt.rotate.join("|")}` : ""}
+                              {opt.definePrintout?.length ? ` · ${opt.definePrintout.join("|")}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
