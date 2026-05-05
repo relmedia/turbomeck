@@ -1,12 +1,17 @@
 /**
  * PostNord OAuth2 client credentials — optional addition to POSTNORD_API_KEY (apikey query param stays required).
  * @see https://postnord-ab-production.3scale.net/api/docs/general-information
+ *
+ * As of 2026 the documented production token host `gate.ess.postnord.com` resolves to a deleted
+ * AWS ELB (NXDOMAIN). If your booking plan does not require IAM, set POSTNORD_SKIP_OAUTH=true
+ * (or simply don’t set POSTNORD_CLIENT_ID). Use POSTNORD_OAUTH_TOKEN_URL=… when PostNord moves it.
  */
 
 import { describePostNordNetworkError } from "./postnord-fetch-errors";
 import { postnordFetch } from "./postnord-node-dns";
 
 let cachedToken: { key: string; value: string; expiresAtMs: number } | null = null;
+let warnedAboutOAuthFallback = false;
 
 function postnordOAuthTokenUrl(): string {
   const override = process.env.POSTNORD_OAUTH_TOKEN_URL?.trim();
@@ -17,12 +22,23 @@ function postnordOAuthTokenUrl(): string {
     : "https://gate.ess.postnord.com/mga/sps/oauth/oauth20/token";
 }
 
+function isOn(name: string): boolean {
+  const v = process.env[name]?.trim().toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
 /**
  * Returns a Bearer access token when POSTNORD_CLIENT_ID is set.
- * POSTNORD_CLIENT_SECRET is omitted from the token request unless set (sandbox often uses client_id only).
- * Still send POSTNORD_API_KEY on REST calls — OAuth is additive for IAM endpoints.
+ * Returns null and logs a warning when:
+ *   - OAuth is explicitly skipped (POSTNORD_SKIP_OAUTH=true), or
+ *   - The token endpoint cannot be reached and POSTNORD_OAUTH_REQUIRED is not true.
+ * Throws only when IAM is explicitly required (POSTNORD_OAUTH_REQUIRED=true) and we couldn't get a token.
+ *
+ * POSTNORD_API_KEY (apikey query param) is unrelated to OAuth and is still required for REST calls.
  */
 export async function getPostNordBearerTokenNullable(): Promise<string | null> {
+  if (isOn("POSTNORD_SKIP_OAUTH")) return null;
+
   const clientId = process.env.POSTNORD_CLIENT_ID?.trim();
   const clientSecret = process.env.POSTNORD_CLIENT_SECRET?.trim();
   if (!clientId) return null;
@@ -45,6 +61,8 @@ export async function getPostNordBearerTokenNullable(): Promise<string | null> {
   if (scope) body.set("scope", scope);
 
   const tokenUrl = postnordOAuthTokenUrl();
+  const oauthRequired = isOn("POSTNORD_OAUTH_REQUIRED");
+
   let res: Response;
   try {
     res = await postnordFetch(tokenUrl, {
@@ -56,7 +74,15 @@ export async function getPostNordBearerTokenNullable(): Promise<string | null> {
       body: body.toString(),
     });
   } catch (e) {
-    throw new Error(describePostNordNetworkError("OAuth token", e));
+    const msg = describePostNordNetworkError("OAuth token", e);
+    if (oauthRequired) throw new Error(msg);
+    if (!warnedAboutOAuthFallback) {
+      warnedAboutOAuthFallback = true;
+      console.warn(
+        `[postnord-oauth] ${msg} — fortsätter utan Bearer (sätt POSTNORD_OAUTH_REQUIRED=true för att tvinga, eller POSTNORD_SKIP_OAUTH=true för att tysta).`,
+      );
+    }
+    return null;
   }
 
   const json = (await res.json().catch(() => ({}))) as {
@@ -67,14 +93,19 @@ export async function getPostNordBearerTokenNullable(): Promise<string | null> {
   };
 
   if (!res.ok) {
-    throw new Error(
-      `PostNord OAuth (${res.status}): ${json?.error_description ?? json?.error ?? "token request failed"}`
-    );
+    const message = `PostNord OAuth (${res.status}): ${json?.error_description ?? json?.error ?? "token request failed"}`;
+    if (oauthRequired) throw new Error(message);
+    if (!warnedAboutOAuthFallback) {
+      warnedAboutOAuthFallback = true;
+      console.warn(`[postnord-oauth] ${message} — fortsätter utan Bearer.`);
+    }
+    return null;
   }
 
   const token = typeof json.access_token === "string" ? json.access_token : null;
   if (!token) {
-    throw new Error("PostNord OAuth: response missing access_token");
+    if (oauthRequired) throw new Error("PostNord OAuth: response missing access_token");
+    return null;
   }
 
   const expiresInSec = typeof json.expires_in === "number" && json.expires_in > 0 ? json.expires_in : 3600;

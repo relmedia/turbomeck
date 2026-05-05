@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildPostNordSessionBody } from "@/lib/postnord-session-payload";
 
 const API_URL = process.env.POSTNORD_SHIPPING_API_URL;
 const API_KEY = process.env.POSTNORD_SHIPPING_API_KEY;
-const SITE_CODE = process.env.POSTNORD_SITE_CODE ?? "acmeSE";
 
 /**
  * PUT /api/postnord/shipping/update-session/[sessionId]
  * Updates a PostNord Shipping Module session when address/cart changes.
+ * Forwards the per-session token from the client when present (PostNord prefers session token over apikey).
  */
 export async function PUT(
   request: NextRequest,
@@ -22,55 +23,20 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { items = [], deliveryAddress = {}, userInputs = {} } = body;
+    const payload = buildPostNordSessionBody(body, "update");
+    const auth = request.headers.get("authorization") ?? API_KEY;
 
-    const payload = {
-      purchaseId: body.purchaseId ?? `P${Date.now()}`,
-      locale: body.locale ?? "sv-SE",
-      mode: 0,
-      checkoutSite: {
-        siteCode: SITE_CODE,
-        countryCode: deliveryAddress.country ?? "SE",
-        currencyCode: "SEK",
-      },
-      items: items.map(
-        (item: { name?: string; price?: number; quantity?: number; weight?: number }) => ({
-          description: item.name ?? "Produkt",
-          amount: Number(item.price ?? 0),
-          quantity: Number(item.quantity ?? 1),
-          shippingParameters: item.weight
-            ? { width: null, height: null, length: null, weight: Number(item.weight), attributes: [] }
-            : null,
-        })
-      ),
-      shippingSettings: { vouchers: null, attributes: null },
-      deliveryAddress: {
-        address1: deliveryAddress.address ?? null,
-        address2: null,
-        street: deliveryAddress.address ?? null,
-        zip: deliveryAddress.postalCode ?? deliveryAddress.zip ?? null,
-        city: deliveryAddress.city ?? null,
-        type: "Private",
-        firstName: deliveryAddress.firstName ?? null,
-        lastName: deliveryAddress.lastName ?? null,
-        country: deliveryAddress.country ?? "SE",
-      },
-      userInputs: {
-        email: userInputs.email ?? null,
-        phoneCountryTwoLetterIso:
-          (deliveryAddress.country ?? userInputs.phoneCountryTwoLetterIso) ?? "SE",
-        phone: userInputs.phone ?? null,
-      },
-    };
-
-    const res = await fetch(`${API_URL}/update-session/${sessionId}`, {
-      method: "PUT",
-      headers: {
-        Authorization: API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${API_URL.replace(/\/+$/, "")}/update-session/${encodeURIComponent(sessionId)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text();

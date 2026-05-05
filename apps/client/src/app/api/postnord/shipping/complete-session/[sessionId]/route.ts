@@ -7,7 +7,8 @@ const SITE_CODE = process.env.POSTNORD_SITE_CODE ?? "acmeSE";
 
 /**
  * PUT /api/postnord/shipping/complete-session/[sessionId]
- * Completes the PostNord session after checkout.
+ * Completes the PostNord session after checkout. Returns trackable shipment id when present.
+ * Forwards the session token from the client when present (preferred over apikey by PostNord).
  */
 export async function PUT(
   request: NextRequest,
@@ -23,13 +24,29 @@ export async function PUT(
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { deliveryAddress = {}, userInputs = {} } = body;
+    const { deliveryAddress = {}, userInputs = {} } = body as {
+      deliveryAddress?: {
+        firstName?: string;
+        lastName?: string;
+        address?: string;
+        postalCode?: string;
+        zip?: string;
+        city?: string;
+        country?: string;
+        companyName?: string;
+        type?: string;
+      };
+      userInputs?: { email?: string; phone?: string; phoneCountryTwoLetterIso?: string };
+    };
 
-    const payload = {
+    const country = (deliveryAddress.country ?? "SE").toUpperCase();
+    const addressType = deliveryAddress.type ?? (deliveryAddress.companyName ? "Company" : "Private");
+
+    const payload: Record<string, unknown> = {
       id: sessionId,
       checkoutSite: {
         siteCode: SITE_CODE,
-        countryCode: deliveryAddress.country ?? "SE",
+        countryCode: country,
         currencyCode: "SEK",
       },
       deliveryAddress: {
@@ -38,27 +55,33 @@ export async function PUT(
         street: deliveryAddress.address ?? null,
         zip: deliveryAddress.postalCode ?? deliveryAddress.zip ?? null,
         city: deliveryAddress.city ?? null,
-        type: "Private",
+        type: addressType,
         firstName: deliveryAddress.firstName ?? null,
         lastName: deliveryAddress.lastName ?? null,
-        country: deliveryAddress.country ?? "SE",
+        country,
+        ...(deliveryAddress.companyName ? { companyName: deliveryAddress.companyName } : {}),
       },
       userInputs: {
         email: userInputs.email ?? null,
         phoneCountryTwoLetterIso:
-          (deliveryAddress.country ?? userInputs.phoneCountryTwoLetterIso) ?? "SE",
+          (userInputs.phoneCountryTwoLetterIso ?? country).toUpperCase(),
         phone: userInputs.phone ?? null,
       },
     };
 
-    const res = await fetch(`${API_URL}/complete-session/${sessionId}`, {
-      method: "PUT",
-      headers: {
-        Authorization: API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const auth = request.headers.get("authorization") ?? API_KEY;
+
+    const res = await fetch(
+      `${API_URL.replace(/\/+$/, "")}/complete-session/${encodeURIComponent(sessionId)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text();

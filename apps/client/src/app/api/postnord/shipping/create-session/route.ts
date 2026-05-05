@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildPostNordSessionBody } from "@/lib/postnord-session-payload";
 
 const API_URL = process.env.POSTNORD_SHIPPING_API_URL;
 const API_KEY = process.env.POSTNORD_SHIPPING_API_KEY;
-const SITE_CODE = process.env.POSTNORD_SITE_CODE ?? "acmeSE";
 
 /**
  * POST /api/postnord/shipping/create-session
@@ -21,59 +21,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const {
-      purchaseId = `P${Date.now()}`,
-      items = [],
-      deliveryAddress = {},
-      userInputs = {},
-      language = "sv-SE",
-    } = body;
+    const payload = buildPostNordSessionBody(body, "create");
 
-    const payload = {
-      purchaseId,
-      language: language.startsWith("sv") ? "sv-SE" : "en-US",
-      checkoutSite: {
-        siteCode: SITE_CODE,
-        countryCode: deliveryAddress.country ?? "SE",
-        currencyCode: "SEK",
-      },
-      mode: 1,
-      items: items.map(
-        (item: { name?: string; price?: number; quantity?: number; weight?: number }) => ({
-          description: item.name ?? "Produkt",
-          amount: Number(item.price ?? 0),
-          quantity: Number(item.quantity ?? 1),
-          shippingParameters: item.weight
-            ? {
-                width: null,
-                height: null,
-                length: null,
-                weight: Number(item.weight),
-                attributes: [],
-              }
-            : null,
-        })
-      ),
-      deliveryAddress: {
-        address1: deliveryAddress.address ?? null,
-        address2: null,
-        street: deliveryAddress.address ?? null,
-        zip: deliveryAddress.postalCode ?? deliveryAddress.zip ?? null,
-        city: deliveryAddress.city ?? null,
-        type: "Private",
-        firstName: deliveryAddress.firstName ?? null,
-        lastName: deliveryAddress.lastName ?? null,
-        country: deliveryAddress.country ?? "SE",
-      },
-      userInputs: {
-        email: userInputs.email ?? null,
-        phoneCountryTwoLetterIso:
-          (deliveryAddress.country ?? userInputs.phoneCountryTwoLetterIso) ?? "SE",
-        phone: userInputs.phone ?? null,
-      },
-    };
-
-    const res = await fetch(`${API_URL}/create-session`, {
+    const res = await fetch(`${API_URL.replace(/\/+$/, "")}/create-session`, {
       method: "POST",
       headers: {
         Authorization: API_KEY,

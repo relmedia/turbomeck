@@ -6,6 +6,7 @@ const API_KEY = process.env.POSTNORD_SHIPPING_API_KEY;
 /**
  * GET /api/postnord/shipping/session/[sessionId]
  * Fetches PostNord session to get selected shipping option and price.
+ * Forwards session token from the client when present.
  */
 export async function GET(
   request: NextRequest,
@@ -21,10 +22,13 @@ export async function GET(
 
   try {
     const auth = request.headers.get("authorization") ?? API_KEY;
-    const res = await fetch(`${API_URL}/get-session/${sessionId}`, {
-      method: "GET",
-      headers: { Authorization: auth },
-    });
+    const res = await fetch(
+      `${API_URL.replace(/\/+$/, "")}/get-session/${encodeURIComponent(sessionId)}`,
+      {
+        method: "GET",
+        headers: { Authorization: auth },
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text();

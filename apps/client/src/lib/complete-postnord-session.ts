@@ -3,9 +3,12 @@ import { extractPostNordTrackableShipmentId } from "./postnord-shipment-response
 /**
  * Books the shipment after checkout (PostNord Shipping Module complete-session).
  * Call after payment succeeds; returns shipment/tracking id or null.
+ *
+ * Pass `postNordSessionToken` when available — PostNord prefers the per-session token over the apikey.
  */
 export async function completePostNordSessionFromCheckoutPayload(payload: {
   postNordSessionId?: string;
+  postNordSessionToken?: string | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -14,15 +17,20 @@ export async function completePostNordSessionFromCheckoutPayload(payload: {
   city: string;
   postalCode: string;
   country?: string;
+  companyName?: string | null;
 }): Promise<string | null> {
   const sid = payload.postNordSessionId?.trim();
   if (!sid) return null;
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (payload.postNordSessionToken) {
+      headers.Authorization = payload.postNordSessionToken;
+    }
     const res = await fetch(
       `/api/postnord/shipping/complete-session/${encodeURIComponent(sid)}`,
       {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           deliveryAddress: {
             firstName: payload.firstName,
@@ -31,6 +39,7 @@ export async function completePostNordSessionFromCheckoutPayload(payload: {
             city: payload.city,
             postalCode: payload.postalCode,
             country: payload.country ?? "SE",
+            companyName: payload.companyName ?? undefined,
           },
           userInputs: {
             email: payload.email,

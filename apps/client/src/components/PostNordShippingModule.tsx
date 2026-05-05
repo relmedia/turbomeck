@@ -1,11 +1,19 @@
 "use client";
 
 import type { FC } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CartItemType } from "@/types";
 import type { ShippingFormInputs } from "@/types";
 
-const SCRIPT_URL =
+/**
+ * PostNord Shipping Module web component wrapper.
+ * @see https://devportal.postnord.com/pn-shipping-module/v1/index.html
+ *
+ * Set NEXT_PUBLIC_POSTNORD_SHIPPING_MODULE_URL to the API base PostNord gave you
+ * (the docs’ `{api-url}` — script and REST share that origin in production).
+ */
+
+const MODULE_BASE_URL =
   process.env.NEXT_PUBLIC_POSTNORD_SHIPPING_MODULE_URL ||
   "https://devportal.postnord.com/pn-shipping-module/v1";
 
@@ -22,6 +30,8 @@ type PostNordShippingModuleProps = {
   formData: Partial<ShippingFormInputs>;
   cartItems: CartItemType[];
   language?: "sv" | "en";
+  /** Optional order/checkout reference passed as `extraIdentifiers.orderReference`. */
+  orderReference?: string;
   onShippingChange?: (selection: PostNordShippingSelection | null) => void;
   onLoaded?: () => void;
   onError?: (message: string) => void;
@@ -42,10 +52,35 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+type SessionPayload = {
+  items: Array<{
+    name: string;
+    price: number;
+    quantity: number;
+    weight?: number | null;
+    notes?: string | null;
+  }>;
+  deliveryAddress: {
+    firstName?: string;
+    lastName?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    country?: string;
+  };
+  userInputs: {
+    email?: string;
+    phone?: string;
+    phoneCountryTwoLetterIso?: string;
+  };
+  orderReference?: string;
+};
+
 const PostNordShippingModule: FC<PostNordShippingModuleProps> = ({
   formData,
   cartItems,
   language = "sv",
+  orderReference,
   onShippingChange,
   onLoaded,
   onError,
@@ -55,11 +90,42 @@ const PostNordShippingModule: FC<PostNordShippingModuleProps> = ({
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const widgetRef = useRef<Element | null>(null);
+  /** Last serialized payload — to detect when address/cart actually changed. */
+  const lastPayloadRef = useRef<string>("");
+  const updateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Stable JSON for the createSession/updateSession body. */
+  const payload: SessionPayload = useMemo(
+    () => ({
+      items: cartItems.map((item) => ({
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        weight: item.weight ?? null,
+        notes: item.selectedVariant ?? null,
+      })),
+      deliveryAddress: {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        address: formData.address,
+        postalCode: formData.postalCode,
+        city: formData.city,
+        country: formData.country ?? "SE",
+      },
+      userInputs: {
+        email: formData.email,
+        phone: formData.phone,
+        phoneCountryTwoLetterIso: formData.country ?? "SE",
+      },
+      orderReference: orderReference ?? undefined,
+    }),
+    [cartItems, formData, orderReference],
+  );
 
   const fetchSession = useCallback(async () => {
-    if (!sessionId || !sessionToken) return null;
+    if (!sessionId) return null;
     const res = await fetch(`/api/postnord/shipping/session/${sessionId}`, {
-      headers: { Authorization: sessionToken },
+      headers: sessionToken ? { Authorization: sessionToken } : {},
     });
     if (!res.ok) return null;
     return res.json();
@@ -68,32 +134,10 @@ const PostNordShippingModule: FC<PostNordShippingModuleProps> = ({
   const createSession = useCallback(async () => {
     setStatus("loading");
     try {
-      const items = cartItems.map((item) => ({
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        weight: item.weight ?? 1,
-      }));
-
       const res = await fetch("/api/postnord/shipping/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items,
-          deliveryAddress: {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            address: formData.address,
-            postalCode: formData.postalCode,
-            city: formData.city,
-            country: formData.country ?? "SE",
-          },
-          userInputs: {
-            email: formData.email,
-            phone: formData.phone,
-            phoneCountryTwoLetterIso: formData.country ?? "SE",
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -108,13 +152,47 @@ const PostNordShippingModule: FC<PostNordShippingModuleProps> = ({
       setSessionId(id);
       setSessionToken(token ?? null);
       setStatus("ready");
+      lastPayloadRef.current = JSON.stringify(payload);
       return { sessionId: id, sessionToken: token };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create session";
       setStatus("error");
       onError?.(msg);
     }
-  }, [cartItems, formData, onError]);
+  }, [payload, onError]);
+
+  /**
+   * Pushes updated cart/address to PostNord and fires `sessionHasUpdated` on the widget so it
+   * re-fetches options. PostNord docs require this whenever any session field changes.
+   */
+  const updateSession = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(
+        `/api/postnord/shipping/update-session/${encodeURIComponent(sessionId)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(sessionToken ? { Authorization: sessionToken } : {}),
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      if (!res.ok) return;
+      lastPayloadRef.current = JSON.stringify(payload);
+      const widget = widgetRef.current as
+        | (Element & { sessionHasUpdated?: () => void })
+        | null;
+      try {
+        widget?.sessionHasUpdated?.();
+      } catch {
+        /* widget may not be fully ready */
+      }
+    } catch {
+      /* network errors are surfaced by the widget itself on next interaction */
+    }
+  }, [sessionId, sessionToken, payload]);
 
   const hasMinData =
     Boolean(formData.country) &&
@@ -130,25 +208,37 @@ const PostNordShippingModule: FC<PostNordShippingModuleProps> = ({
       setStatus("idle");
       return;
     }
+    if (sessionId) return;
     createSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMinData]);
+
+  /** Debounce: when the form/cart payload changes after we already have a session, push update. */
+  useEffect(() => {
+    if (!sessionId || !hasMinData) return;
+    const next = JSON.stringify(payload);
+    if (next === lastPayloadRef.current) return;
+    if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+    updateTimerRef.current = setTimeout(() => {
+      updateSession();
+    }, 350);
+    return () => {
+      if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+    };
+  }, [sessionId, hasMinData, payload, updateSession]);
 
   useEffect(() => {
     if (status !== "ready" || !sessionId || !containerRef.current) return;
 
     const container = containerRef.current;
 
-    loadScript(`${SCRIPT_URL}/postnord-shipping-module.cjs`)
+    loadScript(`${MODULE_BASE_URL}/postnord-shipping-module.cjs`)
       .then(() => {
         const tag = document.createElement("postnord-shipping-module");
         tag.setAttribute("language", language);
         tag.setAttribute("session-id", sessionId);
         if (sessionToken) {
-          tag.setAttribute(
-            "modules",
-            JSON.stringify({ sessionToken })
-          );
+          tag.setAttribute("modules", JSON.stringify({ sessionToken }));
         }
         tag.setAttribute("option-logos", "");
 
