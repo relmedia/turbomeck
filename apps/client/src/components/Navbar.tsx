@@ -34,8 +34,10 @@ const Navbar = () => {
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  // Categories nav is shown on the storefront pages (homepage + product filter).
-  const showInlineCategories = pathname === "/" || pathname === "/products";
+  // Categories nav is shown on the storefront pages (homepage + product list
+  // + product detail at /products/[slug]).
+  const showInlineCategories =
+    pathname === "/" || pathname.startsWith("/products");
 
   return (
     <nav className="sticky top-0 z-30 mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 bg-background/90 py-2 backdrop-blur supports-backdrop-filter:bg-background/75 sm:py-3 sm:mb-6">
