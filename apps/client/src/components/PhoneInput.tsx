@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { useTranslation } from "@/i18n/context";
-import { Input } from "@/components/ui/input";
+import { Input } from "@repo/ui/components/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@repo/ui/components/select";
 import { cn } from "@/lib/utils";
 
 // European countries only: ISO 3166-1 alpha-2, dial code, flag image from CDN

@@ -1,15 +1,44 @@
 "use client";
 
-import { ChevronDown, LayoutGrid, Car, Gauge, Wrench, CircleDot } from "lucide-react";
+import * as React from "react";
+import { LayoutGrid, Car, Gauge, Wrench, CircleDot } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@repo/ui/components/navigation-menu";
 import { categorySlug, cn } from "@/lib/utils";
+
+// Segmented-control item style — pills that sit on a muted bar.
+// Default: transparent + muted text; hover: subtle lift to background/70;
+// active or open dropdown: solid background, foreground text, soft shadow.
+const barItemStyle = cn(
+  "group inline-flex h-9 w-max items-center justify-center gap-2 rounded-md px-3.5 py-2",
+  "text-sm font-medium text-muted-foreground transition-all",
+  "hover:bg-background/70 hover:text-foreground",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+  "data-[active]:bg-background data-[active]:text-foreground data-[active]:shadow-sm",
+  "data-[state=open]:bg-background data-[state=open]:text-foreground data-[state=open]:shadow-sm",
+  "disabled:pointer-events-none disabled:opacity-50",
+);
+
+// Inline navbar item style — classic top-nav text links, no segmented chrome.
+// Sits flush in the navbar so it shares the navbar's background.
+const inlineItemStyle = cn(
+  "group inline-flex h-9 w-max items-center justify-center gap-1.5 rounded-md px-3 py-2",
+  "text-sm font-medium text-foreground/80 transition-colors",
+  "hover:bg-accent hover:text-foreground",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+  "data-[active]:text-foreground data-[active]:font-semibold",
+  "data-[state=open]:bg-accent data-[state=open]:text-foreground",
+  "disabled:pointer-events-none disabled:opacity-50",
+);
 
 type CategoryItem = {
   id: number;
@@ -17,6 +46,8 @@ type CategoryItem = {
   parentId?: number | null;
   parentName?: string | null;
 };
+
+type CategoriesVariant = "bar" | "inline";
 
 function getCategoryIcon(name: string) {
   const lower = name.toLowerCase();
@@ -32,16 +63,23 @@ function getCategoryIcon(name: string) {
   return CircleDot;
 }
 
-const Categories = ({ categories }: { categories: CategoryItem[] }) => {
+const Categories = ({
+  categories,
+  variant = "bar",
+}: {
+  categories: CategoryItem[];
+  variant?: CategoriesVariant;
+}) => {
   const t = useTranslation();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
   const selectedCategory = searchParams.get("category");
+  const isInline = variant === "inline";
+  const navItemStyle = isInline ? inlineItemStyle : barItemStyle;
 
   const makeHref = (slug: string) => {
     const params = new URLSearchParams();
     params.set("category", slug);
-    return `${pathname}?${params.toString()}`;
+    return `/products?${params.toString()}`;
   };
 
   const isSelected = (slug: string) =>
@@ -54,82 +92,139 @@ const Categories = ({ categories }: { categories: CategoryItem[] }) => {
       return slug !== "alla-produkter" && slug !== "all-products";
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+
   const getChildren = (parentId: number) =>
     categories.filter((c) => c.parentId === parentId);
-  const triggerClass = cn(
-    "flex items-center gap-2 h-9 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-    "hover:bg-white/50 hover:text-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none",
-  );
 
   return (
-    <div className="hidden sm:flex bg-gray-100 p-2 rounded-lg mb-4 text-sm flex-wrap items-center gap-1">
-      {/* Alla produkter - always first, link to startpage */}
-      <Link
-        href={pathname}
+    <NavigationMenu
+      viewport={false}
+      className={cn(
+        isInline
+          ? "hidden lg:flex max-w-none justify-start"
+          : cn(
+              "hidden sm:flex max-w-none w-full justify-start",
+              "rounded-md border border-border/40 bg-muted/40 p-1.5",
+              "supports-backdrop-filter:bg-muted/30 supports-backdrop-filter:backdrop-blur-sm",
+            ),
+      )}
+    >
+      <NavigationMenuList
         className={cn(
-          triggerClass,
-          isSelected("alla-produkter") ? "bg-white" : "text-gray-500",
+          "justify-start gap-1",
+          isInline ? "flex-nowrap" : "flex-wrap",
         )}
       >
-        <LayoutGrid className="w-4 h-4 shrink-0" />
-        {t("products.allProducts")}
-      </Link>
-      {/* Main categories - with dropdown if they have subcategories */}
-      {apiParentCategories.map((parent) => {
-        const children = getChildren(parent.id);
-        const parentSlug = categorySlug(parent);
-        const hasChildren = children.length > 0;
-        const Icon = getCategoryIcon(parent.name);
-
-        const linkContent = (
-          <>
-            <Icon className="w-4 h-4 shrink-0" />
-            {parent.name}
-            {hasChildren && (
-              <ChevronDown className="w-4 h-4 ml-0.5 opacity-70" />
-            )}
-          </>
-        );
-
-        const link = (
-          <Link
-            href={makeHref(parentSlug)}
-            className={cn(
-              triggerClass,
-              isSelected(parentSlug) ? "bg-white" : "text-gray-500",
-            )}
+        {/* Alla produkter — always first */}
+        <NavigationMenuItem>
+          <NavigationMenuLink
+            asChild
+            active={isSelected("alla-produkter")}
+            className={navItemStyle}
           >
-            {linkContent}
-          </Link>
-        );
+            <Link href="/products">
+              <LayoutGrid className="w-4 h-4 shrink-0" />
+              {t("products.allProducts")}
+            </Link>
+          </NavigationMenuLink>
+        </NavigationMenuItem>
 
-        if (hasChildren) {
-          return (
-            <HoverCard key={parent.id} openDelay={100} closeDelay={50}>
-              <HoverCardTrigger asChild>{link}</HoverCardTrigger>
-              <HoverCardContent align="start" className="min-w-[180px] p-2">
-                <div className="flex flex-col gap-0.5">
-                  {children.map((child) => {
-                    const childSlug = categorySlug(child);
-                    return (
-                      <Link
-                        key={child.id}
-                        href={makeHref(childSlug)}
-                        className="flex items-center rounded-sm px-2 py-1.5 text-sm font-medium outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+        {/* Parent categories — dropdown if they have children, plain link otherwise */}
+        {apiParentCategories.map((parent) => {
+          const children = getChildren(parent.id);
+          const parentSlug = categorySlug(parent);
+          const hasChildren = children.length > 0;
+          const Icon = getCategoryIcon(parent.name);
+          const parentActive = isSelected(parentSlug);
+
+          if (hasChildren) {
+            const childActive = children.some((c) =>
+              isSelected(categorySlug(c)),
+            );
+            return (
+              <NavigationMenuItem key={parent.id}>
+                <NavigationMenuTrigger
+                  data-active={parentActive || childActive ? "" : undefined}
+                  className={navItemStyle}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {parent.name}
+                </NavigationMenuTrigger>
+                <NavigationMenuContent
+                  className={cn(
+                    // When viewport={false}, content renders inline below its
+                    // own trigger — it needs popover styling that the shared
+                    // viewport would normally provide.
+                    "top-full mt-2 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg",
+                    "data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out",
+                    "data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out",
+                  )}
+                >
+                  <ul className="grid w-[260px] gap-1 p-2">
+                    <li>
+                      <NavigationMenuLink
+                        asChild
+                        active={parentActive}
+                        className={cn(
+                          "flex select-none items-center gap-2 rounded-md px-3 py-2 text-sm font-medium leading-none outline-none transition-colors",
+                          "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                          "data-active:bg-accent/50",
+                        )}
                       >
-                        {child.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          );
-        }
+                        <Link href={makeHref(parentSlug)}>
+                          <Icon className="w-4 h-4 shrink-0 opacity-70" />
+                          {t("products.viewAllIn", { name: parent.name })}
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li
+                      aria-hidden
+                      className="mx-1 my-1 h-px bg-border/70"
+                    />
+                    {children.map((child) => {
+                      const childSlug = categorySlug(child);
+                      return (
+                        <li key={child.id}>
+                          <NavigationMenuLink
+                            asChild
+                            active={isSelected(childSlug)}
+                            className={cn(
+                              "flex select-none items-center rounded-md px-3 py-2 text-sm leading-none outline-none transition-colors",
+                              "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                              "focus:bg-accent focus:text-accent-foreground",
+                              "data-active:bg-accent/60 data-active:text-foreground data-active:font-medium",
+                            )}
+                          >
+                            <Link href={makeHref(childSlug)}>
+                              {child.name}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            );
+          }
 
-        return <span key={parent.id}>{link}</span>;
-      })}
-    </div>
+          return (
+            <NavigationMenuItem key={parent.id}>
+              <NavigationMenuLink
+                asChild
+                active={parentActive}
+                className={navItemStyle}
+              >
+                <Link href={makeHref(parentSlug)}>
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {parent.name}
+                </Link>
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+          );
+        })}
+      </NavigationMenuList>
+    </NavigationMenu>
   );
 };
 

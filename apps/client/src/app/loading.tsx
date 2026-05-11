@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@repo/ui/components/skeleton";
 import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
 
 export default function Loading() {

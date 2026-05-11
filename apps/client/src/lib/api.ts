@@ -68,6 +68,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     description: api.description || "",
     price: api.price,
     weight: api.weight ?? undefined,
+    stock: api.stock ?? 0,
     categoryIds: api.categoryIds ?? [],
     attributes: api.attributes ?? [],
     isExchangeTurbo: api.isExchangeTurbo === true,

@@ -11,8 +11,8 @@ import {
 } from "@stripe/react-stripe-js";
 import Link from "next/link";
 import { ShoppingBagIcon, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@repo/ui/components/button";
+import { Checkbox } from "@repo/ui/components/checkbox";
 import Image from "next/image";
 
 export type PendingOrderPayload = {

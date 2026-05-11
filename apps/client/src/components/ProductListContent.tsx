@@ -12,7 +12,7 @@ import {
   PaginationPrevious,
   PaginationNext,
   PaginationEllipsis,
-} from "./ui/pagination";
+} from "@repo/ui/components/pagination";
 import { useTranslation } from "@/i18n/context";
 
 type Props = {
@@ -23,6 +23,18 @@ type Props = {
   currentPage: number;
   totalPages: number;
   showViewAllLink: boolean;
+  /**
+   * When true, the grid caps at 3 columns at lg+ — used by /products which
+   * shows a 256px filter sidebar that steals horizontal space.
+   * Homepage (false) keeps the wider 4-col layout.
+   */
+  withSidebar?: boolean;
+  /**
+   * When false, the pagination strip is hidden — used on the homepage where
+   * the first page acts as a teaser and customers are funnelled to `/products`
+   * via the view-all link rather than paginated browsing on the landing page.
+   */
+  showPagination?: boolean;
 };
 
 function buildPath(
@@ -42,6 +54,8 @@ export function ProductListContent({
   currentPage,
   totalPages,
   showViewAllLink,
+  withSidebar = false,
+  showPagination = true,
 }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -49,9 +63,13 @@ export function ProductListContent({
 
   const path = (p: number) => buildPath(pathname, searchParams, p);
 
+  const gridCols = withSidebar
+    ? "grid-cols-2 md:grid-cols-2 lg:grid-cols-3"
+    : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-8 md:grid-cols-3 lg:grid-cols-4">
+      <div className={`grid gap-x-3 gap-y-8 sm:gap-8 ${gridCols}`}>
         {products.length > 0 ? (
           products.map((product, i) => (
             <ProductCard
@@ -87,7 +105,7 @@ export function ProductListContent({
           {t("products.viewAllProducts")}
         </Link>
       )}
-      {totalPages > 1 && (
+      {showPagination && totalPages > 1 && (
         <Pagination className="mt-8">
           <PaginationContent>
             <PaginationItem>

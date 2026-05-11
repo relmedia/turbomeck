@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { DataTable } from "../payments/data-table";
 import { createShippingColumns } from "./columns";
 import { RefreshCw } from "lucide-react";

@@ -4,7 +4,7 @@ import { Menu, X, ChevronRight, User, LogOut, MapPin, LayoutGrid, Car, Gauge, Wr
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/i18n/context";
 import { useLanguage } from "@/i18n/context";
 import { categorySlug, cn } from "@/lib/utils";
@@ -42,7 +42,6 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
   const { locale } = useLanguage();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const t = useTranslation();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedCategory = searchParams.get("category");
   const { data: session } = useSession();
@@ -159,7 +158,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
   const makeHref = (slug: string) => {
     const params = new URLSearchParams();
     params.set("category", slug);
-    return `${pathname}?${params.toString()}`;
+    return `/products?${params.toString()}`;
   };
 
   const isSelected = (slug: string) =>
@@ -191,7 +190,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="sm:hidden p-1"
+        className="lg:hidden p-1"
         aria-label="Öppna meny"
       >
         <Menu className="w-5 h-5 text-gray-600" />
@@ -203,7 +202,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
           {/* Backdrop */}
           <div
             ref={backdropRef}
-            className="fixed inset-0 z-40 bg-black/50 sm:hidden"
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
             onClick={handleClose}
             style={{ opacity: 0 }}
           />
@@ -211,7 +210,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
           {/* Menu panel */}
           <div
             ref={panelRef}
-            className="fixed inset-y-0 left-0 z-50 w-[280px] bg-white shadow-2xl sm:hidden flex flex-col"
+            className="fixed inset-y-0 left-0 z-50 w-full sm:w-[320px] bg-white shadow-2xl lg:hidden flex flex-col"
             style={{ transform: "translateX(-100%)" }}
           >
             {/* Header */}
@@ -241,7 +240,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
 
               {/* All products */}
               <Link
-                href={pathname}
+                href="/products"
                 onClick={handleLinkClick}
                 className={cn(
                   "menu-item flex items-center gap-3 mx-3 px-3 py-3 rounded-xl text-sm font-medium transition-all",
@@ -390,7 +389,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
 
 export function MobileMenu({ onAuthClick }: MobileMenuProps) {
   return (
-    <Suspense fallback={<Menu className="w-5 h-5 text-gray-600 sm:hidden" />}>
+    <Suspense fallback={<Menu className="w-5 h-5 text-gray-600 lg:hidden" />}>
       <MobileMenuContent onAuthClick={onAuthClick} />
     </Suspense>
   );

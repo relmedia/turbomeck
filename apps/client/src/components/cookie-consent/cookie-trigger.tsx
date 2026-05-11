@@ -1,6 +1,6 @@
 "use client"
 import { Cookie } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@repo/ui/components/button"
 import { useCookieConsent } from "./cookie-provider"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@/i18n/context"

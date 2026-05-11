@@ -4,13 +4,13 @@ import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/card";
+import { Button } from "@repo/ui/components/button";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@repo/ui/components/dialog";
 
 interface ProductImageGalleryProps {
   images: string[];

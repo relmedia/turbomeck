@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useLanguage, useTranslation } from "@/i18n/context";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { extractTrackingEvents } from "@/lib/postnord-tracking-events";
 

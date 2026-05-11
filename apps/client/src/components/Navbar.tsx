@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import SearchBar from "./SearchBar";
 import { MobileSearch } from "./MobileSearch";
 import { MobileMenu } from "./MobileMenu";
@@ -13,7 +14,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@/components/ui/avatar";
+} from "@repo/ui/components/avatar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import WishlistIcon from "./WishlistIcon";
 import { useSession, signOut } from "next-auth/react";
@@ -22,15 +23,19 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { Button } from "./ui/button";
+} from "@repo/ui/components/dropdown-menu";
+import { Button } from "@repo/ui/components/button";
 import { AuthModal } from "./AuthModal";
+import { NavCategoriesInline } from "./NavCategoriesInline";
 
 const Navbar = () => {
   const t = useTranslation();
+  const pathname = usePathname();
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  // Categories nav is shown on the storefront pages (homepage + product filter).
+  const showInlineCategories = pathname === "/" || pathname === "/products";
 
   return (
     <nav className="mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 pb-4 sm:mb-6">
@@ -53,6 +58,11 @@ const Navbar = () => {
             MECK
           </p>
         </Link>
+        {showInlineCategories && (
+          <Suspense fallback={null}>
+            <NavCategoriesInline />
+          </Suspense>
+        )}
       </div>
       {/*RIGHT*/}
       <div className="flex shrink-0 items-center gap-4 sm:gap-5 md:gap-6">

@@ -3,7 +3,7 @@ import { auth } from "@repo/auth";
 import AppSidebar from "@/components/AppSidebar";
 import { PageTitle } from "@/components/PageTitle";
 import { StudioHeader } from "@/components/StudioHeader";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@repo/ui/components/sidebar";
 
 function isAdmin(userId: string, email: string | undefined, role: string | undefined): boolean {
   const allowlist = process.env.ADMIN_ALLOWLIST?.split(",").map((id) => id.trim()) ?? [];

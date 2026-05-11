@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@repo/ui/components/button";
+import { Input } from "@repo/ui/components/input";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@repo/ui/components/tooltip";
 import { Upload, X, Loader2, ImageIcon, Eraser } from "lucide-react";
 import Image from "next/image";
 import { PRODUCT_API } from "@/lib/product-api";

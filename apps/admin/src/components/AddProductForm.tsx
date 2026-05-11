@@ -11,10 +11,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "./ui/form";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { RichTextEditor } from "./ui/rich-text-editor";
+} from "@repo/ui/components/form";
+import { Input } from "@repo/ui/components/input";
+import { Button } from "@repo/ui/components/button";
+import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Plus, Languages, Sparkles } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
@@ -25,19 +25,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./ui/select";
-import { Badge } from "./ui/badge";
-import { Checkbox } from "./ui/checkbox";
+} from "@repo/ui/components/select";
+import { Badge } from "@repo/ui/components/badge";
+import { Checkbox } from "@repo/ui/components/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "./ui/popover";
+} from "@repo/ui/components/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "./ui/tooltip";
+} from "@repo/ui/components/tooltip";
 import { PRODUCT_API } from "@/lib/product-api";
 
 export type Category = {

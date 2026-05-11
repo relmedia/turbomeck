@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { Star, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -10,6 +10,8 @@ export type ProductType = {
   price: number;
   /** Weight in kg for PostNord shipping calculation */
   weight?: number;
+  /** Current stock count from product service — used by "In stock only" filter and disable-add-to-cart. */
+  stock?: number;
   /** Category ids for filtering (product can belong to multiple categories) */
   categoryIds?: number[];
   sizes: [string, ...string[]];

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@repo/ui/components/button";
+import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
 import AddUser from "@/components/AddUser";
 import { User, createColumns } from "./columns";
 import { DataTable } from "./data-table";

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { ProductType } from "@/types";
 import ProductInteraction from "./ProductInteractions";
 import {
@@ -8,7 +9,14 @@ import {
   ProductReviewsSection,
 } from "./ProductReviews";
 import RichTextContent from "./RichTextContent";
-import { Breadcrumb } from "./ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@repo/ui/components/breadcrumb";
 import Image from "next/image";
 import Link from "next/link";
 import { categorySlug } from "@/lib/utils";
@@ -40,14 +48,14 @@ export function ProductDetailContent({
 
   const breadcrumbItems = [
     { label: t("product.home"), href: "/" },
-    { label: t("product.products"), href: "/" },
+    { label: t("product.products"), href: "/products" },
     ...(firstCategory
       ? [
           {
             label: firstCategory.parentName
               ? `${firstCategory.parentName} › ${firstCategory.name}`
               : firstCategory.name,
-            href: `/?category=${categorySlug(firstCategory)}`,
+            href: `/products?category=${categorySlug(firstCategory)}`,
           },
         ]
       : []),
@@ -57,7 +65,28 @@ export function ProductDetailContent({
   return (
     <ProductReviewsProvider productId={Number(product.id)}>
       <div className="w-full lg:w-7/12 flex flex-col gap-4">
-        <Breadcrumb items={breadcrumbItems} className="text-sm" />
+        <Breadcrumb className="text-sm text-gray-500">
+          <BreadcrumbList>
+            {breadcrumbItems.map((item, i) => {
+              const isLast = i === breadcrumbItems.length - 1;
+              const hasHref = "href" in item && !!item.href;
+              return (
+                <Fragment key={i}>
+                  {i > 0 && <BreadcrumbSeparator />}
+                  <BreadcrumbItem>
+                    {isLast || !hasHref ? (
+                      <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={item.href!}>{item.label}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
+              );
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
         <h1 className="text-2xl font-medium">{product.name}</h1>
         <ProductReviewsSummary />
         <RichTextContent html={product.description} />

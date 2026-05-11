@@ -2,7 +2,7 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@repo/ui/components/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,18 +10,18 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@repo/ui/components/breadcrumb";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
-import { Progress } from "@/components/ui/progress";
+} from "@repo/ui/components/hover-card";
+import { Progress } from "@repo/ui/components/progress";
 import { BadgeCheck, Candy, Citrus, Shield } from "lucide-react";
-import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
+import { Button } from "@repo/ui/components/button";
 import EditUser from "@/components/EditUser";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar";
 import AppLineChart from "@/components/AppLineChart";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";

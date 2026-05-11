@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import {
   Select,
@@ -7,7 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@repo/ui/components/select";
 import { useTranslation } from "@/i18n/context";
 
 const SORT_KEYS = {
@@ -17,7 +18,15 @@ const SORT_KEYS = {
   desc: "products.sortPriceDesc",
 } as const;
 
-export function ProductsToolbar() {
+export function ProductsToolbar({
+  resultCount,
+  mobileFilters,
+}: {
+  /** When provided, shows "{count} produkter" next to the sort dropdown. */
+  resultCount?: number;
+  /** Slot for the mobile filter trigger (rendered on the left). */
+  mobileFilters?: React.ReactNode;
+} = {}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -39,9 +48,20 @@ export function ProductsToolbar() {
   ] as const;
 
   return (
-    <div className="flex items-center justify-end gap-2 mb-6">
-      <span className="text-sm text-muted-foreground">{t("products.sort")}:</span>
-      <Select value={sort} onValueChange={handleSortChange}>
+    <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+      <div className="flex items-center gap-2">
+        {mobileFilters}
+        {typeof resultCount === "number" && (
+          <span className="text-sm text-muted-foreground">
+            {t("products.resultCount", { count: resultCount })}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 ml-auto">
+        <span className="text-sm text-muted-foreground hidden sm:inline">
+          {t("products.sort")}:
+        </span>
+        <Select value={sort} onValueChange={handleSortChange}>
           <SelectTrigger className="w-[180px] h-9 border-border/60 bg-background">
             <SelectValue placeholder={t("products.sortPlaceholder")} />
           </SelectTrigger>
@@ -53,6 +73,7 @@ export function ProductsToolbar() {
             ))}
           </SelectContent>
         </Select>
+      </div>
     </div>
   );
 }

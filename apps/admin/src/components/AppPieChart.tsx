@@ -7,7 +7,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "./ui/chart";
+} from "@repo/ui/components/chart";
 import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 
 const chartConfig = {

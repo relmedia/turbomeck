@@ -5,15 +5,15 @@ import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
 import { CartItemType, ShippingFormInputs } from "@/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@repo/ui/components/button";
+import { Input } from "@repo/ui/components/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@repo/ui/components/select";
 import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";

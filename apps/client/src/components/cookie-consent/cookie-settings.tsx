@@ -9,11 +9,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+} from "@repo/ui/components/dialog"
+import { Button } from "@repo/ui/components/button"
+import { Switch } from "@repo/ui/components/switch"
+import { Label } from "@repo/ui/components/label"
+import { Separator } from "@repo/ui/components/separator"
 import { useCookieConsent, defaultCategories } from "./cookie-provider"
 import type { CategoryConfig, ConsentCategories, ConsentCategory } from "./types"
 import { getDefaultCategories, getAllAcceptedCategories } from "./utils"

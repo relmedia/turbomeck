@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { ArrowLeft } from "lucide-react";
 
 export function PageTitle() {

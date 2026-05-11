@@ -29,7 +29,7 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "./ui/sidebar";
+} from "@repo/ui/components/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,11 +37,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+} from "@repo/ui/components/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar";
 import Link from "next/link";
 import Image from "next/image";
-import { Sheet, SheetTrigger } from "./ui/sheet";
+import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
 import AddOrder from "./AddOrder";
 import AddUser from "./AddUser";
 import AddCategory from "./AddCategory";

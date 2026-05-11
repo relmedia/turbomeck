@@ -3,8 +3,8 @@
 import { Category, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
+import { Button } from "@repo/ui/components/button";
 import { Plus, RefreshCw } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import EditCategory from "@/components/EditCategory";

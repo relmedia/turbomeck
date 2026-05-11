@@ -10,12 +10,20 @@ const ProductList = async ({
   page: pageParam,
   search: searchParam,
   sort: sortParam,
+  minPrice,
+  maxPrice,
+  inStock,
+  utbytes,
 }: {
   category?: string;
   params: "homepage" | "products";
   page?: string;
   search?: string;
   sort?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  inStock?: string;
+  utbytes?: string;
 }) => {
   let categoriesList: {
     id: number;
@@ -39,6 +47,10 @@ const ProductList = async ({
       page={pageParam}
       search={searchParam}
       sort={sortParam}
+      minPrice={minPrice}
+      maxPrice={maxPrice}
+      inStock={inStock}
+      utbytes={utbytes}
     />
   );
 };

@@ -1,7 +1,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@repo/ui/components/badge";
+import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/card";
 
 export type DashboardStats = {
   revenue: { thisMonth: number; change: number };

@@ -118,7 +118,7 @@ function securityHeaders(): { key: string; value: string }[] {
 }
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@repo/sanitize-html"],
+  transpilePackages: ["@repo/sanitize-html", "@repo/ui"],
   async headers() {
     return [
       {

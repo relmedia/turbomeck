@@ -10,10 +10,10 @@ import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
 import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@repo/ui/components/skeleton";
+import { Card, CardContent } from "@repo/ui/components/card";
+import { Button } from "@repo/ui/components/button";
+import { Badge } from "@repo/ui/components/badge";
 import {
   Heart,
   ShoppingCart,

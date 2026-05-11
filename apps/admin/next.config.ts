@@ -61,6 +61,7 @@ function getR2ImagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@repo/ui"],
   /** Legacy bookmarks: /studio/... → /... */
   async redirects() {
     return [

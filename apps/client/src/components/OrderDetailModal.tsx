@@ -6,7 +6,7 @@ import { resolveImageUrl } from "@/lib/api";
 import { useLanguage, useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import OrderTrackingPanel from "@/components/OrderTrackingPanel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { cn, normalizeShopOrderNumber } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {

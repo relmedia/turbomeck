@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Payment, createColumns } from "./columns";
 import { DataTable } from "./data-table";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { Plus } from "lucide-react";
 import { toast } from "react-toastify";
 

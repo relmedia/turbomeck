@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ShieldX } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { signOut } from "next-auth/react";
 
 export default function AccessDeniedPage() {

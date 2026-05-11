@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Product, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/button";
 import { Plus, RefreshCw } from "lucide-react";
 import { PRODUCT_API } from "@/lib/product-api";
 
