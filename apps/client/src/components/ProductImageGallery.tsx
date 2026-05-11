@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
@@ -31,36 +31,94 @@ export function ProductImageGallery({
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const displayImages = images.length > 0 ? images : ["/products/1g.png"];
 
-  // Touch swipe support
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
-  const minSwipeDistance = 50;
+  // Native scroll-snap carousel: a horizontal overflow container handles
+  // both mouse-wheel and touch scrolling. We sync `selectedIndex` from the
+  // scroll position so the dots/thumbnails reflect the visible image, and
+  // we use programmatic `scrollTo` for prev/next/thumbnail clicks.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const programmaticScrollUntil = useRef<number>(0);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = null;
-    touchStartX.current = e.targetTouches[0]?.clientX ?? null;
+  const scrollToIndex = useCallback((index: number, smooth = true) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const clamped = Math.max(0, Math.min(displayImages.length - 1, index));
+    programmaticScrollUntil.current = performance.now() + 600;
+    track.scrollTo({
+      left: clamped * track.clientWidth,
+      behavior: smooth ? "smooth" : "auto",
+    });
+    setSelectedIndex(clamped);
+  }, [displayImages.length]);
+
+  const handleScroll = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    // While a programmatic smooth scroll is in flight, ignore intermediate
+    // native scroll events — they'd otherwise drag the active index away
+    // from the target before the animation finishes.
+    if (performance.now() < programmaticScrollUntil.current) return;
+    const width = track.clientWidth;
+    if (width === 0) return;
+    const index = Math.round(track.scrollLeft / width);
+    setSelectedIndex((prev) => (prev === index ? prev : index));
   }, []);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0]?.clientX ?? null;
+  // Convert vertical mouse-wheel deltas into horizontal scroll so users can
+  // browse the gallery with a normal scroll wheel. Touchpad horizontal
+  // gestures (deltaX) are left alone — the browser already scrolls X then.
+  // We attach manually because React's synthetic wheel listener is passive
+  // by default and `preventDefault()` wouldn't take effect.
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      track.scrollLeft += e.deltaY;
+    };
+    track.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      track.removeEventListener("wheel", onWheel);
+    };
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStartX.current || !touchEndX.current) return;
-    
-    const distance = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+  // Keep the active slide visible if the viewport is resized (clientWidth
+  // changes invalidate the previous snap position).
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const onResize = () => {
+      programmaticScrollUntil.current = performance.now() + 200;
+      track.scrollTo({ left: selectedIndex * track.clientWidth, behavior: "auto" });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [selectedIndex]);
 
-    if (isLeftSwipe && displayImages.length > 1) {
+  // Lightweight swipe handlers — only used inside the fullscreen dialog,
+  // which still shows a single image at a time (not a scroll carousel).
+  const dialogTouchStartX = useRef<number | null>(null);
+  const dialogTouchEndX = useRef<number | null>(null);
+  const handleDialogTouchStart = useCallback((e: React.TouchEvent) => {
+    dialogTouchEndX.current = null;
+    dialogTouchStartX.current = e.targetTouches[0]?.clientX ?? null;
+  }, []);
+  const handleDialogTouchMove = useCallback((e: React.TouchEvent) => {
+    dialogTouchEndX.current = e.targetTouches[0]?.clientX ?? null;
+  }, []);
+  const handleDialogTouchEnd = useCallback(() => {
+    const start = dialogTouchStartX.current;
+    const end = dialogTouchEndX.current;
+    if (start == null || end == null) return;
+    const distance = start - end;
+    if (Math.abs(distance) < 50 || displayImages.length <= 1) return;
+    if (distance > 0) {
       setSelectedIndex((i) => (i === displayImages.length - 1 ? 0 : i + 1));
-    }
-    if (isRightSwipe && displayImages.length > 1) {
+    } else {
       setSelectedIndex((i) => (i === 0 ? displayImages.length - 1 : i - 1));
     }
-
-    touchStartX.current = null;
-    touchEndX.current = null;
+    dialogTouchStartX.current = null;
+    dialogTouchEndX.current = null;
   }, [displayImages.length]);
 
   return (
@@ -68,25 +126,18 @@ export function ProductImageGallery({
     <Card className="p-0 gap-0 overflow-hidden border-0 border-none bg-transparent shadow-none">
       <CardContent className="p-0">
         <div className="flex flex-col gap-3">
-          {/* Main image */}
-          <div
-            className="group/image relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-200 touch-pan-y"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
+          {/* Main image — native horizontal scroll-snap carousel */}
+          <div className="group/image relative aspect-square w-full overflow-hidden rounded-xl bg-neutral-200">
             <div
-              className="flex h-full transition-transform duration-300 ease-out"
-              style={{
-                width: `${displayImages.length * 100}%`,
-                transform: `translateX(-${(selectedIndex / displayImages.length) * 100}%)`,
-              }}
+              ref={trackRef}
+              onScroll={handleScroll}
+              className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+              style={{ touchAction: "pan-x" }}
             >
               {displayImages.map((src, i) => (
                 <div
                   key={`${src}-${i}`}
-                  className="relative shrink-0 aspect-square"
-                  style={{ width: `${100 / displayImages.length}%` }}
+                  className="relative h-full w-full shrink-0 snap-center snap-always"
                 >
                   <ImageWithFallback
                     src={src}
@@ -113,10 +164,12 @@ export function ProductImageGallery({
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
                   onClick={() =>
-                    setSelectedIndex((i) =>
-                      i === 0 ? displayImages.length - 1 : i - 1
+                    scrollToIndex(
+                      selectedIndex === 0
+                        ? displayImages.length - 1
+                        : selectedIndex - 1,
                     )
                   }
                   aria-label={t("product.previousProductImage", { name: alt })}
@@ -126,10 +179,12 @@ export function ProductImageGallery({
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity z-10"
                   onClick={() =>
-                    setSelectedIndex((i) =>
-                      i === displayImages.length - 1 ? 0 : i + 1
+                    scrollToIndex(
+                      selectedIndex === displayImages.length - 1
+                        ? 0
+                        : selectedIndex + 1,
                     )
                   }
                   aria-label={t("product.nextProductImage", { name: alt })}
@@ -137,16 +192,16 @@ export function ProductImageGallery({
                   <ChevronRight className="w-4 h-4" aria-hidden />
                 </Button>
                 {/* Dot indicators for mobile */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 sm:hidden">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 sm:hidden z-10">
                   {displayImages.map((_, i) => (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setSelectedIndex(i)}
-                      className={`w-2 h-2 rounded-full transition-all ${
+                      onClick={() => scrollToIndex(i)}
+                      className={`h-2 rounded-full transition-all ${
                         i === selectedIndex
                           ? "bg-white w-4"
-                          : "bg-white/50"
+                          : "bg-white/50 w-2"
                       }`}
                       aria-label={t("product.selectGalleryThumbnail", { n: i + 1, name: alt })}
                     />
@@ -171,7 +226,7 @@ export function ProductImageGallery({
                     <button
                       key={`${src}-${i}`}
                       type="button"
-                      onClick={() => setSelectedIndex(i)}
+                      onClick={() => scrollToIndex(i)}
                       aria-label={t("product.selectGalleryThumbnail", { n: i + 1, name: alt })}
                       aria-current={i === selectedIndex ? "true" : undefined}
                       className={`relative aspect-square rounded-md overflow-hidden transition-all duration-200 ease-out min-w-0 bg-neutral-200 cursor-pointer ${
@@ -209,9 +264,9 @@ export function ProductImageGallery({
         </DialogTitle>
         <div
           className="relative flex items-center justify-center w-full h-full min-h-0"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          onTouchStart={handleDialogTouchStart}
+          onTouchMove={handleDialogTouchMove}
+          onTouchEnd={handleDialogTouchEnd}
         >
           <span className="inline-block bg-neutral-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -123,7 +123,7 @@ const Categories = ({
             className={navItemStyle}
           >
             <Link href="/products">
-              <LayoutGrid className="w-4 h-4 shrink-0" />
+              {!isInline && <LayoutGrid className="w-4 h-4 shrink-0" />}
               {t("products.allProducts")}
             </Link>
           </NavigationMenuLink>
@@ -147,7 +147,7 @@ const Categories = ({
                   data-active={parentActive || childActive ? "" : undefined}
                   className={navItemStyle}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  {!isInline && <Icon className="w-4 h-4 shrink-0" />}
                   {parent.name}
                 </NavigationMenuTrigger>
                 <NavigationMenuContent
@@ -216,7 +216,7 @@ const Categories = ({
                 className={navItemStyle}
               >
                 <Link href={makeHref(parentSlug)}>
-                  <Icon className="w-4 h-4 shrink-0" />
+                  {!isInline && <Icon className="w-4 h-4 shrink-0" />}
                   {parent.name}
                 </Link>
               </NavigationMenuLink>

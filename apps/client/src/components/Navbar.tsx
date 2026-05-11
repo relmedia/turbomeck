@@ -38,7 +38,7 @@ const Navbar = () => {
   const showInlineCategories = pathname === "/" || pathname === "/products";
 
   return (
-    <nav className="mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 pb-4 sm:mb-6">
+    <nav className="sticky top-0 z-30 mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 bg-background/90 py-2 backdrop-blur supports-backdrop-filter:bg-background/75 sm:py-3 sm:mb-6">
       {/*LEFT*/}
       <div className="flex min-w-0 shrink items-center gap-3">
         <Suspense fallback={null}>
