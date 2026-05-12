@@ -236,7 +236,7 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
                 <Image src="/logo.svg" alt="Turbomeck" width={28} height={28} />
                 <span className="text-lg font-semibold tracking-wider italic ml-2">
                   <span className="text-[#6ec900]">TURBO</span>
-                  <span className="text-gray-700">MECK</span>
+                  <span className="text-[#333333]">MECK</span>
                 </span>
               </Link>
               <button
@@ -386,13 +386,16 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
                     handleLinkClick();
                     onAuthClick?.();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-white transition-all active:scale-[0.98]"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#333333] hover:bg-[#4a4a4a] transition-colors active:scale-[0.98]"
                 >
                   <User className="w-4 h-4" />
                   {t("nav.login")}
                 </button>
               )}
-              <div className="flex items-center gap-3 px-3 py-2.5">
+              {/* Only show language row when the top-nav language icon is
+                  hidden (< sm). Top nav uses `hidden sm:inline-flex` for the
+                  switcher, so this is its inverse. */}
+              <div className="flex items-center gap-3 px-3 py-2.5 sm:hidden">
                 <span className="text-sm text-gray-500">{t("nav.language")}:</span>
                 <LanguageSwitcher />
               </div>
