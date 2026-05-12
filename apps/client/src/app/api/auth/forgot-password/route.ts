@@ -1,9 +1,10 @@
 import { db } from "@repo/database";
 import { users, passwordResetTokens } from "@repo/database";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { sendPasswordResetEmail } from "@repo/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 function generateToken() {
   return randomBytes(32).toString("hex");
@@ -22,7 +23,18 @@ function getBaseUrl(): string {
   );
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // SECURITY (audit M4): without a per-IP cap an attacker can drive cost
+  // amplification (one POST = one SMTP send + one DB write) against this
+  // endpoint cheaply. 10 requests / 15 min per IP fits any human use of the
+  // "forgot password" flow.
+  const limited = rateLimit(req, {
+    bucket: "forgot-password",
+    windowMs: 15 * 60_000,
+    max: 10,
+  });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const { email } = body as { email?: string };

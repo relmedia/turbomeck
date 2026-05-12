@@ -1,11 +1,77 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { secureHeaders } from 'hono/secure-headers'
+import { rateLimiter } from 'hono-rate-limiter'
 import Stripe from 'stripe'
 
 const app = new Hono()
 
-app.use('/*', cors())
+// SECURITY (audit H12): default security headers on every response so that
+// even if a misconfigured downstream forgets to add them, the service itself
+// refuses framing, sniffing, and exposes a minimal referrer.
+app.use('/*', secureHeaders())
+
+// SECURITY (audit C4): lock CORS to known origins. The previous `cors()` call
+// with no options reflected any Origin, so this service could be called from
+// arbitrary attacker-controlled pages once a victim was logged in elsewhere.
+const allowedOrigins = (
+  process.env.PAYMENT_SERVICE_ALLOWED_ORIGINS ||
+  'http://localhost:3000,http://localhost:3001'
+)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+app.use(
+  '/*',
+  cors({
+    origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    credentials: false,
+  }),
+)
+
+// SECURITY (audit H12): per-IP rate limit. Stripe endpoints create real
+// PaymentIntents and call Stripe APIs that cost money; an unauthenticated
+// attacker could otherwise spin them in a loop. Numbers tuned for legitimate
+// checkout flows (one customer = ~3-5 calls/min).
+app.use(
+  '/create-payment-intent',
+  rateLimiter({
+    windowMs: 60_000,
+    limit: 30,
+    standardHeaders: 'draft-6',
+    keyGenerator: (c) =>
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      c.req.header('x-real-ip') ||
+      'unknown',
+  }),
+)
+app.use(
+  '/receipt-url',
+  rateLimiter({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: 'draft-6',
+    keyGenerator: (c) =>
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      c.req.header('x-real-ip') ||
+      'unknown',
+  }),
+)
+app.use(
+  '/payment-method-details',
+  rateLimiter({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: 'draft-6',
+    keyGenerator: (c) =>
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      c.req.header('x-real-ip') ||
+      'unknown',
+  }),
+)
 
 const stripe =
   process.env.STRIPE_SECRET_KEY?.trim() &&
@@ -41,6 +107,14 @@ app.post('/create-payment-intent', async (c) => {
 
     if (amountSek <= 0) {
       return c.json({ error: 'Amount must be greater than 0' }, 400)
+    }
+
+    // SECURITY (audit M7 / cost amplification): cap any single PaymentIntent
+    // at 1,000,000 SEK. Legitimate orders are nowhere near this; a runaway
+    // client supplying a huge amount could otherwise create a single Stripe
+    // charge large enough to trigger card-network alerts or chargebacks.
+    if (amountSek > 1_000_000) {
+      return c.json({ error: 'Amount exceeds maximum allowed' }, 400)
     }
 
     const amountOre = Math.round(amountSek * 100)

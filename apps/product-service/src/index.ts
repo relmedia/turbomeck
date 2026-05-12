@@ -1,5 +1,7 @@
 import "./load-local-env.js";
 import express, { type Request } from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
 import cors from "cors";
@@ -162,6 +164,22 @@ async function verifyCheckoutPaymentIntent(
 
 const app = express();
 
+// SECURITY: the express-rate-limit middleware below needs to trust the
+// nearest proxy so the rate-limit key reflects the real client IP rather than
+// "127.0.0.1" for every request. Configure how many proxies sit in front of
+// this service via TRUST_PROXY_HOPS (default 1 = the storefront Next.js
+// proxy). Setting it to "loopback" is the safest dev default.
+const trustProxyEnv = process.env.TRUST_PROXY_HOPS;
+if (trustProxyEnv) {
+  const asNum = Number(trustProxyEnv);
+  app.set(
+    "trust proxy",
+    Number.isFinite(asNum) ? asNum : trustProxyEnv,
+  );
+} else {
+  app.set("trust proxy", "loopback");
+}
+
 // Use temp dir for uploads – images go to R2 only, never to public folder
 const UPLOAD_DIR = path.join(os.tmpdir(), "turbomeck-product-uploads");
 const USE_R2 = isR2Configured();
@@ -206,13 +224,59 @@ const upload = multer({
   },
 });
 
+// SECURITY (audit H12): defense-in-depth headers on every response. We do not
+// serve HTML from this service, so the default CSP is fine. `crossOriginResourcePolicy`
+// is loosened to `cross-origin` because the storefront fetches R2 images via
+// this origin during processing scripts.
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false,
+  }),
+);
+
 app.use(express.json({ limit: "2mb" }));
+
+// SECURITY (audit C4): lock CORS to known origins. Configurable so prod can
+// inject the public storefront/admin domains without code changes. The legacy
+// localhost list is the default for dev.
+const productAllowedOrigins = (
+  process.env.PRODUCT_SERVICE_ALLOWED_ORIGINS ||
+  "http://localhost:3001,http://localhost:3002,http://localhost:3003"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: ["http://localhost:3001", "http://localhost:3002", "http://localhost:3003"],
+    origin: productAllowedOrigins,
     credentials: true,
   })
 );
+
+/**
+ * SECURITY (audit H12): per-IP rate limit on all /api routes. The internal
+ * Bearer secret already gates these, but a leaked secret should not turn into
+ * a free Stripe / DB amplifier. 600 req/min per IP is generous enough for the
+ * proxied storefront traffic that runs through a small number of egress IPs.
+ */
+const apiLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  // Trust the first hop (Next.js proxy / nginx). If you put this behind a
+  // multi-hop proxy in prod, set NUMBER_OF_PROXIES and use req.ip.
+  keyGenerator: (req) => {
+    const xff = req.headers["x-forwarded-for"];
+    if (typeof xff === "string" && xff.length > 0) {
+      return xff.split(",")[0]!.trim();
+    }
+    return req.ip ?? "unknown";
+  },
+});
+app.use("/api", apiLimiter);
 
 /** Shared secret (Bearer) — required for all /api routes except GET /api/health/db (localhost-gated). */
 app.use("/api", internalProductApiAuth);

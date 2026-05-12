@@ -2,6 +2,7 @@ import { db } from "@repo/database";
 import { discountCodes } from "@repo/database/schema";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/coupons/validate
@@ -9,6 +10,18 @@ import { NextRequest, NextResponse } from "next/server";
  * Returns: { valid: boolean, discount?: number, discountType?: string, message?: string }
  */
 export async function POST(request: NextRequest) {
+  // SECURITY (audit M4): without a limit, an attacker can enumerate every
+  // active discount code in the table by guessing prefixes against this
+  // endpoint (it discloses validity, value, and minimum order). 20 requests
+  // per minute per IP is roomy enough for the legitimate "type code, click
+  // apply" UX and tight enough to make brute-forcing pointless.
+  const limited = rateLimit(request, {
+    bucket: "coupons-validate",
+    windowMs: 60_000,
+    max: 20,
+  });
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const code = String(body?.code ?? "").trim().toUpperCase();

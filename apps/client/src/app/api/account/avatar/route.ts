@@ -3,7 +3,7 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import path from "path";
+import sharp from "sharp";
 import {
   isR2Configured,
   uploadAvatarToR2,
@@ -11,6 +11,14 @@ import {
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+// SECURITY (audit M2): we re-encode every avatar through sharp into a fixed
+// 512×512 WebP. This strips EXIF / ICC metadata (incl. GPS), neutralizes
+// polyglot files that masquerade as images (the file pretends to be PNG, the
+// bytes are actually HTML / SVG / a zip), and refuses anything sharp cannot
+// decode — so the file we hand to R2 is provably the image we promised.
+const NORMALIZED_DIM = 512;
+const NORMALIZED_CONTENT_TYPE = "image/webp";
+const NORMALIZED_EXT = ".webp";
 
 export async function POST(req: Request) {
   try {
@@ -52,15 +60,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const ext = path.extname(file.name) || ".png";
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const rawBuffer = Buffer.from(bytes);
+
+    let normalized: Buffer;
+    try {
+      normalized = await sharp(rawBuffer, { failOn: "error" })
+        .rotate()
+        .resize(NORMALIZED_DIM, NORMALIZED_DIM, {
+          fit: "cover",
+          withoutEnlargement: false,
+        })
+        .webp({ quality: 82, effort: 4 })
+        .toBuffer();
+    } catch {
+      return NextResponse.json(
+        { error: "Bilden kunde inte läsas. Försök med en annan fil." },
+        { status: 400 }
+      );
+    }
 
     const imageUrl = await uploadAvatarToR2(
       session.user.id,
-      buffer,
-      file.type,
-      ext
+      normalized,
+      NORMALIZED_CONTENT_TYPE,
+      NORMALIZED_EXT
     );
 
     await db

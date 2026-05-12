@@ -8,6 +8,13 @@ export const maxDuration = 60;
 /** Default: Claude Opus 4.5 — override with ANTHROPIC_MODEL if needed. */
 const DEFAULT_CLAUDE_MODEL = "claude-opus-4-5-20251101";
 
+// SECURITY (audit M7): cap user-controlled prompt fragments. Same rationale
+// as suggest-description: keep the LLM bill bounded even if an admin pastes a
+// novel.
+const MAX_NAME_CHARS = 500;
+const MAX_SHORT_DESCRIPTION_CHARS = 4000;
+const MAX_DESCRIPTION_CHARS = 32000;
+
 export async function POST(req: NextRequest) {
   const gate = await requireAdmin();
   if (!gate.ok) return gate.response;
@@ -40,13 +47,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      (name && name.length > MAX_NAME_CHARS) ||
+      (shortDescription && shortDescription.length > MAX_SHORT_DESCRIPTION_CHARS) ||
+      (description && description.length > MAX_DESCRIPTION_CHARS)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Input too long (max ${MAX_NAME_CHARS}/${MAX_SHORT_DESCRIPTION_CHARS}/${MAX_DESCRIPTION_CHARS} chars).`,
+        },
+        { status: 413 },
+      );
+    }
+
+    const safeName = (name ?? "").slice(0, MAX_NAME_CHARS);
+    const safeShort = (shortDescription ?? "").slice(0, MAX_SHORT_DESCRIPTION_CHARS);
+    const safeDescription = (description ?? "").slice(0, MAX_DESCRIPTION_CHARS);
+
     const anthropic = new Anthropic({ apiKey: apiKey });
 
     const prompt = `Translate the following Swedish product fields to English. Keep the same tone and meaning. For the description, it may contain HTML - translate only the text content inside tags, preserve the HTML structure exactly (e.g. <p>, <ul>, <li>, <strong>). Return valid JSON only, no markdown code block, with keys: nameEn, shortDescriptionEn, descriptionEn. Use empty string for any field that was empty in the input.
 
-Swedish name: ${name || ""}
-Swedish short description: ${shortDescription || ""}
-Swedish description (may have HTML): ${description || ""}`;
+Swedish name: ${safeName}
+Swedish short description: ${safeShort}
+Swedish description (may have HTML): ${safeDescription}`;
 
     const message = await anthropic.messages.create({
       model,

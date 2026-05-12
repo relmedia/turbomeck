@@ -7,6 +7,15 @@ export const maxDuration = 120;
 
 const DEFAULT_CLAUDE_MODEL = "claude-opus-4-5-20251101";
 
+// SECURITY (audit M7): cap the user-controlled prompt fragments. Without
+// these limits an admin (or anyone who has compromised an admin session) can
+// inject very long Swedish strings into the Anthropic prompt to burn money or
+// stuff in prompt-injection payloads. Numbers cover real product entries:
+// "name" rarely tops ~200 chars and short descriptions rarely top a couple
+// of paragraphs, so 4 KB is plenty.
+const MAX_NAME_CHARS = 500;
+const MAX_SHORT_DESCRIPTION_CHARS = 4000;
+
 /** Strip markdown fences and leading chatter; keep HTML body. */
 function extractHtmlFromModelOutput(raw: string): string {
   let s = raw.trim();
@@ -59,6 +68,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      (typeof name === "string" && name.length > MAX_NAME_CHARS) ||
+      shortDescription.length > MAX_SHORT_DESCRIPTION_CHARS
+    ) {
+      return NextResponse.json(
+        {
+          error: `För lång inmatning (max ${MAX_NAME_CHARS} tecken för namn, ${MAX_SHORT_DESCRIPTION_CHARS} tecken för kort beskrivning).`,
+        },
+        { status: 413 },
+      );
+    }
+
+    const safeName = (name?.trim() ?? "").slice(0, MAX_NAME_CHARS);
+    const safeShort = shortDescription.trim().slice(0, MAX_SHORT_DESCRIPTION_CHARS);
+
     const anthropic = new Anthropic({ apiKey });
 
     const prompt = `Baserat på produktnamn och kort beskrivning nedan, skriv en fullständig produktbeskrivning på svenska för en e-handel (turbo/delar till fordon om relevant).
@@ -68,8 +92,8 @@ Formatera som HTML: <p> för stycken, <ul><li> för punktlistor där det passar,
 
 VIKTIGT: Svara ENDAST med HTML-fragmentet. Ingen JSON, ingen förklarande text före eller efter, inga markdown-kodblock om du kan undvika det.
 
-Produktnamn: ${name?.trim() || "(okänt)"}
-Kort beskrivning: ${shortDescription.trim()}`;
+Produktnamn: ${safeName || "(okänt)"}
+Kort beskrivning: ${safeShort}`;
 
     const message = await anthropic.messages.create({
       model,

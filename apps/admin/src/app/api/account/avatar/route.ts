@@ -2,7 +2,7 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import path from "path";
+import sharp from "sharp";
 import {
   isR2Configured,
   uploadAvatarToR2,
@@ -11,6 +11,12 @@ import { requireAdmin } from "@/lib/require-admin";
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+// SECURITY (audit M2): re-encode every avatar to a fixed-size WebP. See the
+// matching comment in the storefront route — this strips metadata and refuses
+// polyglot uploads.
+const NORMALIZED_DIM = 512;
+const NORMALIZED_CONTENT_TYPE = "image/webp";
+const NORMALIZED_EXT = ".webp";
 
 export async function POST(req: Request) {
   const gate = await requireAdmin();
@@ -50,15 +56,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const ext = path.extname(file.name) || ".png";
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const rawBuffer = Buffer.from(bytes);
+
+    let normalized: Buffer;
+    try {
+      normalized = await sharp(rawBuffer, { failOn: "error" })
+        .rotate()
+        .resize(NORMALIZED_DIM, NORMALIZED_DIM, {
+          fit: "cover",
+          withoutEnlargement: false,
+        })
+        .webp({ quality: 82, effort: 4 })
+        .toBuffer();
+    } catch {
+      return NextResponse.json(
+        { error: "Bilden kunde inte läsas. Försök med en annan fil." },
+        { status: 400 }
+      );
+    }
 
     const imageUrl = await uploadAvatarToR2(
       session.user.id,
-      buffer,
-      file.type,
-      ext
+      normalized,
+      NORMALIZED_CONTENT_TYPE,
+      NORMALIZED_EXT
     );
 
     await db
