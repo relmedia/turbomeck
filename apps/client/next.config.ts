@@ -131,7 +131,11 @@ function securityHeaders(): { key: string; value: string }[] {
 }
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@repo/sanitize-html", "@repo/ui"],
+  // `@repo/sanitize-html` is intentionally NOT in this list: it ships native
+  // ESM .js with a conditional `exports` map (`browser` / `default`). Adding
+  // it back forces webpack to resolve via `main` and bundles `jsdom` into
+  // the client bundle, which breaks the build against modern undici.
+  transpilePackages: ["@repo/ui"],
   async headers() {
     return [
       {
@@ -153,12 +157,24 @@ const nextConfig: NextConfig = {
     NEXTAUTH_URL: clientPublicUrl || "http://localhost:3000",
   },
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  webpack: (config) => {
-    // Ensure monorepo root node_modules is in resolution path (fixes CSS @import in turbo)
+  webpack: (config, { isServer }) => {
     config.resolve.modules = [
       ...(config.resolve.modules || []),
       path.resolve(__dirname, "../../node_modules"),
     ];
+    // SECURITY/BUILD: force the client bundle through the jsdom-free entry
+    // of `@repo/sanitize-html`. The package ships a conditional `exports`
+    // map, but Next.js's resolver doesn't always honor the `browser`
+    // condition for workspace packages — pin it explicitly here.
+    if (!isServer) {
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        "@repo/sanitize-html": path.resolve(
+          __dirname,
+          "../../packages/sanitize-html/src/browser.js",
+        ),
+      };
+    }
     return config;
   },
   images: {
