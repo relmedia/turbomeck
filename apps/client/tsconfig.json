@@ -21,7 +21,6 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@repo/sanitize-html": ["../../packages/sanitize-html/src/index.ts"],
       "@repo/ui/components/*": ["../../packages/ui/src/components/ui/*"],
       "@repo/ui/hooks/*": ["../../packages/ui/src/hooks/*"],
       "@repo/ui/lib/utils": ["../../packages/ui/src/lib/utils"]
