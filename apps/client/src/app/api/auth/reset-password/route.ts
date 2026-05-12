@@ -3,6 +3,7 @@ import { users, passwordResetTokens } from "@repo/database";
 import { eq, and, gt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { validatePassword, BCRYPT_COST } from "@repo/auth";
 
 export async function POST(req: Request) {
   try {
@@ -16,11 +17,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!password || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json(
-        { error: "Lösenordet måste vara minst 6 tecken" },
-        { status: 400 }
-      );
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) {
+      return NextResponse.json({ error: pwCheck.error }, { status: 400 });
     }
 
     const [resetRow] = await db
@@ -41,11 +40,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password as string, BCRYPT_COST);
 
+    // A successful reset also verifies the email: the recipient demonstrably
+    // controls the inbox the reset link was sent to. This is the recovery
+    // path for existing credentials users blocked by H9 after the audit fix.
     await db
       .update(users)
-      .set({ password: hashedPassword })
+      .set({ password: hashedPassword, emailVerified: new Date() })
       .where(eq(users.id, resetRow.userId));
 
     await db

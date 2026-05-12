@@ -3,22 +3,23 @@ import { users, passwordResetTokens } from "@repo/database";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { sendPasswordResetEmail } from "@repo/auth";
 
 function generateToken() {
   return randomBytes(32).toString("hex");
 }
 
-function getBaseUrl(req: Request): string {
-  const origin = req.headers.get("origin") || req.headers.get("referer");
-  if (origin) {
-    try {
-      const url = new URL(origin);
-      return `${url.protocol}//${url.host}`;
-    } catch {
-      // ignore
-    }
-  }
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002";
+/**
+ * SECURITY: the base URL is derived from `NEXT_PUBLIC_APP_URL` only. Previously
+ * we honored the request `Origin`/`Referer` headers, which would let an
+ * attacker who can craft a `POST /api/auth/forgot-password` with a forged
+ * Origin send the victim a reset link pointing at the attacker's host.
+ */
+function getBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002").replace(
+    /\/$/,
+    "",
+  );
 }
 
 export async function POST(req: Request) {
@@ -48,6 +49,12 @@ export async function POST(req: Request) {
       });
     }
 
+    // Invalidate any previously-issued tokens for this user so a leaked older
+    // token cannot be replayed and so the table doesn't grow unbounded.
+    await db
+      .delete(passwordResetTokens)
+      .where(eq(passwordResetTokens.userId, user.id));
+
     const token = generateToken();
     const id = randomBytes(16).toString("hex");
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -59,14 +66,24 @@ export async function POST(req: Request) {
       expires,
     });
 
-    const baseUrl = getBaseUrl(req);
+    const baseUrl = getBaseUrl();
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+    let delivered = false;
+    try {
+      delivered = await sendPasswordResetEmail({
+        to: normalizedEmail,
+        url: resetUrl,
+      });
+    } catch (mailErr) {
+      console.error("[forgot-password] failed to send email:", mailErr);
+    }
 
     return NextResponse.json({
       success: true,
       message: "Om ett konto finns för denna e-post har vi skickat en återställningslänk.",
-      // Dev only: expose link when no email provider is configured
-      ...(process.env.NODE_ENV === "development" && { resetUrl }),
+      // Dev: expose link when email isn't configured so local testing works
+      ...(process.env.NODE_ENV === "development" && !delivered && { resetUrl }),
     });
   } catch (err) {
     console.error("Forgot password error:", err);

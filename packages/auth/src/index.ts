@@ -8,7 +8,7 @@ import { db, users, accounts, sessions, verificationTokens, appSettings } from "
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import type { DefaultSession } from "next-auth";
-import { renderMagicLinkEmail } from "./email-templates";
+import { renderMagicLinkEmail, renderPasswordResetEmail } from "./email-templates";
 import { buildSmtpTransport, type MailTransportConfig } from "./smtp-transport";
 
 type MailConfig = MailTransportConfig;
@@ -61,6 +61,39 @@ declare module "next-auth" {
 }
 
 export { renderTestEmail } from "./email-templates";
+export { validatePassword, BCRYPT_COST } from "./password-policy";
+
+/**
+ * Send the storefront password-reset email via the same SMTP pipeline the
+ * magic-link provider uses. Returns true if the message was handed to the
+ * transporter, false if mail is not configured. Throws on transport errors.
+ *
+ * The forgot-password route uses this to ensure the user actually receives a
+ * working link — previously the route persisted a token in the DB but never
+ * delivered the email, locking real users out of their accounts.
+ */
+export async function sendPasswordResetEmail(args: {
+  to: string;
+  url: string;
+}): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) {
+    console.error(
+      "[Auth] Mail settings not configured. Cannot send password-reset email."
+    );
+    return false;
+  }
+  const transporter = buildSmtpTransport(config);
+  const { html, text } = renderPasswordResetEmail(args.url);
+  await transporter.sendMail({
+    from: config.from || config.user || "noreply@localhost",
+    to: args.to,
+    subject: "Återställ ditt Turbomeck-lösenord",
+    html,
+    text,
+  });
+  return true;
+}
 
 /**
  * Canonical public origin for this Node process (set in each app’s next.config + PM2).
@@ -274,6 +307,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user?.password) return null;
         const ok = await bcrypt.compare(String(credentials.password), user.password);
         if (!ok) return null;
+        // SECURITY (audit H9): reject login if the email was never verified.
+        // Otherwise an attacker can register an account against someone else's
+        // address (the public admin signup endpoint) and silently take the
+        // email's identity inside our store. Magic-link signups already set
+        // emailVerified; the storefront reset-password flow also sets it on
+        // successful reset, so existing credentials users can recover via
+        // "Forgot password".
+        if (!user.emailVerified) return null;
         return {
           id: user.id,
           email: user.email,

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import { validatePassword, BCRYPT_COST } from "@repo/auth";
 
 function generateId() {
   return randomBytes(16).toString("hex");
@@ -23,11 +24,15 @@ export async function POST(req: Request) {
       name?: string;
     };
 
-    if (!email || typeof email !== "string" || !password || typeof password !== "string") {
+    if (!email || typeof email !== "string") {
       return NextResponse.json(
-        { error: "E-post och lösenord krävs" },
+        { error: "E-post krävs" },
         { status: 400 }
       );
+    }
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) {
+      return NextResponse.json({ error: pwCheck.error }, { status: 400 });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -39,7 +44,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password as string, BCRYPT_COST);
     const id = generateId();
 
     await db.insert(users).values({

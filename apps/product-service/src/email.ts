@@ -254,6 +254,25 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   // 25 % VAT included in prices (Swedish B2C): VAT share of gross = 20 %
   const vatAmount = vatFromGrossIncl25(data.total);
 
+  // SECURITY: every dynamic field interpolated into the HTML below MUST be
+  // escaped. Order data flows in from product names (admin-controlled today
+  // but could be seller-submitted tomorrow), customer shipping fields (raw
+  // user input), and PostNord servicePointName/trackingId. Without escaping
+  // a stray `<` or `&` either breaks rendering or — worse — turns into
+  // active HTML in mail clients that don't strictly sanitize.
+  const safe = {
+    orderNumber: escapeHtml(String(data.orderNumber ?? "")),
+    paymentMethodDisplay: escapeHtml(data.paymentMethodDisplay ?? ""),
+    trackingId: data.trackingId ? escapeHtml(data.trackingId) : "",
+    firstName: escapeHtml(data.firstName ?? ""),
+    lastName: escapeHtml(data.lastName ?? ""),
+    address: escapeHtml(data.address ?? ""),
+    postalCode: escapeHtml(data.postalCode ?? ""),
+    city: escapeHtml(data.city ?? ""),
+    country: escapeHtml(getCountryName(data.country, locale)),
+    servicePointName: data.servicePointName ? escapeHtml(data.servicePointName) : "",
+  };
+
   const itemsHtml = data.items
     .map(
       (item) => {
@@ -261,6 +280,8 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
         const lineVat = vatFromGrossIncl25(lineGross);
         const imgSrc = resolveProductImageUrlForEmail(item.productImage);
         const imgAttr = imgSrc ? escapeHtmlAttr(imgSrc) : "";
+        const productName = escapeHtml(item.productName ?? "");
+        const variant = item.variant ? escapeHtml(item.variant) : "";
         return `
       <tr>
         <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
@@ -269,13 +290,13 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
               <td width="80" style="vertical-align: top;">
                 ${
                   imgSrc
-                    ? `<img src="${imgAttr}" alt="${escapeHtml(item.productName)}" width="64" height="64" style="display: block; width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
+                    ? `<img src="${imgAttr}" alt="${productName}" width="64" height="64" style="display: block; width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: #f3f4f6;" />`
                     : `<div style="width: 64px; height: 64px; background: #f3f4f6; border-radius: 8px;"></div>`
                 }
               </td>
               <td style="vertical-align: top; padding-left: 12px;">
-                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">${item.productName}</p>
-                ${item.variant ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">${item.variant}</p>` : ""}
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">${productName}</p>
+                ${variant ? `<p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">${variant}</p>` : ""}
                 <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.quantity}: ${item.quantity}</p>
               </td>
               <td style="vertical-align: top; text-align: right; white-space: nowrap;">
@@ -345,7 +366,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                       <tr>
                         <td style="padding: 0;">
                           <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.orderNumber}</p>
-                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 16px;">${data.orderNumber}</p>
+                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 16px;">${safe.orderNumber}</p>
                         </td>
                         <td style="padding: 0; text-align: right;">
                           <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.date}</p>
@@ -355,7 +376,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                       <tr>
                         <td colspan="2" style="padding: 16px 0 0 0; border-top: 1px solid #e5e7eb;">
                           <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.paymentMethod}</p>
-                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 15px;">${escapeHtml(data.paymentMethodDisplay)}</p>
+                          <p style="margin: 4px 0 0 0; font-weight: 600; color: #111827; font-size: 15px;">${safe.paymentMethodDisplay}</p>
                         </td>
                       </tr>
                     </table>
@@ -375,7 +396,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                 <tr>
                   <td style="padding: 20px;">
                     <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e40af;">📦 ${t.trackDelivery}</p>
-                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #3b82f6;">${t.trackingNumber}: ${data.trackingId}</p>
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #3b82f6;">${t.trackingNumber}: ${safe.trackingId}</p>
                     <a href="${trackingUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">${t.trackAtPostNord} →</a>
                     <p style="margin: 14px 0 0 0; font-size: 12px; color: #64748b; line-height: 1.45;">${t.trackingInitialStatusNote}</p>
                   </td>
@@ -442,11 +463,11 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                   <td style="padding: 20px;">
                     <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #111827;">${t.shippingAddress}</h4>
                     <p style="margin: 0; font-size: 14px; color: #374151; line-height: 1.6;">
-                      ${data.firstName} ${data.lastName}<br>
-                      ${data.address}<br>
-                      ${data.postalCode} ${data.city}<br>
-                      ${getCountryName(data.country, locale)}
-                      ${data.servicePointName ? `<br><br><strong>${t.servicePoint}:</strong> ${data.servicePointName}` : ""}
+                      ${safe.firstName} ${safe.lastName}<br>
+                      ${safe.address}<br>
+                      ${safe.postalCode} ${safe.city}<br>
+                      ${safe.country}
+                      ${safe.servicePointName ? `<br><br><strong>${t.servicePoint}:</strong> ${safe.servicePointName}` : ""}
                     </p>
                   </td>
                 </tr>

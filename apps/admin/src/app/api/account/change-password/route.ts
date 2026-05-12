@@ -1,4 +1,4 @@
-import { auth } from "@repo/auth";
+import { auth, validatePassword, BCRYPT_COST } from "@repo/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
@@ -25,11 +25,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
-      return NextResponse.json(
-        { error: "Nytt lösenord måste vara minst 6 tecken" },
-        { status: 400 }
-      );
+    const pwCheck = validatePassword(newPassword);
+    if (!pwCheck.ok) {
+      return NextResponse.json({ error: pwCheck.error }, { status: 400 });
     }
 
     const [user] = await db
@@ -57,7 +55,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword as string, BCRYPT_COST);
     await db
       .update(users)
       .set({ password: hashedPassword })

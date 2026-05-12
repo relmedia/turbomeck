@@ -140,6 +140,53 @@ Länken är giltig i 15 minuter av säkerhetsskäl.`;
 }
 
 /**
+ * Password-reset email template. The reset URL is rendered into both the CTA
+ * button and the plain-text fallback; the storefront route signs and time-
+ * bounds the token, this template just delivers the link.
+ */
+export function renderPasswordResetEmail(url: string): { html: string; text: string } {
+  const html = baseWrapper(`
+    <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${TEXT_COLOR};">
+      Återställ ditt lösenord
+    </h2>
+    <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: ${TEXT_COLOR};">
+      Hej,
+    </p>
+    <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: ${TEXT_COLOR};">
+      Du har begärt att återställa lösenordet till ditt Turbomeck-konto. Klicka på knappen nedan för att välja ett nytt lösenord.
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+      <tr>
+        <td align="center" style="padding: 8px 0 24px 0;">
+          <a href="${url}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 6px; box-shadow: 0 2px 4px rgba(110, 201, 0, 0.3);">
+            Återställ lösenord
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin: 0; font-size: 13px; color: ${MUTED_COLOR}; line-height: 1.5;">
+      Länken är giltig i 1 timme. Om du inte begärde någon återställning kan du ignorera detta mail — ditt lösenord ändras inte.
+    </p>
+    <p style="margin: 16px 0 0 0; font-size: 12px; color: ${MUTED_COLOR}; word-break: break-all;">
+      Fungerar knappen inte? Kopiera och klistra in denna länk i din webbläsare:<br>
+      <a href="${url}" style="color: ${BRAND_COLOR}; text-decoration: underline;">${url}</a>
+    </p>
+  `);
+
+  const text = `Återställ ditt lösenord
+
+Hej,
+
+Du har begärt att återställa lösenordet till ditt Turbomeck-konto. Öppna länken nedan för att välja ett nytt lösenord:
+
+${url}
+
+Länken är giltig i 1 timme. Om du inte begärde någon återställning kan du ignorera detta mail — ditt lösenord ändras inte.`;
+
+  return { html, text };
+}
+
+/**
  * Test email template for SMTP verification.
  */
 export function renderTestEmail(): { html: string; text: string } {

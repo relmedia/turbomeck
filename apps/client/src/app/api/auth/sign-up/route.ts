@@ -24,20 +24,25 @@ export async function POST(req: Request) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const [existing] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
-    
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1);
+
+    // SECURITY: do NOT differentiate the response between "newly created" and
+    // "already exists", and never return the existing row's id. Returning
+    // distinct shapes / known ids lets an attacker enumerate which emails are
+    // registered. The downstream magic-link flow doesn't need the id either —
+    // it looks the user up by email itself.
     if (existing) {
-      // User already exists - that's fine for magic link flow
-      // They can just use the login flow
-      return NextResponse.json({ 
-        success: true, 
-        userId: existing.id,
-        message: "User already exists, use login instead"
+      return NextResponse.json({
+        success: true,
+        message: "Om e-posten är giltig kan du logga in via inloggningslänk.",
       });
     }
 
     const id = generateId();
-
     await db.insert(users).values({
       id,
       email: normalizedEmail,
@@ -45,7 +50,10 @@ export async function POST(req: Request) {
       role: "customer",
     });
 
-    return NextResponse.json({ success: true, userId: id });
+    return NextResponse.json({
+      success: true,
+      message: "Om e-posten är giltig kan du logga in via inloggningslänk.",
+    });
   } catch (err) {
     console.error("Failed to create user:", err);
     return NextResponse.json(
