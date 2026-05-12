@@ -8,8 +8,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.0",
-    "hono": "^4.9.6",
+    "@hono/node-server": "^1.19.13",
+    "hono": "^4.12.18",
     "hono-rate-limiter": "^0.5.3",
     "stripe": "^20.4.0"
   },

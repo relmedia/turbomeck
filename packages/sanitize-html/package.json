@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "isomorphic-dompurify": "^3.0.0"
+    "isomorphic-dompurify": "^3.5.0"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
