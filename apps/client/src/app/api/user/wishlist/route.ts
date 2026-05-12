@@ -3,8 +3,13 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireSameOrigin } from "@/lib/same-origin";
 
 export async function POST(req: Request) {
+  // SECURITY (audit M3): same-origin gate on cookie-auth state change.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,7 +36,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+    // SECURITY (audit M10): explicit column projection — never select * from users
+    // here. The row's `password` hash would otherwise sit in process memory for
+    // the lifetime of this handler.
+    const [user] = await db
+      .select({ id: users.id, metadata: users.metadata })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -63,11 +75,19 @@ export async function POST(req: Request) {
 
 export async function GET() {
   const session = await auth();
+  // SECURITY (audit L1): return 401 for unauthenticated callers instead of
+  // pretending the wishlist is empty. The old 200 + empty body let pages
+  // render as if the user "had no items" even when they were silently
+  // logged out — a UX bug that doubles as authentication confusion.
   if (!session?.user?.id) {
-    return NextResponse.json({ wishlist: [] });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+    const [user] = await db
+      .select({ metadata: users.metadata })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
     const wishlist = user?.metadata?.savedWishlist ?? [];
     return NextResponse.json({ wishlist });
   } catch {

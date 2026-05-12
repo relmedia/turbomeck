@@ -7,8 +7,10 @@ import { NextResponse } from "next/server";
 /** Returns product IDs the current user has reviewed. */
 export async function GET() {
   const session = await auth();
+  // SECURITY (audit L1): return 401 for unauthenticated callers instead of an
+  // empty-body 200 (was confusing logged-out state with "no reviews").
   if (!session?.user?.id) {
-    return NextResponse.json({ productIds: [], reviews: [] });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

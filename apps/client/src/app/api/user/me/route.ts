@@ -3,6 +3,7 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 
 export async function GET() {
   const session = await auth();
@@ -10,7 +11,21 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+  // SECURITY (audit M10): narrow the select so the password hash never even
+  // touches process memory for this handler. `hasPassword` is computed in SQL.
+  const [user] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      image: users.image,
+      createdAt: users.createdAt,
+      metadata: users.metadata,
+      hasPassword: sql<boolean>`${users.password} is not null`,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
@@ -23,6 +38,6 @@ export async function GET() {
     image: user.image,
     createdAt: user.createdAt,
     savedAddress,
-    hasPassword: !!user.password,
+    hasPassword: !!user.hasPassword,
   });
 }

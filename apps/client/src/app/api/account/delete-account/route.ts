@@ -3,8 +3,14 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireSameOrigin } from "@/lib/same-origin";
 
 export async function POST(req: Request) {
+  // SECURITY (audit M3): delete-account is irreversible; require an explicit
+  // same-origin Origin header on top of the session cookie check below.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   try {
     const session = await auth();
     if (!session?.user?.id) {

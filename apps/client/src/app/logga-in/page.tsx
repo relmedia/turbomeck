@@ -16,11 +16,32 @@ import { AuthModal } from "@/components/AuthModal";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+/**
+ * SECURITY (audit M1): only accept same-origin absolute paths as the
+ * post-login redirect target. Without this, `?callbackUrl=//evil.com` or
+ * `?callbackUrl=https://evil.com` would let an attacker bounce a logged-in
+ * user off our domain into a phishing page that wears the just-logged-in
+ * trust signal. Auth.js itself clamps OAuth redirects on the server side
+ * (`packages/auth/src/index.ts` `redirect` callback) but this client-side
+ * `router.replace` runs after the modal closes and would otherwise honor
+ * whatever the URL said.
+ */
+function sanitizeCallbackUrl(raw: string | null | undefined): string {
+  if (!raw) return "/";
+  // Reject scheme-relative ("//evil.com") and absolute URLs entirely;
+  // only allow a leading single slash followed by an alphanumeric / dash
+  // / underscore. Query strings and hashes are preserved.
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+    return "/";
+  }
+  return raw;
+}
+
 function LoggaInContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const errorParam = searchParams.get("error");
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const [authOpen, setAuthOpen] = useState(!errorParam);
 
   const handleAuthOpenChange = (open: boolean) => {

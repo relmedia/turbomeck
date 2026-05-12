@@ -3,6 +3,7 @@ import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireSameOrigin } from "@/lib/same-origin";
 
 const savedAddressKeys = [
   "firstName",
@@ -24,6 +25,10 @@ function isValidSavedAddress(body: unknown): body is Record<string, string> {
 }
 
 export async function POST(req: Request) {
+  // SECURITY (audit M3): same-origin gate on cookie-auth state change.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +64,12 @@ export async function POST(req: Request) {
   };
 
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+    // SECURITY (audit M10): narrow projection — only the fields we need to merge.
+    const [user] = await db
+      .select({ name: users.name, metadata: users.metadata })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

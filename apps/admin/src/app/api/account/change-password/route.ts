@@ -4,8 +4,13 @@ import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { requireSameOrigin } from "@/lib/same-origin";
 
 export async function POST(req: Request) {
+  // SECURITY (audit M3): password change must come from the admin app itself.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   try {
     const session = await auth();
     if (!session?.user?.id) {

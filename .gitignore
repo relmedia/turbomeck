@@ -37,6 +37,17 @@ debug-*.log
 # Misc
 .DS_Store
 *.pem
-*.example
-*.example
-apps/admin/.env.example
+
+# SECURITY (audit L6): we intentionally do NOT wildcard `*.example`. .env.example
+# files are documentation of which environment variables exist and MUST be
+# checked in. The earlier `*.example` line silently hid them, so contributors
+# had to ask out-of-band what to set.
+#
+# If you ever need to ignore a specific local-only example file, add an
+# explicit path here (e.g. `secret-stuff.local.example`).
+
+# Audit recovery scratch files — these get created when we re-extract the
+# audit report from agent transcripts. Always machine-generated, never useful
+# to track.
+.audit.md
+.audit-*.txt

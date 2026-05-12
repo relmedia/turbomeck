@@ -3,8 +3,13 @@ import { db } from "@repo/database";
 import { reviews, orders, orderItems, users } from "@repo/database";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireSameOrigin } from "@/lib/same-origin";
 
 export async function POST(req: Request) {
+  // SECURITY (audit M3): same-origin gate on cookie-auth state change.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Logga in för att skriva en recension." }, { status: 401 });
