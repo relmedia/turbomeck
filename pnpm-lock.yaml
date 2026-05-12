@@ -350,6 +350,9 @@ importers:
       sharp:
         specifier: 0.32.6
         version: 0.32.6
+      stripe:
+        specifier: ^20.4.0
+        version: 20.4.0(@types/node@20.19.23)
       tailwind-merge:
         specifier: ^3.2.0
         version: 3.3.1
