@@ -123,6 +123,10 @@ export default function PayBalancePage() {
           </div>
           <PaymentForm
             total={balance.balanceDue}
+            balanceOrder={{
+              orderId: balance.orderId,
+              orderToken: orderToken ?? undefined,
+            }}
             getOrderPayload={() => ({
               email: "",
               firstName: balance.customerName.split(" ")[0] ?? "",

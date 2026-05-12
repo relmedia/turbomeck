@@ -12,11 +12,15 @@ function generateId() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, name, role } = body as {
+    // SECURITY: `role` is intentionally NOT read from the client. This endpoint
+    // is publicly reachable (proxy.ts treats /api/auth/** as public), so trusting
+    // a client-supplied role would let anyone create an admin account. Admin
+    // access is granted out-of-band via ADMIN_ALLOWLIST or the
+    // packages/database/src/set-admin-password.ts script.
+    const { email, password, name } = body as {
       email?: string;
       password?: string;
       name?: string;
-      role?: "admin" | "customer";
     };
 
     if (!email || typeof email !== "string" || !password || typeof password !== "string") {
@@ -43,7 +47,7 @@ export async function POST(req: Request) {
       email: normalizedEmail,
       name: name?.trim() || null,
       password: hashedPassword,
-      role: role === "admin" ? "admin" : "customer",
+      role: "customer",
     });
 
     return NextResponse.json({ success: true, userId: id });

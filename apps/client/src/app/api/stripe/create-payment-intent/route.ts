@@ -19,16 +19,36 @@ type CheckoutQuoteBody = {
   commitsCoreReturnWithin14?: boolean;
 };
 
+type BalancePaymentBody = {
+  orderId: number;
+  orderToken?: string;
+};
+
 function isCheckoutQuoteBody(b: unknown): b is CheckoutQuoteBody {
   if (!b || typeof b !== "object") return false;
   const o = b as Record<string, unknown>;
   return Array.isArray(o.items) && o.items.length > 0;
 }
 
+function isBalancePaymentBody(b: unknown): b is BalancePaymentBody {
+  if (!b || typeof b !== "object") return false;
+  const o = b as Record<string, unknown>;
+  return typeof o.orderId === "number" && Number.isFinite(o.orderId) && o.orderId > 0;
+}
+
 /**
  * POST /api/stripe/create-payment-intent
- * - Full checkout body: server quotes amount via product-service (do not trust client totals).
- * - Legacy: { amount: number } for balance payments (prefer migrating to order-scoped verification).
+ *
+ * The route NEVER trusts a client-supplied amount. Two server-quoted paths:
+ *
+ * - **Full checkout** (`{ items, couponCode, country, deliveryOption, ... }`):
+ *   amount is quoted via product-service `/api/checkout-quote`.
+ * - **Order balance** (`{ orderId, orderToken? }`): amount is fetched from
+ *   product-service `/api/orders/:id/balance`, which itself enforces a
+ *   viewToken-based access check on guest orders.
+ *
+ * The previous `{ amount: number }` shape was removed — it let any caller
+ * specify an arbitrary positive amount for Stripe to charge.
  */
 export async function POST(request: NextRequest) {
   const paymentUrl = `${PAYMENT_SERVICE_URL.replace(/\/$/, "")}/create-payment-intent`;
@@ -65,12 +85,45 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid quote from checkout service" }, { status: 502 });
       }
       amountSek = quoteData.amount;
-    } else {
-      const raw = (body as { amount?: unknown }).amount;
-      amountSek = typeof raw === "number" ? raw : parseFloat(String(raw ?? 0)) || 0;
-      if (amountSek <= 0) {
-        return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
+    } else if (isBalancePaymentBody(body)) {
+      requireInternalProductApiSecret();
+      const balanceQuery = body.orderToken
+        ? `?token=${encodeURIComponent(body.orderToken)}`
+        : "";
+      const balanceRes = await fetch(
+        `${PRODUCT_SERVICE.replace(/\/$/, "")}/api/orders/${encodeURIComponent(String(body.orderId))}/balance${balanceQuery}`,
+        {
+          method: "GET",
+          headers: { ...internalProductApiAuthHeaders() },
+          cache: "no-store",
+        },
+      );
+      const balanceData = (await balanceRes.json().catch(() => ({}))) as {
+        error?: string;
+        balanceDue?: number;
+      };
+      if (!balanceRes.ok) {
+        return NextResponse.json(
+          { error: balanceData.error ?? "Could not fetch order balance" },
+          { status: balanceRes.status },
+        );
       }
+      if (
+        typeof balanceData.balanceDue !== "number" ||
+        !Number.isFinite(balanceData.balanceDue) ||
+        balanceData.balanceDue <= 0
+      ) {
+        return NextResponse.json(
+          { error: "Invalid order balance" },
+          { status: 400 },
+        );
+      }
+      amountSek = balanceData.balanceDue;
+    } else {
+      return NextResponse.json(
+        { error: "Invalid payment request" },
+        { status: 400 },
+      );
     }
 
     const res = await fetch(paymentUrl, {

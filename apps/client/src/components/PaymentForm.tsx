@@ -57,14 +57,30 @@ export type CheckoutQuoteBody = {
   commitsCoreReturnWithin14?: boolean;
 };
 
+/** Identifies an existing order whose remaining balance we want to charge.
+ *  The API server fetches the trusted balance from product-service — the
+ *  client cannot specify the amount directly. */
+export type BalanceOrderRef = {
+  orderId: number;
+  /** viewToken from the magic balance-payment link, when present. */
+  orderToken?: string;
+};
+
 type PaymentFormProps = {
-  /** Label / fallback; actual charge uses server quote when `checkoutQuoteBody` is set. */
+  /** Display total in the UI; the server-quoted amount is what actually gets charged. */
   total: number;
   /**
-   * When set: payment intent uses server-side checkout quote (secure).
-   * `null` = not ready (e.g. missing SE core choice). Omit for legacy balance pay ({ amount: total }).
+   * Full-checkout mode. When set: payment intent uses the server-side checkout quote (secure).
+   * `null` = not ready (e.g. missing SE core choice).
+   * Mutually exclusive with `balanceOrder`.
    */
   checkoutQuoteBody?: CheckoutQuoteBody | null;
+  /**
+   * Balance-payment mode. When set: the server looks up the order's remaining
+   * balance via product-service and charges that. Mutually exclusive with
+   * `checkoutQuoteBody`.
+   */
+  balanceOrder?: BalanceOrderRef;
   getOrderPayload: () => PendingOrderPayload;
   onComplete?: (result: { stripePaymentId: string }) => void;
   /** Shown when `checkoutQuoteBody` is null (e.g. Swedish customer must pick core option first). */
@@ -225,6 +241,7 @@ function CheckoutForm({
 export default function PaymentForm({
   total,
   checkoutQuoteBody,
+  balanceOrder,
   getOrderPayload,
   onComplete,
   quoteIncompleteMessage,
@@ -266,11 +283,15 @@ export default function PaymentForm({
       return;
     }
 
-    if (!useQuote && total <= 0) return;
+    if (!useQuote && !balanceOrder && total <= 0) return;
 
     setLoading(true);
     setApiError(null);
 
+    // The API never trusts a client-supplied `amount`. The request shape tells
+    // the server which server-trusted lookup to perform:
+    //   - `items` → quote checkout from product-service
+    //   - `orderId` → fetch the order's remaining balance from product-service
     const body =
       useQuote && checkoutQuoteBody
         ? {
@@ -280,7 +301,18 @@ export default function PaymentForm({
             deliveryOption: checkoutQuoteBody.deliveryOption,
             commitsCoreReturnWithin14: checkoutQuoteBody.commitsCoreReturnWithin14,
           }
-        : { amount: total };
+        : balanceOrder
+          ? {
+              orderId: balanceOrder.orderId,
+              orderToken: balanceOrder.orderToken,
+            }
+          : null;
+
+    if (!body) {
+      setApiError("Kunde inte starta betalning");
+      setLoading(false);
+      return;
+    }
 
     fetch("/api/stripe/create-payment-intent", {
       method: "POST",
@@ -295,7 +327,7 @@ export default function PaymentForm({
       })
       .catch((err) => setApiError(err.message ?? "Kunde inte starta betalning"))
       .finally(() => setLoading(false));
-  }, [stripePromise, total, checkoutQuoteBody]);
+  }, [stripePromise, total, checkoutQuoteBody, balanceOrder]);
 
   if (!stripePromise && !apiError) {
     return (
