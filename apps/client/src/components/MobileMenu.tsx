@@ -2,6 +2,7 @@
 
 import { Menu, X, ChevronRight, User, LogOut, MapPin, LayoutGrid, Car, Gauge, Wrench, Box, CircleDot } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -48,6 +49,21 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock body scroll while the menu is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   const backdropRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -196,8 +212,9 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
         <Menu className="w-5 h-5 text-gray-600" />
       </button>
 
-      {/* Menu overlay */}
-      {isOpen && (
+      {/* Menu overlay — portal to body so it escapes the nav's `backdrop-filter`
+          containing block (which otherwise breaks `position: fixed`). */}
+      {isOpen && mounted && createPortal(
         <>
           {/* Backdrop */}
           <div
@@ -381,7 +398,8 @@ function MobileMenuContent({ onAuthClick }: MobileMenuProps) {
               </div>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );

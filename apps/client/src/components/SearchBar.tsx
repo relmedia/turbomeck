@@ -135,13 +135,14 @@ const SearchBar = () => {
     };
   }, [query, allProducts]);
 
-  // URL sync when on searchable pages
+  // Live URL sync: only when the user is already on /products, so filter chips,
+  // pagination, sort etc. stay in sync as they type. From other pages we wait
+  // for an explicit submit (Enter) to navigate — see handleSubmit below.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      const isSearchablePage = pathname === "/" || pathname === "/products";
-      if (!isSearchablePage) return;
+      if (pathname !== "/products") return;
 
       const q = query.trim();
       const params = new URLSearchParams(searchParamsRef.current);
@@ -152,11 +153,10 @@ const SearchBar = () => {
         params.delete("search");
         params.delete("page");
       }
-      const targetPath = pathname === "/products" ? "/products" : "/";
       const queryString = params.toString();
-      const newUrl = queryString ? `${targetPath}?${queryString}` : targetPath;
+      const newUrl = queryString ? `/products?${queryString}` : "/products";
       const currentUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
-      const targetFull = targetPath + (queryString ? `?${queryString}` : "");
+      const targetFull = "/products" + (queryString ? `?${queryString}` : "");
       if (currentUrl !== targetFull) {
         router.replace(newUrl, { scroll: false });
       }
@@ -183,12 +183,38 @@ const SearchBar = () => {
     router.push(productUrl(product));
   }, [router]);
 
+  // Submit (Enter / search-icon click): take the user to the products listing
+  // with the search filter applied. Preserves any current filters when already
+  // on /products; otherwise just sets ?search=<query>.
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setIsDropdownOpen(false);
+    const params = new URLSearchParams(
+      pathname === "/products" ? searchParamsRef.current : undefined
+    );
+    params.set("search", q);
+    params.delete("page");
+    router.push(`/products?${params.toString()}`);
+  }, [query, pathname, router]);
+
   const showDropdown = isDropdownOpen && query.trim().length >= 3;
 
   return (
     <div ref={containerRef} className="hidden sm:block relative min-w-[280px] max-w-[520px] w-full">
-      <div className="flex items-center gap-2 rounded-md ring-1 ring-gray-200 px-2 py-1.5 bg-white">
-        <Search className="w-4 h-4 text-gray-500 shrink-0" />
+      <form
+        onSubmit={handleSubmit}
+        role="search"
+        className="flex items-center gap-2 rounded-md ring-1 ring-gray-200 px-2 py-1.5 bg-white"
+      >
+        <button
+          type="submit"
+          aria-label={t("search.placeholder")}
+          className="shrink-0 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+        >
+          <Search className="w-4 h-4" />
+        </button>
         <input
           type="search"
           value={query}
@@ -203,7 +229,7 @@ const SearchBar = () => {
           aria-expanded={showDropdown}
           aria-haspopup="listbox"
         />
-      </div>
+      </form>
 
       <div
         hidden={!showDropdown}
@@ -252,7 +278,7 @@ const SearchBar = () => {
         </ul>
         {showDropdown && dropdownProducts.length > 0 && (
           <Link
-            href={pathname === "/products" ? `/products?search=${encodeURIComponent(query.trim())}` : `/?search=${encodeURIComponent(query.trim())}`}
+            href={`/products?search=${encodeURIComponent(query.trim())}`}
             onClick={() => setIsDropdownOpen(false)}
             className="block px-3 py-2.5 text-sm font-medium text-center border-t border-gray-100 hover:bg-gray-50 transition-colors"
           >

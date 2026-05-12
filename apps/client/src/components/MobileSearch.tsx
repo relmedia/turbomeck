@@ -4,6 +4,7 @@ import { Search, X } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import Link from "next/link";
 import { ProductType } from "@/types";
@@ -62,8 +63,22 @@ export function MobileSearch() {
   const [query, setQuery] = useState("");
   const [dropdownProducts, setDropdownProducts] = useState<ProductType[]>([]);
   const [allProducts, setAllProducts] = useState<ProductType[] | null>(null);
+  const [mounted, setMounted] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   // Fetch all products once
   useEffect(() => {
@@ -154,6 +169,27 @@ export function MobileSearch() {
     setDropdownProducts([]);
   };
 
+  // Enter / submit → take user to the products listing with the search filter.
+  // On /products we preserve current filters; from anywhere else we just set
+  // ?search=<query>.
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const q = query.trim();
+      if (!q) return;
+      const params = new URLSearchParams(
+        pathname === "/products" ? searchParams.toString() : undefined
+      );
+      params.set("search", q);
+      params.delete("page");
+      setIsOpen(false);
+      setQuery("");
+      setDropdownProducts([]);
+      router.push(`/products?${params.toString()}`);
+    },
+    [query, pathname, searchParams, router]
+  );
+
   const showResults = query.trim().length >= 3;
 
   return (
@@ -168,13 +204,24 @@ export function MobileSearch() {
         <Search className="w-5 h-5 text-gray-600" />
       </button>
 
-      {/* Full-screen search overlay */}
-      {isOpen && (
+      {/* Full-screen search overlay — portaled to body so it escapes the nav's
+          `backdrop-filter` containing block (which otherwise breaks `fixed`). */}
+      {isOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 bg-white sm:hidden">
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="flex items-center gap-3 p-4 border-b border-gray-200">
-              <Search className="w-5 h-5 text-gray-500 shrink-0" />
+            <form
+              onSubmit={handleSubmit}
+              role="search"
+              className="flex items-center gap-3 p-4 border-b border-gray-200"
+            >
+              <button
+                type="submit"
+                aria-label={t("search.placeholder")}
+                className="shrink-0 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <Search className="w-5 h-5" />
+              </button>
               <input
                 ref={inputRef}
                 type="search"
@@ -192,7 +239,7 @@ export function MobileSearch() {
               >
                 <X className="w-5 h-5 text-gray-600" />
               </button>
-            </div>
+            </form>
 
             {/* Results */}
             <div className="flex-1 overflow-y-auto">
@@ -244,11 +291,7 @@ export function MobileSearch() {
               )}
               {showResults && dropdownProducts.length > 0 && (
                 <Link
-                  href={
-                    pathname === "/products"
-                      ? `/products?search=${encodeURIComponent(query.trim())}`
-                      : `/?search=${encodeURIComponent(query.trim())}`
-                  }
+                  href={`/products?search=${encodeURIComponent(query.trim())}`}
                   onClick={handleClose}
                   className="block px-4 py-3 text-sm font-medium text-center border-t border-gray-100 text-primary"
                 >
@@ -257,7 +300,8 @@ export function MobileSearch() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -15,7 +15,25 @@ import {
 } from "./ProductFilters";
 
 const HOMEPAGE_PAGE_SIZE = 8;
-const PRODUCTS_PAGE_SIZE = 9;
+// /products grid is `grid-cols-2 md:grid-cols-2 lg:grid-cols-3`. To get clean
+// rows we use 10 on the 2-col viewports (5 rows) and 12 on the 3-col desktop
+// viewport (4 rows). The breakpoint here must match the `lg:` Tailwind class.
+const PRODUCTS_PAGE_SIZE_MOBILE = 10;
+const PRODUCTS_PAGE_SIZE_DESKTOP = 12;
+const LG_BREAKPOINT_PX = 1024;
+
+function useIsLargeViewport(): boolean {
+  // Default false (mobile-first) so SSR + first paint match the smaller layout.
+  const [isLarge, setIsLarge] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${LG_BREAKPOINT_PX}px)`);
+    setIsLarge(mq.matches);
+    const fn = (e: MediaQueryListEvent) => setIsLarge(e.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return isLarge;
+}
 
 function matchesSearch(p: ProductType, q: string): boolean {
   const lower = q.toLowerCase().trim();
@@ -208,10 +226,18 @@ export function ProductListClient({
   const sortedProducts = sortProducts(filteredProducts, sortOption);
 
   const isProductsPage = params === "products";
-  const pageSize = isProductsPage ? PRODUCTS_PAGE_SIZE : HOMEPAGE_PAGE_SIZE;
+  const isLargeViewport = useIsLargeViewport();
+  const pageSize = isProductsPage
+    ? isLargeViewport
+      ? PRODUCTS_PAGE_SIZE_DESKTOP
+      : PRODUCTS_PAGE_SIZE_MOBILE
+    : HOMEPAGE_PAGE_SIZE;
 
-  const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const totalPages = Math.ceil(sortedProducts.length / pageSize);
+  const requestedPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
+  // Clamp so a viewport resize that shrinks the page count doesn't leave us on
+  // a non-existent page.
+  const currentPage = Math.min(requestedPage, totalPages);
   const paginatedProducts = sortedProducts.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
@@ -275,7 +301,7 @@ export function ProductListClient({
           />
           {loading ? (
             <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(9)].map((_, i) => (
+              {[...Array(pageSize)].map((_, i) => (
                 <ProductCardSkeleton key={i} />
               ))}
             </div>
