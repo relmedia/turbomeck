@@ -96,6 +96,30 @@ export async function GET(
   const { path } = await params;
   const pathStr = path.join("/");
   const searchParams = new URLSearchParams(req.nextUrl.searchParams);
+  // SECURITY: the upstream `/api/orders*` endpoints derive ownership from a
+  // `userId` query param. Because the proxy attaches the internal Bearer secret
+  // to every call, any anonymous request supplying `?userId=<victim>` would
+  // dump that user's orders. Strip these "server-trust" keys unconditionally
+  // and re-inject `userId` from the verified session below for the orders
+  // endpoints that need it. `token` (= order viewToken) is a legitimate guest
+  // access mechanism and is left intact.
+  searchParams.delete("userId");
+  searchParams.delete("email");
+  const isOrdersPath = pathStr === "orders" || pathStr.startsWith("orders/");
+  if (isOrdersPath) {
+    const session = await auth();
+    if (session?.user?.id) {
+      searchParams.set("userId", session.user.id);
+    } else if (pathStr === "orders") {
+      // The list endpoint requires a userId; guests cannot list orders.
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+    // For `orders/:id*` an unauthenticated caller must supply the viewToken
+    // (already preserved as `token=`); upstream will 403 if it doesn't match.
+  }
   const locale = req.cookies.get(LOCALE_COOKIE_NAME)?.value;
   if (locale === "en" || locale === "sv") {
     searchParams.set("locale", locale);

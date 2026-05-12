@@ -20,8 +20,19 @@ export async function GET(
     );
   }
 
+  // SECURITY: do NOT fall back to the master API_KEY here. The PostNord master
+  // key can read any session by id, so falling back lets anyone who guesses a
+  // sessionId read someone else's checkout PII. Per-session calls must carry
+  // the session token returned by create-session.
+  const auth = request.headers.get("authorization");
+  if (!auth) {
+    return NextResponse.json(
+      { error: "Unauthorized: missing PostNord session token" },
+      { status: 401 }
+    );
+  }
+
   try {
-    const auth = request.headers.get("authorization") ?? API_KEY;
     const res = await fetch(
       `${API_URL.replace(/\/+$/, "")}/get-session/${encodeURIComponent(sessionId)}`,
       {

@@ -69,7 +69,14 @@ export async function PUT(
       },
     };
 
-    const auth = request.headers.get("authorization") ?? API_KEY;
+    // SECURITY: require the per-session token; never fall back to master API_KEY.
+    const auth = request.headers.get("authorization");
+    if (!auth) {
+      return NextResponse.json(
+        { error: "Unauthorized: missing PostNord session token" },
+        { status: 401 }
+      );
+    }
 
     const res = await fetch(
       `${API_URL.replace(/\/+$/, "")}/complete-session/${encodeURIComponent(sessionId)}`,

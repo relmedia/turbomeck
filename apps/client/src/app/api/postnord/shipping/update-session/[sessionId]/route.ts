@@ -21,10 +21,19 @@ export async function PUT(
     );
   }
 
+  // SECURITY: require the per-session token; never fall back to the master
+  // API_KEY (it can mutate any session by id). See `session/[sessionId]/route.ts`.
+  const auth = request.headers.get("authorization");
+  if (!auth) {
+    return NextResponse.json(
+      { error: "Unauthorized: missing PostNord session token" },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
     const payload = buildPostNordSessionBody(body, "update");
-    const auth = request.headers.get("authorization") ?? API_KEY;
 
     const res = await fetch(
       `${API_URL.replace(/\/+$/, "")}/update-session/${encodeURIComponent(sessionId)}`,
