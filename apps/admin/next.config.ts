@@ -60,8 +60,56 @@ function getR2ImagePattern() {
   }
 }
 
+/**
+ * Baseline security headers for the admin app. Admin doesn't load any
+ * third-party scripts (no Stripe.js, no Klarna, no PostNord widget), so we can
+ * be strict here. HSTS only in production.
+ */
+function adminSecurityHeaders(): { key: string; value: string }[] {
+  const isProd = process.env.NODE_ENV === "production";
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ];
+  if (isProd) csp.push("upgrade-insecure-requests");
+  const headers = [
+    { key: "X-DNS-Prefetch-Control", value: "on" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    {
+      key: "Permissions-Policy",
+      value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    },
+    { key: "Content-Security-Policy", value: csp.join("; ") },
+  ];
+  if (isProd) {
+    headers.push({
+      key: "Strict-Transport-Security",
+      value: "max-age=63072000; includeSubDomains; preload",
+    });
+  }
+  return headers;
+}
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@repo/ui"],
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: adminSecurityHeaders(),
+      },
+    ];
+  },
   /** Legacy bookmarks: /studio/... → /... */
   async redirects() {
     return [

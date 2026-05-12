@@ -44,6 +44,9 @@ export async function POST(req: Request) {
       );
     }
 
+    // SECURITY (audit M14): see /api/settings/mail/test — TLS verification is
+    // opted out only via SMTP_INSECURE_TEST_TLS=true, never on NODE_ENV alone.
+    const insecureTls = process.env.SMTP_INSECURE_TEST_TLS === "true";
     const transporter = buildSmtpTransport({
       host,
       port,
@@ -52,7 +55,7 @@ export async function POST(req: Request) {
       password,
       from,
       ...(tlsServername ? { tlsServername } : {}),
-      ...(process.env.NODE_ENV !== "production" ? { rejectUnauthorized: false } : {}),
+      ...(insecureTls ? { rejectUnauthorized: false } : {}),
     });
 
     const { html, text } = renderTestEmail();

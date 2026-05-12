@@ -105,9 +105,13 @@ function buildContentSecurityPolicy(): string {
 }
 
 function securityHeaders(): { key: string; value: string }[] {
-  return [
+  const isProd = process.env.NODE_ENV === "production";
+  const headers: { key: string; value: string }[] = [
     { key: "X-DNS-Prefetch-Control", value: "on" },
     { key: "X-Content-Type-Options", value: "nosniff" },
+    // CSP already sets frame-ancestors 'self'; the legacy header gives a
+    // belt-and-braces guarantee in older browsers / proxies.
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {
       key: "Permissions-Policy",
@@ -115,6 +119,15 @@ function securityHeaders(): { key: string; value: string }[] {
     },
     { key: "Content-Security-Policy", value: buildContentSecurityPolicy() },
   ];
+  if (isProd) {
+    // 2-year HSTS w/ subdomains + preload, matching modern browser preload
+    // requirements.
+    headers.push({
+      key: "Strict-Transport-Security",
+      value: "max-age=63072000; includeSubDomains; preload",
+    });
+  }
+  return headers;
 }
 
 const nextConfig: NextConfig = {
@@ -149,7 +162,10 @@ const nextConfig: NextConfig = {
     return config;
   },
   images: {
-    dangerouslyAllowLocalIP: true,
+    // SECURITY (audit M11): only allow proxying local IPs in dev. The dev flow
+    // loads images served by the admin/product process on localhost:3001/8000,
+    // which production deployments never expose.
+    dangerouslyAllowLocalIP: process.env.NODE_ENV !== "production",
     remotePatterns: [
       {
         protocol: "http",

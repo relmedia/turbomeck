@@ -4,11 +4,15 @@ services:
     container_name: turbodb
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: turbodb
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # SECURITY: never ship with the literal "postgres" password to a host that
+      # has a public IP. Set POSTGRES_PASSWORD in `.env` next to docker-compose.yml.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env}
+      POSTGRES_DB: ${POSTGRES_DB:-turbodb}
+    # SECURITY: bind only to loopback by default. Override DB_BIND in .env if
+    # you intentionally need to expose Postgres on a LAN address.
     ports:
-      - "5433:5432"
+      - "${DB_BIND:-127.0.0.1}:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

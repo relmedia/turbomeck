@@ -35,6 +35,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // SECURITY (audit M14): disable TLS verification only when the operator
+    // explicitly opts in via `SMTP_INSECURE_TEST_TLS=true`. Tying it to
+    // `NODE_ENV` was unsafe — a staging deployment that touches a real SMTP
+    // gateway runs with NODE_ENV=development and would silently accept any
+    // certificate.
+    const insecureTls = process.env.SMTP_INSECURE_TEST_TLS === "true";
     const transporter = buildSmtpTransport({
       host,
       port,
@@ -43,7 +49,7 @@ export async function POST(req: Request) {
       password,
       from: body.from ?? "",
       ...(tlsServername ? { tlsServername } : {}),
-      ...(process.env.NODE_ENV !== "production" ? { rejectUnauthorized: false } : {}),
+      ...(insecureTls ? { rejectUnauthorized: false } : {}),
     });
 
     await transporter.verify();

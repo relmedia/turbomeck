@@ -27,11 +27,19 @@ function getStoredLocale(): Locale {
   return stored === "en" || stored === "sv" ? stored : "sv";
 }
 
+function localeCookieFlags(): string {
+  // SECURITY (audit L4): add `Secure` whenever the page is on https. Plain
+  // HTTP dev keeps the cookie without `Secure` so the dev server still works.
+  const isHttps =
+    typeof window !== "undefined" && window.location.protocol === "https:";
+  return `path=/;max-age=31536000;SameSite=Lax${isHttps ? ";Secure" : ""}`;
+}
+
 function setStoredLocale(locale: Locale) {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, locale);
     document.documentElement.lang = locale === "en" ? "en" : "sv";
-    document.cookie = `${LOCALE_COOKIE_NAME}=${locale};path=/;max-age=31536000;SameSite=Lax`;
+    document.cookie = `${LOCALE_COOKIE_NAME}=${locale};${localeCookieFlags()}`;
   }
 }
 
@@ -66,7 +74,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const stored = getStoredLocale();
     setLocaleState(stored);
     document.documentElement.lang = stored === "en" ? "en" : "sv";
-    document.cookie = `${LOCALE_COOKIE_NAME}=${stored};path=/;max-age=31536000;SameSite=Lax`;
+    document.cookie = `${LOCALE_COOKIE_NAME}=${stored};${localeCookieFlags()}`;
     setTranslationData(loadTranslations(stored));
     setReady(true);
   }, []);

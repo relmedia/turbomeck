@@ -60,6 +60,37 @@ declare module "next-auth" {
   }
 }
 
+/**
+ * SECURITY (audit H8 + L9): refuse to boot in production without the
+ * essential auth secrets configured. Auth.js will happily start with no
+ * AUTH_SECRET and emit signed-cookie-less tokens; once we noticed that, the
+ * only safe behavior is to fail fast.
+ *
+ * - `AUTH_SECRET` / `NEXTAUTH_SECRET` are required to sign JWT session tokens
+ *   and CSRF state. Missing → Auth.js falls back to weak defaults.
+ * - The cron / internal-API secrets are checked at the call sites and so are
+ *   not validated here (different processes may not need them).
+ */
+function assertProductionAuthEnv(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  const secret = (
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    ""
+  ).trim();
+  if (!secret) {
+    throw new Error(
+      "[@repo/auth] AUTH_SECRET (or NEXTAUTH_SECRET) must be set in production. Refusing to start.",
+    );
+  }
+  if (secret.length < 32) {
+    throw new Error(
+      "[@repo/auth] AUTH_SECRET is too short (< 32 chars). Generate one with `openssl rand -base64 48` and set it in env.",
+    );
+  }
+}
+assertProductionAuthEnv();
+
 export { renderTestEmail } from "./email-templates";
 export { validatePassword, BCRYPT_COST } from "./password-policy";
 
