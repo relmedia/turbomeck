@@ -1,15 +1,13 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { reviews, users } from "@repo/database/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/reviews/stats - Aggregate stats for dashboard */
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   try {
     const [stats] = await db

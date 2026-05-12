@@ -1,18 +1,16 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { reviews, products, users } from "@repo/database";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/reviews/[id] - Admin fetch single review */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const reviewId = Number(id);
@@ -64,10 +62,8 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const reviewId = Number(id);
@@ -95,10 +91,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   const { id } = await params;
   const reviewId = Number(id);

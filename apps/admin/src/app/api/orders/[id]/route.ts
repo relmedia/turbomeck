@@ -1,9 +1,9 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { orders, orderItems } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
+import { requireAdmin } from "@/lib/require-admin";
 
 const VALID_STATUSES = ["confirmed", "shipped", "delivered", "cancelled", "completed"] as const;
 
@@ -12,10 +12,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   try {
     const { id } = await params;
@@ -118,10 +116,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+  const { session } = gate;
 
   try {
     const { id } = await params;
@@ -133,12 +130,14 @@ export async function DELETE(
     const [deleted] = await db
       .delete(orders)
       .where(eq(orders.id, orderId))
-      .returning({ id: orders.id, orderNumber: orders.orderNumber });
+      .returning({ id: orders.id });
     if (!deleted) {
       return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
     }
+    // Log ids only — orderNumber and admin email are PII-adjacent and bloat
+    // log lines for log aggregators.
     console.log(
-      `[orders DELETE] order ${deleted.id} (${deleted.orderNumber}) deleted by ${session.user.email ?? session.user.id}`,
+      `[orders DELETE] order ${deleted.id} deleted by admin ${session.user.id}`,
     );
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -152,6 +151,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const { id } = await params;
     const orderId = parseInt(id, 10);

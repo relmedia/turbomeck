@@ -3,6 +3,7 @@ import {
   internalProductApiAuthHeaders,
   requireInternalProductApiSecret,
 } from "@/lib/internal-product-api";
+import { requireAdmin } from "@/lib/require-admin";
 
 const PRODUCT_SERVICE =
   process.env.PRODUCT_SERVICE_URL ||
@@ -39,6 +40,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     requireInternalProductApiSecret();
   } catch {
@@ -70,6 +73,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     requireInternalProductApiSecret();
   } catch {
@@ -148,6 +153,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     requireInternalProductApiSecret();
   } catch {
@@ -190,6 +197,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     requireInternalProductApiSecret();
   } catch {
@@ -225,6 +234,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     requireInternalProductApiSecret();
   } catch {

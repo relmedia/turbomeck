@@ -1,13 +1,15 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const { id } = await params;
     const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
@@ -54,10 +56,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   try {
     const { id } = await params;
@@ -126,10 +126,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+  const { session } = gate;
 
   try {
     const { id } = await params;
@@ -146,12 +145,14 @@ export async function DELETE(
     const [deleted] = await db
       .delete(users)
       .where(eq(users.id, id))
-      .returning({ id: users.id, email: users.email, name: users.name });
+      .returning({ id: users.id });
     if (!deleted) {
       return NextResponse.json({ error: "Användare hittades inte" }, { status: 404 });
     }
+    // SECURITY: log user ID only — emails and names are PII and propagate to
+    // any log aggregator. Audit trail by id is sufficient to correlate.
     console.log(
-      `[users DELETE] user ${deleted.id} (${deleted.email ?? deleted.name ?? "—"}) deleted by ${session.user.email ?? session.user.id}`,
+      `[users DELETE] user ${deleted.id} deleted by admin ${session.user.id}`,
     );
     return NextResponse.json({ success: true });
   } catch (err) {

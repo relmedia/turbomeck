@@ -2,12 +2,15 @@ import { db } from "@repo/database";
 import { discountCodes } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** PATCH /api/coupons/[id] - Update discount code */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const { id } = await params;
     const couponId = parseInt(id, 10);
@@ -117,6 +120,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const { id } = await params;
     const couponId = parseInt(id, 10);

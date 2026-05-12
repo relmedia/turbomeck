@@ -1,14 +1,12 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/dashboard/browsers - Browser usage breakdown (last 6 months) for pie chart */
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   try {
     const rows = await db.execute(sql`

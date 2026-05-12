@@ -2,9 +2,12 @@ import { db } from "@repo/database";
 import { discountCodes } from "@repo/database/schema";
 import { desc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/coupons - List all discount codes */
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const rows = await db
       .select()
@@ -37,6 +40,8 @@ export async function GET() {
 
 /** POST /api/coupons - Create discount code */
 export async function POST(request: NextRequest) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const body = await request.json();
     const code = String(body?.code ?? "").trim().toUpperCase();

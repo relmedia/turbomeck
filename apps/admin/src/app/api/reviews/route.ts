@@ -1,15 +1,13 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { reviews, products, users } from "@repo/database";
 import { eq, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/reviews - List all reviews for admin. Optional ?productId=N filters by product. */
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Logga in" }, { status: 401 });
-  }
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
   try {
     const { searchParams } = new URL(req.url);

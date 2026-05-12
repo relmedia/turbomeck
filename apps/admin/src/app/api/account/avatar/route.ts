@@ -1,4 +1,3 @@
-import { auth } from "@repo/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
@@ -8,17 +7,16 @@ import {
   isR2Configured,
   uploadAvatarToR2,
 } from "@/lib/r2-avatars";
+import { requireAdmin } from "@/lib/require-admin";
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+  const { session } = gate;
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Ej inloggad" }, { status: 401 });
-    }
-
     if (!isR2Configured()) {
       return NextResponse.json(
         {

@@ -2,6 +2,7 @@ import { db } from "@repo/database";
 import { orders } from "@repo/database/schema";
 import { sql, and, gte, lt, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 const COUNTRY_NAMES: Record<string, string> = {
   SE: "Sverige",
@@ -22,6 +23,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 /** GET /api/sales-by-location - Orders by country for last 28 days + prior 28 for change */
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const now = new Date();
     const days28Ago = new Date(now);

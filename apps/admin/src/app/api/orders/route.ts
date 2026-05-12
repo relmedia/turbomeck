@@ -2,6 +2,7 @@ import { db } from "@repo/database";
 import { orders, orderItems, users } from "@repo/database/schema";
 import { desc, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 function getFullNameFromUser(u: { name: string | null; metadata?: unknown } | null): string | null {
   if (!u) return null;
@@ -20,6 +21,8 @@ function getFullNameFromUser(u: { name: string | null; metadata?: unknown } | nu
 
 /** GET /api/orders - List orders for payments table */
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const orderRows = await db
       .select()

@@ -2,9 +2,12 @@ import { db } from "@repo/database";
 import { orderItems, orders, products } from "@repo/database/schema";
 import { sql, eq, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 /** GET /api/best-selling-products - Aggregated product sales from order_items (excludes cancelled) */
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const rows = await db
       .select({

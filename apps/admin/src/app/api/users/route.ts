@@ -1,6 +1,7 @@
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/require-admin";
 
 function getFullName(u: { name: string | null; metadata?: unknown }): string {
   const meta = u.metadata as { savedAddress?: Record<string, unknown> } | null | undefined;
@@ -17,6 +18,8 @@ function getFullName(u: { name: string | null; metadata?: unknown }): string {
 }
 
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
   try {
     const rows = await db.select().from(users).limit(100);
     const list = rows.map((u) => ({
