@@ -248,7 +248,8 @@ function OrderSuccessContent() {
     ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(trackingId)}`
     : null;
 
-  const displayOrderNumber = orderDetails?.orderNumber?.trim() || null;
+  const displayOrderNumber =
+    orderDetails?.orderNumber?.trim().replace(/^#+/u, "") || null;
   const displayEmail = orderDetails?.email?.trim() || null;
   const displayServicePoint = orderDetails?.servicePointName?.trim() || null;
   const emailConfirmationText = displayEmail
