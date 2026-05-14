@@ -9,7 +9,7 @@ import { Label } from "@repo/ui/components/label";
 import { Checkbox } from "@repo/ui/components/checkbox";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
-import { Save, RefreshCw, Trash2, Plus, Languages, Loader2, Sparkles } from "lucide-react";
+import { Save, RefreshCw, Trash2, Plus, Languages, Sparkles } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -51,6 +51,8 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { ThumbnailsUpload } from "@/components/ThumbnailsUpload";
 import { toast } from "react-toastify";
 import { PRODUCT_API } from "@/lib/product-api";
+import { DashboardProductEditSkeleton } from "@/components/dashboard-skeletons";
+import { Skeleton } from "@repo/ui/components/skeleton";
 
 type Category = {
   id: number;
@@ -386,11 +388,7 @@ export default function ProductDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <DashboardProductEditSkeleton />;
   }
 
   if (error && !product) {
@@ -448,7 +446,7 @@ export default function ProductDetailPage() {
               onClick={fetchProduct}
               disabled={loading}
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Uppdatera
             </Button>
             <AlertDialog>
@@ -534,7 +532,7 @@ export default function ProductDetailPage() {
                     disabled={saving || isSuggestingDescription}
                   >
                     {isSuggestingDescription ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Skeleton className="h-4 w-4 mr-2 shrink-0 rounded" />
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
@@ -568,7 +566,7 @@ export default function ProductDetailPage() {
                     disabled={isTranslating}
                   >
                     {isTranslating ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Skeleton className="h-4 w-4 mr-2 shrink-0 rounded" />
                     ) : (
                       <Languages className="h-4 w-4 mr-2" />
                     )}

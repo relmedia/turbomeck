@@ -22,7 +22,6 @@ import {
   Package,
   Truck,
   CheckCircle2,
-  Loader2,
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -36,6 +35,8 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { toast } from "react-toastify";
+import { DashboardOrderDetailSkeleton } from "@/components/dashboard-skeletons";
+import { Skeleton } from "@repo/ui/components/skeleton";
 import { resolveImageUrl } from "@/lib/image-utils";
 
 type OrderItem = {
@@ -387,13 +388,7 @@ export default function OrderDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-4 p-4 w-full">
-        <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-          Laddar order...
-        </div>
-      </div>
-    );
+    return <DashboardOrderDetailSkeleton />;
   }
   if (!order) {
     return (
@@ -488,7 +483,7 @@ export default function OrderDetailPage() {
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Skeleton className="mr-2 h-4 w-4 shrink-0 rounded" />
                       Tar bort...
                     </>
                   ) : (
@@ -752,7 +747,7 @@ export default function OrderDetailPage() {
                       onClick={handlePostnordBook}
                     >
                       {postnordBooking ? (
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        <Skeleton className="h-4 w-4 shrink-0 rounded" aria-hidden />
                       ) : null}
                       Boka frakt
                     </Button>
@@ -853,7 +848,7 @@ export default function OrderDetailPage() {
                     disabled={labelOptionsLoading}
                   >
                     {labelOptionsLoading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      <Skeleton className="h-3.5 w-3.5 shrink-0 rounded" aria-hidden />
                     ) : (
                       <Printer className="h-3.5 w-3.5" aria-hidden />
                     )}

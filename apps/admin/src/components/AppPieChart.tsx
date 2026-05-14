@@ -8,7 +8,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@repo/ui/components/chart";
-import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { Skeleton } from "@repo/ui/components/skeleton";
 
 const chartConfig = {
   visitors: {
@@ -98,8 +99,15 @@ const AppPieChart = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[250px]">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-44" />
+        <div className="mx-auto flex aspect-square h-[220px] max-h-[250px] w-full max-w-[220px] items-center justify-center">
+          <Skeleton className="size-full max-h-[250px] rounded-full" />
+        </div>
+        <div className="flex justify-center gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-16" />
+        </div>
       </div>
     );
   }

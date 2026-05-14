@@ -19,6 +19,18 @@ export type MailSettings = {
    * shared server (e.g. prime4.inleed.net).
    */
   tlsServername?: string;
+  /**
+   * Comma/newline-separated list of admin recipients that should get a
+   * "new order placed" notification each time a customer completes checkout.
+   * Stored raw so the form can round-trip exactly what the admin typed.
+   */
+  adminNotificationEmails?: string;
+  /**
+   * Master switch for the new-order admin notification. When false, the
+   * recipients list is preserved but no mail is sent. Defaults to true so
+   * existing deployments keep their current behavior after upgrade.
+   */
+  adminNotificationsEnabled?: boolean;
 };
 
 const DEFAULTS: MailSettings = {
@@ -29,7 +41,18 @@ const DEFAULTS: MailSettings = {
   password: "",
   from: "",
   tlsServername: "",
+  adminNotificationEmails: "",
+  adminNotificationsEnabled: true,
 };
+
+function normalizeAdminEmails(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .split(/[\s,;]+/u)
+    .map((s) => s.trim())
+    .filter((s) => s.includes("@"))
+    .join(", ");
+}
 
 export async function GET() {
   const session = await auth();
@@ -53,22 +76,51 @@ export async function GET() {
   }
 }
 
+/**
+ * Read-modify-write so two independent cards on the settings page
+ * (SMTP form + admin-notifications form) can save independently
+ * without wiping fields owned by the other card.
+ * `has()` checks are used so a field that is intentionally absent
+ * from the payload is left untouched.
+ */
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const body = (await req.json()) as Partial<MailSettings>;
-    const value = JSON.stringify({
-      host: body.host ?? "",
-      port: Number(body.port) || 587,
-      secure: Boolean(body.secure),
-      user: body.user ?? "",
-      password: body.password ?? "",
-      from: body.from ?? "",
-      tlsServername: (body.tlsServername ?? "").trim(),
-    });
+    const body = (await req.json()) as Partial<MailSettings> & Record<string, unknown>;
+
+    const existingRow = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, MAIL_KEY))
+      .limit(1);
+    const existing: MailSettings = existingRow[0]
+      ? { ...DEFAULTS, ...(JSON.parse(existingRow[0].value) as Partial<MailSettings>) }
+      : DEFAULTS;
+
+    const has = (key: keyof MailSettings) => Object.prototype.hasOwnProperty.call(body, key);
+
+    const merged: MailSettings = {
+      host: has("host") ? String(body.host ?? "") : existing.host,
+      port: has("port") ? Number(body.port) || 587 : existing.port,
+      secure: has("secure") ? Boolean(body.secure) : existing.secure,
+      user: has("user") ? String(body.user ?? "") : existing.user,
+      password: has("password") ? String(body.password ?? "") : existing.password,
+      from: has("from") ? String(body.from ?? "") : existing.from,
+      tlsServername: has("tlsServername")
+        ? String(body.tlsServername ?? "").trim()
+        : (existing.tlsServername ?? ""),
+      adminNotificationEmails: has("adminNotificationEmails")
+        ? normalizeAdminEmails(body.adminNotificationEmails)
+        : (existing.adminNotificationEmails ?? ""),
+      adminNotificationsEnabled: has("adminNotificationsEnabled")
+        ? Boolean(body.adminNotificationsEnabled)
+        : (existing.adminNotificationsEnabled ?? true),
+    };
+
+    const value = JSON.stringify(merged);
     await db
       .insert(appSettings)
       .values({

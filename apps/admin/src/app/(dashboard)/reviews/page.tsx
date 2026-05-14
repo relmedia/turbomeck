@@ -12,6 +12,7 @@ import {
 import { type Review, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { cn } from "@/lib/utils";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { toast } from "react-toastify";
 
 export default function ReviewsPage() {
@@ -91,7 +92,7 @@ export default function ReviewsPage() {
           onClick={fetchReviews}
           disabled={loading}
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
 
@@ -105,9 +106,7 @@ export default function ReviewsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center h-64 items-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardDataTableSkeleton filterChips={0} columns={5} rows={8} />
       ) : (
         <DataTable
           columns={columns}

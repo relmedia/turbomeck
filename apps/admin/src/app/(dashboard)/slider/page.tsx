@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { RefreshCw, GripVertical, ImageIcon } from "lucide-react";
+import { DashboardSliderPageSkeleton } from "@/components/dashboard-skeletons";
+import { Skeleton } from "@repo/ui/components/skeleton";
 
 type Product = {
   id: number;
@@ -111,11 +113,7 @@ export default function SliderPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <DashboardSliderPageSkeleton />;
   }
 
   if (loadError) {
@@ -199,7 +197,7 @@ export default function SliderPage() {
                     disabled={saving[p.id]}
                   >
                     {saving[p.id] ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <Skeleton className="h-4 w-10 rounded" />
                     ) : (
                       "Ta bort"
                     )}
@@ -248,7 +246,7 @@ export default function SliderPage() {
                     disabled={saving[p.id]}
                   >
                     {saving[p.id] ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <Skeleton className="h-4 w-14 rounded" />
                     ) : (
                       "Lägg till"
                     )}

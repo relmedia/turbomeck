@@ -8,6 +8,7 @@ import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
 import AddUser from "@/components/AddUser";
 import { User, createColumns } from "./columns";
 import { DataTable } from "./data-table";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { Plus, RefreshCw } from "lucide-react";
 
 const UsersPage = () => {
@@ -134,7 +135,7 @@ const UsersPage = () => {
             onClick={fetchUsers}
             disabled={loading}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <Sheet>
             <SheetTrigger asChild>
@@ -153,9 +154,7 @@ const UsersPage = () => {
         </div>
       )}
       {loading ? (
-        <div className="flex justify-center h-64 items-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardDataTableSkeleton filterChips={4} columns={6} rows={8} />
       ) : (
         <DataTable
           columns={columns}

@@ -14,7 +14,11 @@ import { db, products, categories, productCategories, orders, orderItems, review
 import { eq, inArray, desc, asc, sql, or } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
-import { sendOrderConfirmationEmail, sendShipmentDispatchedEmail } from "./email.js";
+import {
+  sendAdminNewOrderEmail,
+  sendOrderConfirmationEmail,
+  sendShipmentDispatchedEmail,
+} from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
 import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
@@ -1250,6 +1254,34 @@ app.post("/api/orders", async (req, res) => {
       paymentMethodDisplay,
       items: emailItems,
     }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
+
+    sendAdminNewOrderEmail({
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      email: body.email,
+      phone: body.phone ?? null,
+      address: body.address,
+      city: body.city,
+      postalCode: body.postalCode,
+      country: body.country ?? "SE",
+      servicePointName: body.servicePointName ?? null,
+      deliveryOption: body.deliveryOption ?? null,
+      subtotal: priced.subtotal,
+      shippingCost: priced.shipping,
+      discount: priced.discount,
+      total: priced.total,
+      paymentMethodDisplay,
+      items: emailItems.map((it) => ({
+        productName: it.productName,
+        variant: it.variant ?? null,
+        price: it.price,
+        quantity: it.quantity,
+      })),
+    }).catch((err) =>
+      console.error("[order] Failed to send admin new-order email:", err),
+    );
 
     res.status(201).json({
       id: order.id,

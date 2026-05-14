@@ -8,6 +8,7 @@ import { Button } from "@repo/ui/components/button";
 import { Plus, RefreshCw } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import EditCategory from "@/components/EditCategory";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { PRODUCT_API } from "@/lib/product-api";
 
 const CategoriesPage = () => {
@@ -93,9 +94,7 @@ const CategoriesPage = () => {
             onClick={fetchCategories}
             disabled={loading}
           >
-            <RefreshCw
-              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <Sheet open={addSheetOpen} onOpenChange={setAddSheetOpen}>
             <SheetTrigger asChild>
@@ -128,9 +127,7 @@ const CategoriesPage = () => {
       )}
 
       {loading ? (
-        <div className="flex justify-center h-64 items-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardDataTableSkeleton filterChips={2} columns={5} rows={8} />
       ) : (
         <>
           <DataTable

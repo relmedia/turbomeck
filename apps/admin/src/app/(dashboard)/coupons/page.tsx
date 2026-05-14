@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@repo/ui/components/table";
 import { Plus, Trash2, Tag, RefreshCw } from "lucide-react";
+import { DashboardCouponsTableSkeleton } from "@/components/dashboard-skeletons";
 
 type Coupon = {
   id: number;
@@ -110,7 +111,7 @@ export default function CouponsPage() {
           onClick={fetchCoupons}
           disabled={loading}
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
 
@@ -207,7 +208,7 @@ export default function CouponsPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-muted-foreground">Laddar...</p>
+              <DashboardCouponsTableSkeleton />
             ) : coupons.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Inga rabattkoder ännu. Skapa en till vänster.

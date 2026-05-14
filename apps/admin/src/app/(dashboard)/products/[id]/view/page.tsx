@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
-import { Pencil, RefreshCw, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, TrendingUp, Trash2, Star, List } from "lucide-react";
+import { Pencil, ChevronLeft, ChevronRight, Banknote, ShoppingCart, FolderTree, TrendingUp, Trash2, Star, List } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -31,6 +31,10 @@ import Image from "next/image";
 import { Avatar, AvatarFallback } from "@repo/ui/components/avatar";
 import { PRODUCT_API } from "@/lib/product-api";
 import { resolveImageUrl } from "@/lib/image-utils";
+import {
+  DashboardProductViewSkeleton,
+  DashboardReviewsSectionSkeleton,
+} from "@/components/dashboard-skeletons";
 
 type Category = {
   id: number;
@@ -166,11 +170,7 @@ export default function ProductViewPage() {
     .map((c) => categoryDisplayName(c!));
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <DashboardProductViewSkeleton />;
   }
 
   if (error && !product) {
@@ -495,9 +495,7 @@ export default function ProductViewPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 px-6 items-start">
               <div className="space-y-4">
                 {reviewsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
+                  <DashboardReviewsSectionSkeleton />
                 ) : reviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6">Inga recensioner ännu.</p>
                 ) : (

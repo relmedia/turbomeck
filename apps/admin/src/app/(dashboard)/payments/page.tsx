@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Payment, createColumns } from "./columns";
 import { DataTable } from "./data-table";
 import { Button } from "@repo/ui/components/button";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { Plus } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -125,9 +126,7 @@ const PaymentsPage = () => {
         </div>
       </div>
       {loading ? (
-        <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-          Laddar ordrar...
-        </div>
+        <DashboardDataTableSkeleton filterChips={3} columns={7} rows={8} />
       ) : (
         <DataTable
           columns={columns}

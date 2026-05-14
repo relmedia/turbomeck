@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@repo/ui/components/button";
+import { Skeleton } from "@repo/ui/components/skeleton";
 import { Star, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -59,12 +60,27 @@ export function CustomerReviews() {
 
   if (stats === null) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <h1 className="text-lg font-semibold">Kundrecensioner</h1>
-            <p className="text-sm text-muted-foreground">Laddar...</p>
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-56" />
           </div>
+          <Skeleton className="h-8 w-28 shrink-0 rounded-md" />
+        </div>
+        <div className="space-y-3">
+          {[0, 1, 2, 3, 4].map((key) => (
+            <div key={key} className="flex items-center gap-2">
+              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-2 flex-1 rounded-full" />
+              <Skeleton className="h-4 w-8" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-2 rounded-lg border border-border/60 p-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-[80%]" />
         </div>
       </div>
     );

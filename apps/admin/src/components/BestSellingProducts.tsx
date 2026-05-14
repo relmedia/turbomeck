@@ -35,6 +35,7 @@ import { resolveImageUrl } from "@/lib/image-utils";
 import Link from "next/link";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DashboardBestSellingTableSkeleton } from "@/components/dashboard-skeletons";
 
 type ProductRow = {
   id: number;
@@ -290,7 +291,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
         disabled={loading}
         aria-label="Uppdatera"
       >
-        <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className="w-4 h-4" />
       </Button>
       <Input
         placeholder="Filtrera produkter..."
@@ -366,9 +367,7 @@ export function BestSellingProducts({ hideTitle, onToolbarRender }: BestSellingP
       )}
       <div className="rounded-xl border bg-card overflow-hidden font-light [&_th]:font-normal">
         {loading && data.length === 0 ? (
-          <div className="flex justify-center items-center h-64">
-            <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
+          <DashboardBestSellingTableSkeleton />
         ) : (
         <>
         <Table>

@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@repo/ui/components/dropdown-menu";
+import { Skeleton } from "@repo/ui/components/skeleton";
 
 type LocationRow = {
   name: string;
@@ -88,8 +89,19 @@ export function SalesByLocation() {
   const renderContent = () => {
     if (loading && locations.length === 0) {
       return (
-        <div className="flex justify-center items-center h-48">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="space-y-6 py-1">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-5 w-14 rounded-md" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-2 flex-1 rounded-full" />
+                <Skeleton className="h-4 w-10" />
+              </div>
+            </div>
+          ))}
         </div>
       );
     }
@@ -148,7 +160,7 @@ export function SalesByLocation() {
             disabled={loading}
             aria-label="Uppdatera"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@repo/ui/components/button";
 import { DataTable } from "../payments/data-table";
 import { createShippingColumns } from "./columns";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { RefreshCw } from "lucide-react";
 
 export type ShippingRow = {
@@ -64,13 +65,11 @@ const ShippingPage = () => {
           onClick={fetchShipping}
           disabled={loading}
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
       {loading ? (
-        <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-          Laddar leveransinformation...
-        </div>
+        <DashboardDataTableSkeleton filterChips={3} columns={7} rows={8} />
       ) : (
         <DataTable columns={columns} data={data} />
       )}

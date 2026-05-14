@@ -114,7 +114,25 @@ type MailConfig = {
   user: string;
   password: string;
   from: string;
+  /** Comma/space/newline-separated recipients for "new order placed" admin alerts. */
+  adminNotificationEmails?: string;
+  /** Master switch for the new-order admin notification. Defaults to true if absent. */
+  adminNotificationsEnabled?: boolean;
 };
+
+/**
+ * Parse the raw admin-notifications field (comma/whitespace separated)
+ * into a clean list of unique addresses that look like emails.
+ */
+function parseAdminNotificationRecipients(raw: string | undefined | null): string[] {
+  if (!raw) return [];
+  const set = new Set<string>();
+  for (const part of String(raw).split(/[\s,;]+/u)) {
+    const trimmed = part.trim();
+    if (trimmed.includes("@")) set.add(trimmed);
+  }
+  return [...set];
+}
 
 function getMailConfigFromEnv(): MailConfig | null {
   const host = process.env.SMTP_HOST?.trim();
@@ -144,7 +162,12 @@ async function getMailConfig(): Promise<MailConfig | null> {
   } catch {
     /* fall through */
   }
-  return getMailConfigFromEnv();
+  const envCfg = getMailConfigFromEnv();
+  if (!envCfg) return null;
+  return {
+    ...envCfg,
+    adminNotificationEmails: process.env.ADMIN_NOTIFICATION_EMAILS ?? "",
+  };
 }
 
 type OrderEmailData = {
@@ -687,6 +710,225 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
     return true;
   } catch (error) {
     console.error("[email] Failed to send order confirmation:", error);
+    return false;
+  }
+}
+
+// ——— Admin notification: a customer just placed an order ———
+
+export type AdminNewOrderEmailData = {
+  orderNumber: string;
+  /** Internal order id (used to build the admin deep-link). */
+  orderId: number | string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  address: string;
+  city: string;
+  postalCode: string;
+  country: string;
+  servicePointName?: string | null;
+  deliveryOption?: string | null;
+  subtotal: number;
+  shippingCost: number;
+  discount: number;
+  total: number;
+  paymentMethodDisplay: string;
+  items: Array<{
+    productName: string;
+    variant?: string | null;
+    price: number;
+    quantity: number;
+  }>;
+};
+
+function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
+  const adminBase = (
+    process.env.NEXT_PUBLIC_ADMIN_URL ||
+    process.env.ADMIN_URL ||
+    ""
+  ).replace(/\/$/u, "");
+  const orderUrl = adminBase ? `${adminBase}/payments/${data.orderId}` : "";
+
+  const fullName = `${data.firstName} ${data.lastName}`.trim();
+  const itemsText = data.items
+    .map((it) => {
+      const variant = it.variant ? ` (${escapeHtml(it.variant)})` : "";
+      return `<tr>
+        <td style="padding:6px 0;color:#111827;font-size:14px;">${escapeHtml(it.productName)}${variant}</td>
+        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right;white-space:nowrap;">${it.quantity} × ${it.price.toLocaleString("sv-SE")} kr</td>
+      </tr>`;
+    })
+    .join("");
+
+  const addressBlock = [
+    escapeHtml(fullName),
+    escapeHtml(data.address),
+    `${escapeHtml(data.postalCode)} ${escapeHtml(data.city)}`,
+    escapeHtml(data.country || ""),
+    data.servicePointName ? `Ombud: ${escapeHtml(data.servicePointName)}` : "",
+  ]
+    .filter(Boolean)
+    .join("<br/>");
+
+  return `
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ny order ${escapeHtml(data.orderNumber)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#ffffff;padding:24px 32px;">
+              <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;">Turbomeck · Admin</p>
+              <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">Ny order mottagen</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 8px 32px;">
+              <p style="margin:0 0 4px 0;font-size:14px;color:#6b7280;">Ordernummer</p>
+              <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;">${escapeHtml(data.orderNumber)}</p>
+              <p style="margin:0 0 4px 0;font-size:14px;color:#6b7280;">Kund</p>
+              <p style="margin:0 0 4px 0;font-size:15px;color:#111827;">${escapeHtml(fullName) || "—"}</p>
+              <p style="margin:0 0 4px 0;font-size:14px;color:#374151;">
+                <a href="mailto:${escapeHtmlAttr(data.email)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.email)}</a>
+              </p>
+              ${
+                data.phone
+                  ? `<p style="margin:0 0 16px 0;font-size:14px;color:#374151;">${escapeHtml(data.phone)}</p>`
+                  : `<p style="margin:0 0 16px 0;"></p>`
+              }
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f9fafb;border-radius:8px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Produkter</p>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      ${itemsText}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:6px 0;color:#6b7280;font-size:14px;">Delsumma</td>
+                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${data.subtotal.toLocaleString("sv-SE")} kr</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#6b7280;font-size:14px;">Frakt</td>
+                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${data.shippingCost > 0 ? `${data.shippingCost.toLocaleString("sv-SE")} kr` : "Gratis"}</td>
+                </tr>
+                ${
+                  data.discount > 0
+                    ? `<tr>
+                        <td style="padding:6px 0;color:#16a34a;font-size:14px;">Rabatt</td>
+                        <td style="padding:6px 0;color:#16a34a;font-size:14px;text-align:right;">-${data.discount.toLocaleString("sv-SE")} kr</td>
+                      </tr>`
+                    : ""
+                }
+                <tr>
+                  <td colspan="2" style="padding:8px 0 0 0;border-top:1px solid #e5e7eb;"></td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;color:#111827;font-size:16px;font-weight:700;">Totalt</td>
+                  <td style="padding:8px 0;color:#111827;font-size:16px;font-weight:700;text-align:right;">${data.total.toLocaleString("sv-SE")} kr</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 20px 32px;">
+              <p style="margin:0 0 4px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Betalning</p>
+              <p style="margin:0 0 16px 0;font-size:14px;color:#111827;">${escapeHtml(data.paymentMethodDisplay)}</p>
+              <p style="margin:0 0 4px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Leveransadress</p>
+              <p style="margin:0 0 16px 0;font-size:14px;color:#111827;line-height:1.55;">${addressBlock || "—"}</p>
+            </td>
+          </tr>
+          ${
+            orderUrl
+              ? `<tr>
+                  <td style="padding:0 32px 28px 32px;">
+                    <a href="${escapeHtmlAttr(orderUrl)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Öppna ordern i admin →</a>
+                  </td>
+                </tr>`
+              : ""
+          }
+          <tr>
+            <td style="background:#f9fafb;padding:18px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;">Detta är ett internt admin-meddelande från Turbomeck. © ${new Date().getFullYear()}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Notifies every configured admin recipient that a customer just placed an order.
+ * Recipients come from `app_settings.mail.adminNotificationEmails`
+ * (or env `ADMIN_NOTIFICATION_EMAILS` if the DB row is absent).
+ * Silently no-ops when no recipients or SMTP config exist.
+ */
+export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) {
+    console.warn("[email] No mail config, skipping admin new-order notification");
+    return false;
+  }
+  if (config.adminNotificationsEnabled === false) {
+    return false;
+  }
+  const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
+  if (recipients.length === 0) {
+    return false;
+  }
+
+  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    tls: skipTlsVerify
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : {},
+  });
+
+  const html = renderAdminNewOrderEmail(data);
+  const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
+  const customer = `${data.firstName} ${data.lastName}`.trim() || data.email;
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck Admin" <${config.from}>`,
+      to: recipients.join(", "),
+      subject: `Ny order #${orderRef} – ${customer} (${data.total.toLocaleString("sv-SE")} kr)`,
+      html,
+    });
+    console.log(
+      `[email] Admin new-order notice sent to ${recipients.join(", ")} for order ${data.orderNumber}`,
+    );
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send admin new-order notice:", error);
     return false;
   }
 }

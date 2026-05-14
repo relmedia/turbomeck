@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { RefreshCw } from "lucide-react";
+import { Skeleton } from "@repo/ui/components/skeleton";
 
 const chartConfig = {
   mobile: {
@@ -70,8 +70,14 @@ const AppAreaChart = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-[200px] w-full rounded-lg" />
+        <div className="flex flex-wrap justify-center gap-3">
+          <Skeleton className="h-4 w-14" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+        </div>
       </div>
     );
   }

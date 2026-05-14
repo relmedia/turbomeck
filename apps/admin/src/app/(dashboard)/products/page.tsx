@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@repo/ui/components/button";
 import { Plus, RefreshCw } from "lucide-react";
 import { PRODUCT_API } from "@/lib/product-api";
+import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 
 const ProductsPage = () => {
   const [data, setData] = useState<Product[]>([]);
@@ -75,7 +76,7 @@ const ProductsPage = () => {
             onClick={fetchProducts}
             disabled={loading}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className="w-4 h-4" />
           </Button>
           <Button size="sm" asChild>
             <Link href="/products/add">
@@ -100,9 +101,7 @@ const ProductsPage = () => {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardDataTableSkeleton filterChips={5} columns={8} rows={8} />
       ) : (
         <DataTable columns={columns} data={data} categories={categories.map((c) => ({ id: c.id, name: c.parentName ? `${c.parentName} › ${c.name}` : c.name }))} onDelete={handleDelete} />
       )}
