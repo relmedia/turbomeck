@@ -845,8 +845,8 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
           <tr>
-            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#ffffff;padding:24px 32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px 0;">
+            <td style="background:#ffffff;border-bottom:1px solid #e5e7eb;padding:28px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
                 <tr>
                   ${
                     logoUrl
@@ -854,17 +854,17 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
                           <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="32" height="32" style="display:block;width:32px;height:32px;border-radius:6px;" />
                         </td>`
                       : `<td style="vertical-align:middle;padding-right:12px;">
-                          <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.12);color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
+                          <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:#0f172a;color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
                         </td>`
                   }
                   <td style="vertical-align:middle;">
-                    <span style="font-size:16px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#ffffff;">MECK</span></span>
+                    <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
                   </td>
                 </tr>
               </table>
-              <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;">Turbomeck · Admin</p>
-              <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">Ny order mottagen</h1>
-              <p style="margin:8px 0 0 0;font-size:14px;color:#cbd5e1;line-height:1.5;">En kund har just slutfört ett köp. Sammanställningen och kunduppgifterna finns nedan – öppna ordern i admin för att hantera frakt och status.</p>
+              <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.12em;color:#6b7280;">TURBOMECK · STUDIO</p>
+              <h1 style="margin:8px 0 0 0;font-size:22px;font-weight:700;color:#111827;">Ny order mottagen</h1>
+              <p style="margin:10px 0 0 0;font-size:14px;color:#374151;line-height:1.55;">En kund har just slutfört ett köp. Sammanställningen och kunduppgifterna finns nedan – öppna ordern i Turbomeck studio för att hantera frakt och status.</p>
             </td>
           </tr>
           <tr>
@@ -938,7 +938,7 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
             orderUrl
               ? `<tr>
                   <td style="padding:0 32px 28px 32px;">
-                    <a href="${escapeHtmlAttr(orderUrl)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Öppna ordern i admin →</a>
+                    <a href="${escapeHtmlAttr(orderUrl)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Öppna ordern i Turbomeck Studio →</a>
                   </td>
                 </tr>`
               : ""
@@ -1038,6 +1038,14 @@ type AdminEmailLayoutOptions = {
 
 function renderAdminEmailLayout(opts: AdminEmailLayoutOptions): string {
   const sectionsHtml = opts.sections.join("\n");
+  const logoUrl = getOrderEmailLogoUrl();
+  const logoCell = logoUrl
+    ? `<td style="vertical-align:middle;padding-right:12px;">
+        <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="32" height="32" style="display:block;width:32px;height:32px;border-radius:6px;" />
+      </td>`
+    : `<td style="vertical-align:middle;padding-right:12px;">
+        <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:#0f172a;color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
+      </td>`;
   const ctaHtml = opts.cta
     ? `<tr>
         <td style="padding:0 32px 28px 32px;">
@@ -1060,16 +1068,24 @@ function renderAdminEmailLayout(opts: AdminEmailLayoutOptions): string {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
           <tr>
-            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#ffffff;padding:24px 32px;">
-              <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;">Turbomeck · Admin · ${escapeHtml(opts.eyebrow)}</p>
-              <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">${escapeHtml(opts.heading)}</h1>
+            <td style="background:#ffffff;border-bottom:1px solid #e5e7eb;padding:28px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                <tr>
+                  ${logoCell}
+                  <td style="vertical-align:middle;">
+                    <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.12em;color:#6b7280;">TURBOMECK · STUDIO · ${escapeHtml(opts.eyebrow.toUpperCase())}</p>
+              <h1 style="margin:8px 0 0 0;font-size:22px;font-weight:700;color:#111827;">${escapeHtml(opts.heading)}</h1>
             </td>
           </tr>
           ${sectionsHtml}
           ${ctaHtml}
           <tr>
             <td style="background:#f9fafb;padding:18px 32px;text-align:center;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;font-size:12px;color:#9ca3af;">Internt admin-meddelande från Turbomeck. © ${new Date().getFullYear()}</p>
+              <p style="margin:0;font-size:12px;color:#6b7280;">Internt meddelande från Turbomeck Studio. © ${new Date().getFullYear()}</p>
             </td>
           </tr>
         </table>
@@ -1185,7 +1201,7 @@ function renderAdminNewReviewEmail(data: AdminNewReviewEmailData): string {
     eyebrow: "Ny review",
     heading: `Ny recension för ${data.productName}`,
     sections,
-    ...(reviewUrl ? { cta: { label: "Hantera recensioner i admin", url: reviewUrl } } : {}),
+    ...(reviewUrl ? { cta: { label: "Hantera recensioner i Turbomeck Studio", url: reviewUrl } } : {}),
   });
 }
 
@@ -1271,7 +1287,7 @@ function renderAdminUserDeletedEmail(data: AdminUserDeletedEmailData): string {
         ? "En användare har raderat sitt konto"
         : "Ett användarkonto har tagits bort",
     sections,
-    ...(usersUrl ? { cta: { label: "Öppna användarlistan", url: usersUrl } } : {}),
+    ...(usersUrl ? { cta: { label: "Öppna användarlistan i Turbomeck Studio", url: usersUrl } } : {}),
   });
 }
 
@@ -1362,7 +1378,7 @@ function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): str
         "Etiketten finns tillgänglig i admin under ordern. Kunden får automatiskt ett mejl med spårningslänken.",
       ),
     ],
-    ...(orderUrl ? { cta: { label: "Öppna ordern i admin", url: orderUrl } } : {}),
+    ...(orderUrl ? { cta: { label: "Öppna ordern i Turbomeck Studio", url: orderUrl } } : {}),
   });
 }
 

@@ -422,8 +422,6 @@ const CartPage: React.FC = () => {
               )}
               {isSwedenForCoreOffer && cartNeedsCoreReturn && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className="text-sm font-medium">{t("cart.coreReturnTitle")}</p>
-                  <p className="text-xs text-muted-foreground">{t("cart.coreReturnIntro")}</p>
                   <label className="flex items-start gap-2 cursor-pointer text-sm">
                     <input
                       type="radio"

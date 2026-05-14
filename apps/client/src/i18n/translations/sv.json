@@ -393,8 +393,6 @@
     "discount": "Rabatt",
     "total": "Totalt",
     "quoteIncomplete": "Välj leveransland och kärnretur enligt rutorna ovan för att kunna betala.",
-    "coreReturnTitle": "Gammal turbo (kärnretur) – Sverige",
-    "coreReturnIntro": "Gäller när leveransadressen är i Sverige. Du väljer ett av alternativen nedan. Beloppet styrs av servern vid betalning.",
     "coreReturnOptionSend": "Jag skickar in min gamla turbo inom 14 dagar enligt instruktion i orderbekräftelsen (ingen kärnavgift i kassan).",
     "coreReturnOptionKeep": "Jag behåller min gamla turbo / skickar inte in kärnan – jag betalar {{amount}} kr i kärnavgift nu.",
     "coreReturnInvoiceNote": "Väljer du att skicka in kärnan men inte gör det inom 14 dagar kan du debiteras {{amount}} kr i efterhand (faktura) enligt köpvillkoren.",

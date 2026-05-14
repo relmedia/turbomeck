@@ -393,8 +393,6 @@
     "discount": "Discount",
     "total": "Total",
     "quoteIncomplete": "Choose delivery country and core return option above to continue to payment.",
-    "coreReturnTitle": "Old turbo (core return) – Sweden",
-    "coreReturnIntro": "Applies when the delivery address is in Sweden. Choose one option below. The amount charged is calculated on our servers at payment time.",
     "coreReturnOptionSend": "I will send in my old turbo within 14 days as instructed in the order confirmation (no core charge at checkout).",
     "coreReturnOptionKeep": "I keep my old turbo / will not send the core – I pay the {{amount}} SEK core charge now.",
     "coreReturnInvoiceNote": "If you choose to send the core but do not return it within 14 days, you may be invoiced {{amount}} SEK afterwards according to our terms.",
