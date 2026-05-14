@@ -31,6 +31,26 @@ export type MailSettings = {
    * existing deployments keep their current behavior after upgrade.
    */
   adminNotificationsEnabled?: boolean;
+  /**
+   * Per-event toggles. A specific event only mails when both the master
+   * switch above and the matching key here are true. Absent keys default
+   * to true so older docs keep their current behavior after upgrade.
+   */
+  adminNotifications?: AdminNotificationFlags;
+};
+
+export type AdminNotificationFlags = {
+  newOrder?: boolean;
+  newReview?: boolean;
+  userDeleted?: boolean;
+  shipmentBooked?: boolean;
+};
+
+const DEFAULT_FLAGS: Required<AdminNotificationFlags> = {
+  newOrder: true,
+  newReview: true,
+  userDeleted: true,
+  shipmentBooked: true,
 };
 
 const DEFAULTS: MailSettings = {
@@ -43,6 +63,7 @@ const DEFAULTS: MailSettings = {
   tlsServername: "",
   adminNotificationEmails: "",
   adminNotificationsEnabled: true,
+  adminNotifications: DEFAULT_FLAGS,
 };
 
 function normalizeAdminEmails(raw: unknown): string {
@@ -102,6 +123,19 @@ export async function POST(req: Request) {
 
     const has = (key: keyof MailSettings) => Object.prototype.hasOwnProperty.call(body, key);
 
+    const mergedFlags: Required<AdminNotificationFlags> = (() => {
+      const current = { ...DEFAULT_FLAGS, ...(existing.adminNotifications ?? {}) };
+      const incoming = body.adminNotifications;
+      if (!incoming || typeof incoming !== "object") return current;
+      const next: Required<AdminNotificationFlags> = { ...current };
+      for (const k of Object.keys(DEFAULT_FLAGS) as Array<keyof AdminNotificationFlags>) {
+        if (Object.prototype.hasOwnProperty.call(incoming, k)) {
+          next[k] = Boolean((incoming as AdminNotificationFlags)[k]);
+        }
+      }
+      return next;
+    })();
+
     const merged: MailSettings = {
       host: has("host") ? String(body.host ?? "") : existing.host,
       port: has("port") ? Number(body.port) || 587 : existing.port,
@@ -118,6 +152,7 @@ export async function POST(req: Request) {
       adminNotificationsEnabled: has("adminNotificationsEnabled")
         ? Boolean(body.adminNotificationsEnabled)
         : (existing.adminNotificationsEnabled ?? true),
+      adminNotifications: mergedFlags,
     };
 
     const value = JSON.stringify(merged);

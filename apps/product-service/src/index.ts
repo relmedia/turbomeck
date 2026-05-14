@@ -16,6 +16,9 @@ import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 import {
   sendAdminNewOrderEmail,
+  sendAdminNewReviewEmail,
+  sendAdminShipmentBookedEmail,
+  sendAdminUserDeletedEmail,
   sendOrderConfirmationEmail,
   sendShipmentDispatchedEmail,
 } from "./email.js";
@@ -1339,6 +1342,124 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
   } catch (error) {
     console.error("send-shipment-notification:", error);
     res.status(500).json({ error: "Failed to send shipment notification" });
+  }
+});
+
+/**
+ * POST /api/admin/notify/new-review
+ * Internal endpoint called by client app after a customer submits a review.
+ * Always 200 OK so callers can fire-and-forget; `sent: false` indicates the
+ * admin disabled the event or no recipients are configured.
+ */
+app.post("/api/admin/notify/new-review", async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      productId?: number | string;
+      productName?: string;
+      reviewId?: number | string;
+      reviewerName?: string;
+      reviewerEmail?: string | null;
+      rating?: number;
+      title?: string | null;
+      comment?: string | null;
+      verifiedPurchase?: boolean;
+    };
+    if (
+      body.productId == null ||
+      body.reviewId == null ||
+      typeof body.rating !== "number" ||
+      typeof body.productName !== "string" ||
+      typeof body.reviewerName !== "string"
+    ) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    const sent = await sendAdminNewReviewEmail({
+      productId: body.productId,
+      productName: body.productName,
+      reviewId: body.reviewId,
+      reviewerName: body.reviewerName,
+      reviewerEmail: body.reviewerEmail ?? null,
+      rating: body.rating,
+      title: body.title ?? null,
+      comment: body.comment ?? null,
+      verifiedPurchase: Boolean(body.verifiedPurchase),
+    });
+    return res.json({ success: true, sent });
+  } catch (error) {
+    console.error("notify/new-review:", error);
+    return res.status(500).json({ error: "Failed to send notification" });
+  }
+});
+
+/**
+ * POST /api/admin/notify/user-deleted
+ * Internal endpoint called when a user account is removed (self or by admin).
+ * Caller MUST capture name/email before the deletion runs (rows are gone after).
+ */
+app.post("/api/admin/notify/user-deleted", async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      userId?: string;
+      userName?: string | null;
+      userEmail?: string | null;
+      initiator?: "self" | "admin";
+      performedBy?: string | null;
+    };
+    if (!body.userId || (body.initiator !== "self" && body.initiator !== "admin")) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    const sent = await sendAdminUserDeletedEmail({
+      userId: body.userId,
+      userName: body.userName ?? null,
+      userEmail: body.userEmail ?? null,
+      initiator: body.initiator,
+      performedBy: body.performedBy ?? null,
+    });
+    return res.json({ success: true, sent });
+  } catch (error) {
+    console.error("notify/user-deleted:", error);
+    return res.status(500).json({ error: "Failed to send notification" });
+  }
+});
+
+/**
+ * POST /api/admin/notify/shipment-booked
+ * Internal endpoint called by admin app after PostNord booking succeeds.
+ */
+app.post("/api/admin/notify/shipment-booked", async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      orderId?: number | string;
+      orderNumber?: string;
+      trackingId?: string;
+      customerName?: string;
+      customerEmail?: string | null;
+      servicePointName?: string | null;
+      weightKg?: number | null;
+      performedBy?: string | null;
+    };
+    if (
+      body.orderId == null ||
+      typeof body.orderNumber !== "string" ||
+      typeof body.trackingId !== "string" ||
+      typeof body.customerName !== "string"
+    ) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    const sent = await sendAdminShipmentBookedEmail({
+      orderId: body.orderId,
+      orderNumber: body.orderNumber,
+      trackingId: body.trackingId,
+      customerName: body.customerName,
+      customerEmail: body.customerEmail ?? null,
+      servicePointName: body.servicePointName ?? null,
+      weightKg: body.weightKg ?? null,
+      performedBy: body.performedBy ?? null,
+    });
+    return res.json({ success: true, sent });
+  } catch (error) {
+    console.error("notify/shipment-booked:", error);
+    return res.status(500).json({ error: "Failed to send notification" });
   }
 });
 

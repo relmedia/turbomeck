@@ -10,6 +10,7 @@ import {
   postEdiBooking,
 } from "@/lib/postnord-booking-edi";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
+import { notifyShipmentBooked } from "@/lib/trigger-admin-notification";
 
 /**
  * POST /api/orders/[id]/postnord-book-shipment
@@ -144,6 +145,17 @@ export async function POST(
     shipmentEmailError = err instanceof Error ? err.message : String(err);
     console.error("[postnord-book-shipment] shipment email:", err);
   }
+
+  void notifyShipmentBooked({
+    orderId,
+    orderNumber: order.orderNumber ?? `ORD-${orderId}`,
+    trackingId: booked.trackableId,
+    customerName: `${order.firstName ?? ""} ${order.lastName ?? ""}`.trim() || "—",
+    customerEmail: order.email ?? null,
+    servicePointName: order.servicePointName ?? null,
+    weightKg,
+    performedBy: session.user.email ?? session.user.id ?? null,
+  });
 
   return NextResponse.json({
     success: true,

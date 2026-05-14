@@ -1,9 +1,10 @@
 import { auth } from "@repo/auth";
 import { db } from "@repo/database";
-import { reviews, orders, orderItems, users } from "@repo/database";
+import { reviews, orders, orderItems, users, products } from "@repo/database";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireSameOrigin } from "@/lib/same-origin";
+import { notifyNewReview } from "@/lib/trigger-admin-notification";
 
 export async function POST(req: Request) {
   // SECURITY (audit M3): same-origin gate on cookie-auth state change.
@@ -63,7 +64,30 @@ export async function POST(req: Request) {
       .returning();
 
     const r = inserted[0]!;
-    const [u] = await db.select({ name: users.name }).from(users).where(eq(users.id, r.userId)).limit(1);
+    const [u] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, r.userId))
+      .limit(1);
+    const [p] = await db
+      .select({ name: products.name })
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+
+    // Fire-and-forget admin notification; errors are swallowed inside the
+    // helper so a flaky SMTP can't block the customer's review submission.
+    void notifyNewReview({
+      productId,
+      productName: p?.name ?? `Produkt #${productId}`,
+      reviewId: r.id,
+      reviewerName: u?.name ?? "Anonym",
+      reviewerEmail: u?.email ?? null,
+      rating,
+      title,
+      comment,
+      verifiedPurchase: orderId != null,
+    });
 
     return NextResponse.json({
       success: true,

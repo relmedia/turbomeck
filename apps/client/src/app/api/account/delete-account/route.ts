@@ -4,6 +4,7 @@ import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireSameOrigin } from "@/lib/same-origin";
+import { notifyUserDeleted } from "@/lib/trigger-admin-notification";
 
 export async function POST(req: Request) {
   // SECURITY (audit M3): delete-account is irreversible; require an explicit
@@ -31,7 +32,12 @@ export async function POST(req: Request) {
     }
 
     const [user] = await db
-      .select({ id: users.id, password: users.password })
+      .select({
+        id: users.id,
+        password: users.password,
+        name: users.name,
+        email: users.email,
+      })
       .from(users)
       .where(eq(users.id, session.user.id))
       .limit(1);
@@ -59,6 +65,14 @@ export async function POST(req: Request) {
     }
 
     await db.delete(users).where(eq(users.id, session.user.id));
+
+    // Notify admins AFTER delete succeeds, with values captured pre-delete.
+    void notifyUserDeleted({
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      initiator: "self",
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

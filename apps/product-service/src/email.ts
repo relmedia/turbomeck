@@ -107,6 +107,12 @@ export function resolveProductImageUrlForEmail(raw: string | null | undefined): 
   return absolute;
 }
 
+export type AdminEventKey =
+  | "newOrder"
+  | "newReview"
+  | "userDeleted"
+  | "shipmentBooked";
+
 type MailConfig = {
   host: string;
   port: number;
@@ -114,11 +120,24 @@ type MailConfig = {
   user: string;
   password: string;
   from: string;
-  /** Comma/space/newline-separated recipients for "new order placed" admin alerts. */
+  /** Comma/space/newline-separated recipients for admin alerts. */
   adminNotificationEmails?: string;
-  /** Master switch for the new-order admin notification. Defaults to true if absent. */
+  /** Master switch for admin notifications. Defaults to true if absent. */
   adminNotificationsEnabled?: boolean;
+  /** Per-event toggles. Each key defaults to true if absent. */
+  adminNotifications?: Partial<Record<AdminEventKey, boolean>>;
 };
+
+/**
+ * An admin event mails only when both the master switch and the per-event
+ * key allow it. Both default to true so an unconfigured DB row keeps the
+ * historic always-on behavior for the order-confirmation flow.
+ */
+function isAdminEventEnabled(config: MailConfig, key: AdminEventKey): boolean {
+  if (config.adminNotificationsEnabled === false) return false;
+  const flag = config.adminNotifications?.[key];
+  return flag !== false;
+}
 
 /**
  * Parse the raw admin-notifications field (comma/whitespace separated)
@@ -893,7 +912,7 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     console.warn("[email] No mail config, skipping admin new-order notification");
     return false;
   }
-  if (config.adminNotificationsEnabled === false) {
+  if (!isAdminEventEnabled(config, "newOrder")) {
     return false;
   }
   const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
@@ -929,6 +948,393 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     return true;
   } catch (error) {
     console.error("[email] Failed to send admin new-order notice:", error);
+    return false;
+  }
+}
+
+// ——— Shared admin-mail helpers ———
+
+/**
+ * Resolves the absolute base URL the admin app is reachable on, used to
+ * build "open in admin" deep links inside admin-side emails. Falls back
+ * to an empty string when no admin URL is configured; callers should
+ * omit the CTA in that case.
+ */
+function getAdminBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_ADMIN_URL ||
+    process.env.ADMIN_URL ||
+    ""
+  ).replace(/\/$/u, "");
+}
+
+type AdminEmailLayoutOptions = {
+  /** Small uppercase eyebrow above the heading. */
+  eyebrow: string;
+  /** Main heading shown in the dark header card. */
+  heading: string;
+  /** Body sections (already-rendered HTML strings, inserted in order). */
+  sections: string[];
+  /** Optional CTA at the bottom (label + absolute URL). */
+  cta?: { label: string; url: string };
+};
+
+function renderAdminEmailLayout(opts: AdminEmailLayoutOptions): string {
+  const sectionsHtml = opts.sections.join("\n");
+  const ctaHtml = opts.cta
+    ? `<tr>
+        <td style="padding:0 32px 28px 32px;">
+          <a href="${escapeHtmlAttr(opts.cta.url)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${escapeHtml(opts.cta.label)} →</a>
+        </td>
+      </tr>`
+    : "";
+
+  return `
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(opts.heading)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#ffffff;padding:24px 32px;">
+              <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;">Turbomeck · Admin · ${escapeHtml(opts.eyebrow)}</p>
+              <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">${escapeHtml(opts.heading)}</h1>
+            </td>
+          </tr>
+          ${sectionsHtml}
+          ${ctaHtml}
+          <tr>
+            <td style="background:#f9fafb;padding:18px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;">Internt admin-meddelande från Turbomeck. © ${new Date().getFullYear()}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+function adminInfoSection(rows: Array<{ label: string; value: string }>): string {
+  const trs = rows
+    .map(
+      (r) => `<tr>
+        <td style="padding:8px 0;color:#6b7280;font-size:13px;width:40%;vertical-align:top;">${escapeHtml(r.label)}</td>
+        <td style="padding:8px 0;color:#111827;font-size:14px;">${r.value}</td>
+      </tr>`,
+    )
+    .join("");
+  return `<tr>
+    <td style="padding:20px 32px 4px 32px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">${trs}</table>
+    </td>
+  </tr>`;
+}
+
+function adminBlockSection(title: string, html: string): string {
+  return `<tr>
+    <td style="padding:8px 32px 16px 32px;">
+      <p style="margin:0 0 6px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(title)}</p>
+      <div style="font-size:14px;color:#111827;line-height:1.55;">${html}</div>
+    </td>
+  </tr>`;
+}
+
+async function buildAdminTransport(config: MailConfig) {
+  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    tls: skipTlsVerify
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : {},
+  });
+}
+
+// ——— Admin notification: new review submitted ———
+
+export type AdminNewReviewEmailData = {
+  productId: number | string;
+  productName: string;
+  reviewId: number | string;
+  reviewerName: string;
+  reviewerEmail?: string | null;
+  rating: number;
+  title?: string | null;
+  comment?: string | null;
+  verifiedPurchase: boolean;
+};
+
+function ratingStars(rating: number): string {
+  const r = Math.max(0, Math.min(5, Math.round(rating)));
+  const filled = "★".repeat(r);
+  const empty = "☆".repeat(5 - r);
+  return `<span style="color:#f59e0b;font-size:16px;letter-spacing:1px;">${filled}<span style="color:#d1d5db;">${empty}</span></span>`;
+}
+
+function renderAdminNewReviewEmail(data: AdminNewReviewEmailData): string {
+  const adminBase = getAdminBaseUrl();
+  const reviewUrl = adminBase ? `${adminBase}/reviews` : "";
+
+  const reviewerHtml = data.reviewerEmail
+    ? `${escapeHtml(data.reviewerName)} · <a href="mailto:${escapeHtmlAttr(data.reviewerEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.reviewerEmail)}</a>`
+    : escapeHtml(data.reviewerName);
+
+  const verifiedBadge = data.verifiedPurchase
+    ? `<span style="display:inline-block;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">Verifierat köp</span>`
+    : `<span style="display:inline-block;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">Ej verifierat</span>`;
+
+  const sections = [
+    adminInfoSection([
+      { label: "Produkt", value: escapeHtml(data.productName) },
+      {
+        label: "Betyg",
+        value: `${ratingStars(data.rating)} <span style="color:#6b7280;">(${data.rating}/5)</span>`,
+      },
+      { label: "Recensent", value: reviewerHtml },
+      { label: "Status", value: verifiedBadge },
+    ]),
+  ];
+
+  if (data.title) {
+    sections.push(
+      adminBlockSection(
+        "Rubrik",
+        `<strong>${escapeHtml(data.title)}</strong>`,
+      ),
+    );
+  }
+  if (data.comment) {
+    sections.push(
+      adminBlockSection(
+        "Kommentar",
+        escapeHtml(data.comment).replace(/\n/g, "<br/>"),
+      ),
+    );
+  }
+
+  return renderAdminEmailLayout({
+    eyebrow: "Ny review",
+    heading: `Ny recension för ${data.productName}`,
+    sections,
+    ...(reviewUrl ? { cta: { label: "Hantera recensioner i admin", url: reviewUrl } } : {}),
+  });
+}
+
+export async function sendAdminNewReviewEmail(
+  data: AdminNewReviewEmailData,
+): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) return false;
+  if (!isAdminEventEnabled(config, "newReview")) return false;
+  const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
+  if (recipients.length === 0) return false;
+
+  const transporter = await buildAdminTransport(config);
+  const html = renderAdminNewReviewEmail(data);
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck Admin" <${config.from}>`,
+      to: recipients.join(", "),
+      subject: `Ny recension (${data.rating}/5) – ${data.productName}`,
+      html,
+    });
+    console.log(
+      `[email] Admin new-review notice sent to ${recipients.join(", ")} for review ${data.reviewId}`,
+    );
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send admin new-review notice:", error);
+    return false;
+  }
+}
+
+// ——— Admin notification: user account deleted ———
+
+export type AdminUserDeletedEmailData = {
+  userId: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  /** "self" = user deleted their own account; "admin" = an admin removed the user. */
+  initiator: "self" | "admin";
+  /** Display name/email of the admin who triggered the deletion (only when initiator === "admin"). */
+  performedBy?: string | null;
+};
+
+function renderAdminUserDeletedEmail(data: AdminUserDeletedEmailData): string {
+  const adminBase = getAdminBaseUrl();
+  const usersUrl = adminBase ? `${adminBase}/users` : "";
+
+  const initiatorLabel =
+    data.initiator === "self"
+      ? `<span style="display:inline-block;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">Självradering</span>`
+      : `<span style="display:inline-block;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">Borttagen av admin</span>`;
+
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Användar-ID", value: `<code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;">${escapeHtml(data.userId)}</code>` },
+    { label: "Status", value: initiatorLabel },
+  ];
+  if (data.userName) {
+    rows.splice(1, 0, { label: "Namn", value: escapeHtml(data.userName) });
+  }
+  if (data.userEmail) {
+    rows.push({
+      label: "E-post",
+      value: `<a href="mailto:${escapeHtmlAttr(data.userEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.userEmail)}</a>`,
+    });
+  }
+  if (data.initiator === "admin" && data.performedBy) {
+    rows.push({ label: "Utförd av", value: escapeHtml(data.performedBy) });
+  }
+
+  const sections = [
+    adminInfoSection(rows),
+    adminBlockSection(
+      "Vad har raderats?",
+      "Användarens konto, sessioner och recensioner togs bort. Ordrar bevaras med användar-ID för historik och bokföring.",
+    ),
+  ];
+
+  return renderAdminEmailLayout({
+    eyebrow: "Användare raderad",
+    heading:
+      data.initiator === "self"
+        ? "En användare har raderat sitt konto"
+        : "Ett användarkonto har tagits bort",
+    sections,
+    ...(usersUrl ? { cta: { label: "Öppna användarlistan", url: usersUrl } } : {}),
+  });
+}
+
+export async function sendAdminUserDeletedEmail(
+  data: AdminUserDeletedEmailData,
+): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) return false;
+  if (!isAdminEventEnabled(config, "userDeleted")) return false;
+  const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
+  if (recipients.length === 0) return false;
+
+  const transporter = await buildAdminTransport(config);
+  const html = renderAdminUserDeletedEmail(data);
+  const who = data.userName || data.userEmail || data.userId;
+  const subjectPrefix =
+    data.initiator === "self"
+      ? "Användare raderade sitt konto"
+      : "Användare borttagen";
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck Admin" <${config.from}>`,
+      to: recipients.join(", "),
+      subject: `${subjectPrefix} – ${who}`,
+      html,
+    });
+    console.log(
+      `[email] Admin user-deleted notice sent to ${recipients.join(", ")} for user ${data.userId}`,
+    );
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send admin user-deleted notice:", error);
+    return false;
+  }
+}
+
+// ——— Admin notification: shipment booked / tracking generated ———
+
+export type AdminShipmentBookedEmailData = {
+  orderId: number | string;
+  orderNumber: string;
+  trackingId: string;
+  customerName: string;
+  customerEmail?: string | null;
+  servicePointName?: string | null;
+  weightKg?: number | null;
+  performedBy?: string | null;
+};
+
+function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): string {
+  const adminBase = getAdminBaseUrl();
+  const orderUrl = adminBase ? `${adminBase}/payments/${data.orderId}` : "";
+  const trackingUrl = `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`;
+  const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
+
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Ordernummer", value: `<strong>#${escapeHtml(orderRef)}</strong>` },
+    {
+      label: "Spårningsnummer",
+      value: `<a href="${escapeHtmlAttr(trackingUrl)}" style="color:#2563eb;text-decoration:none;font-weight:600;">${escapeHtml(data.trackingId)}</a>`,
+    },
+    { label: "Kund", value: escapeHtml(data.customerName) },
+  ];
+  if (data.customerEmail) {
+    rows.push({
+      label: "Kund-e-post",
+      value: `<a href="mailto:${escapeHtmlAttr(data.customerEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.customerEmail)}</a>`,
+    });
+  }
+  if (data.servicePointName) {
+    rows.push({ label: "Ombud", value: escapeHtml(data.servicePointName) });
+  }
+  if (typeof data.weightKg === "number" && Number.isFinite(data.weightKg)) {
+    rows.push({ label: "Vikt", value: `${data.weightKg.toLocaleString("sv-SE")} kg` });
+  }
+  if (data.performedBy) {
+    rows.push({ label: "Bokad av", value: escapeHtml(data.performedBy) });
+  }
+
+  return renderAdminEmailLayout({
+    eyebrow: "Frakt bokad",
+    heading: `Spårningsnummer genererat för order #${orderRef}`,
+    sections: [
+      adminInfoSection(rows),
+      adminBlockSection(
+        "Nästa steg",
+        "Etiketten finns tillgänglig i admin under ordern. Kunden får automatiskt ett mejl med spårningslänken.",
+      ),
+    ],
+    ...(orderUrl ? { cta: { label: "Öppna ordern i admin", url: orderUrl } } : {}),
+  });
+}
+
+export async function sendAdminShipmentBookedEmail(
+  data: AdminShipmentBookedEmailData,
+): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) return false;
+  if (!isAdminEventEnabled(config, "shipmentBooked")) return false;
+  const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
+  if (recipients.length === 0) return false;
+
+  const transporter = await buildAdminTransport(config);
+  const html = renderAdminShipmentBookedEmail(data);
+  const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck Admin" <${config.from}>`,
+      to: recipients.join(", "),
+      subject: `Frakt bokad #${orderRef} – ${data.customerName}`,
+      html,
+    });
+    console.log(
+      `[email] Admin shipment-booked notice sent to ${recipients.join(", ")} for order ${data.orderNumber}`,
+    );
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send admin shipment-booked notice:", error);
     return false;
   }
 }

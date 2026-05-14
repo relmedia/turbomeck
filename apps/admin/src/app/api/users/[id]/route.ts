@@ -3,6 +3,7 @@ import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
+import { notifyUserDeleted } from "@/lib/trigger-admin-notification";
 
 export async function GET(
   _req: Request,
@@ -142,6 +143,12 @@ export async function DELETE(
       );
     }
 
+    const [target] = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
     const [deleted] = await db
       .delete(users)
       .where(eq(users.id, id))
@@ -154,6 +161,15 @@ export async function DELETE(
     console.log(
       `[users DELETE] user ${deleted.id} deleted by admin ${session.user.id}`,
     );
+
+    void notifyUserDeleted({
+      userId: deleted.id,
+      userName: target?.name ?? null,
+      userEmail: target?.email ?? null,
+      initiator: "admin",
+      performedBy: session.user.email ?? session.user.id,
+    });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Failed to delete user:", err);
