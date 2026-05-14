@@ -4,7 +4,18 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowRight, ExternalLink, Home, Loader2, CheckCircle, Package } from "lucide-react";
+import {
+  ArrowRight,
+  Box,
+  CheckCircle,
+  ExternalLink,
+  Home,
+  Loader2,
+  Mail,
+  MapPin,
+  Package,
+  Truck,
+} from "lucide-react";
 import { Button } from "@repo/ui/components/button";
 import { Confetti } from "@repo/ui/components/confetti";
 import { createOrder, fetchOrder } from "@/lib/api";
@@ -32,6 +43,9 @@ function OrderSuccessContent() {
   const [orderDetails, setOrderDetails] = useState<{
     total: number;
     createdAt: Date;
+    orderNumber?: string | null;
+    email?: string | null;
+    servicePointName?: string | null;
   } | null>(null);
   const [clientTotal, setClientTotal] = useState<number | null>(null);
   const clearCart = useCartStore((s) => s.clearCart);
@@ -138,7 +152,13 @@ function OrderSuccessContent() {
     fetchOrder(id, userId)
       .then((order) => {
         if (order) {
-          setOrderDetails({ total: order.total, createdAt: new Date(order.createdAt) });
+          setOrderDetails({
+            total: order.total,
+            createdAt: new Date(order.createdAt),
+            orderNumber: order.orderNumber ?? null,
+            email: order.email ?? null,
+            servicePointName: order.servicePointName ?? null,
+          });
         }
       })
       .catch(() => { /* ignore - use fallbacks */ });
@@ -228,6 +248,35 @@ function OrderSuccessContent() {
     ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(trackingId)}`
     : null;
 
+  const displayOrderNumber = orderDetails?.orderNumber?.trim() || null;
+  const displayEmail = orderDetails?.email?.trim() || null;
+  const displayServicePoint = orderDetails?.servicePointName?.trim() || null;
+  const emailConfirmationText = displayEmail
+    ? t("orderSuccess.emailConfirmation", { email: displayEmail })
+    : t("orderSuccess.emailConfirmationFallback");
+
+  const nextSteps: Array<{
+    icon: typeof Mail;
+    title: string;
+    body: string;
+  }> = [
+    {
+      icon: Mail,
+      title: t("orderSuccess.nextStep1Title"),
+      body: t("orderSuccess.nextStep1Body"),
+    },
+    {
+      icon: Box,
+      title: t("orderSuccess.nextStep2Title"),
+      body: t("orderSuccess.nextStep2Body"),
+    },
+    {
+      icon: Truck,
+      title: t("orderSuccess.nextStep3Title"),
+      body: t("orderSuccess.nextStep3Body"),
+    },
+  ];
+
   return (
     <>
       <Confetti
@@ -243,11 +292,21 @@ function OrderSuccessContent() {
             <p className="text-muted-foreground">
               {t("orderSuccess.message")}
             </p>
+            <p className="mt-3 inline-flex items-start gap-2 text-sm text-muted-foreground">
+              <Mail className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
+              <span className="text-left">{emailConfirmationText}</span>
+            </p>
           </div>
 
           <hr className="my-6 border-border" />
 
           <div className="space-y-3 text-sm">
+            {displayOrderNumber && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t("orderSuccess.orderNumberLabel")}</span>
+                <span className="font-mono font-medium">#{displayOrderNumber}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("orderSuccess.amountPaid")}</span>
               <span className="font-medium">
@@ -262,6 +321,44 @@ function OrderSuccessContent() {
               <span className="text-muted-foreground">{t("orderSuccess.dateTime")}</span>
               <span className="font-medium">{formattedDate}</span>
             </div>
+          </div>
+
+          {displayServicePoint && (
+            <div className="mt-6 flex items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("orderSuccess.servicePointLabel")}
+                </p>
+                <p className="mt-0.5 truncate font-medium text-foreground">
+                  {displayServicePoint}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 rounded-lg border bg-card px-4 py-4">
+            <p className="mb-3 text-sm font-medium text-foreground">
+              {t("orderSuccess.nextStepsTitle")}
+            </p>
+            <ol className="space-y-3">
+              {nextSteps.map(({ icon: Icon, title, body }, idx) => (
+                <li key={title} className="flex items-start gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    {idx + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                      {title}
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {body}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
 
           {postNordTrackingUrl && (
