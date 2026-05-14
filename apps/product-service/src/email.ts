@@ -222,6 +222,15 @@ const translations = {
     title: "Orderbekräftelse",
     thankYou: "Tack för din beställning!",
     orderReceived: "Vi har mottagit din order och börjar behandla den direkt.",
+    welcomeGreeting: "Hej och tack för din order.",
+    welcomeReview: "Granska ordersammanställning och leveranssätt nedan.",
+    welcomeAccount:
+      "På Mina sidor får du en mer detaljerad översikt. Du får ett mejl när ordern skickas från oss.",
+    welcomeReply:
+      "Har du frågor kan du ställa dem genom att svara på detta mejl. Vi gör vårt bästa för att svara dig snabbt.",
+    welcomeThanks: "Tack för att du handlar hos oss!",
+    welcomeSignoff: "Vänliga hälsningar,",
+    welcomeSignature: "Turbomeck.se",
     orderNumber: "Ordernummer",
     date: "Datum",
     trackDelivery: "Spåra din leverans",
@@ -250,6 +259,15 @@ const translations = {
     title: "Order Confirmation",
     thankYou: "Thank you for your order!",
     orderReceived: "We have received your order and will start processing it immediately.",
+    welcomeGreeting: "Hi and thank you for your order.",
+    welcomeReview: "Please review the order summary and delivery method below.",
+    welcomeAccount:
+      "In My Account you'll find a more detailed overview. You'll receive an email when the order ships from us.",
+    welcomeReply:
+      "If you have any questions, just reply to this email. We'll do our best to answer you quickly.",
+    welcomeThanks: "Thank you for shopping with us!",
+    welcomeSignoff: "Best regards,",
+    welcomeSignature: "Turbomeck.se",
     orderNumber: "Order Number",
     date: "Date",
     trackDelivery: "Track your delivery",
@@ -397,7 +415,28 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
               <p style="margin: 0; color: #6b7280; font-size: 15px;">${t.orderReceived}</p>
             </td>
           </tr>
-          
+
+          <!-- Welcome message -->
+          <tr>
+            <td style="padding: 0 40px 24px 40px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 22px 24px; color: #374151; font-size: 14px; line-height: 1.65;">
+                    <p style="margin: 0 0 12px 0;">${t.welcomeGreeting}</p>
+                    <p style="margin: 0 0 12px 0;">${t.welcomeReview}</p>
+                    <p style="margin: 0 0 12px 0;">${t.welcomeAccount}</p>
+                    <p style="margin: 0 0 12px 0;">${t.welcomeReply}</p>
+                    <p style="margin: 0 0 16px 0; font-weight: 600; color: #111827;">${t.welcomeThanks}</p>
+                    <p style="margin: 0; color: #6b7280;">
+                      ${t.welcomeSignoff}<br/>
+                      <span style="color: #111827; font-weight: 600;">${t.welcomeSignature}</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <!-- Order Info -->
           <tr>
             <td style="padding: 0 40px 24px 40px;">
@@ -769,6 +808,7 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
     ""
   ).replace(/\/$/u, "");
   const orderUrl = adminBase ? `${adminBase}/payments/${data.orderId}` : "";
+  const logoUrl = getOrderEmailLogoUrl();
 
   const fullName = `${data.firstName} ${data.lastName}`.trim();
   const itemsText = data.items
@@ -806,8 +846,25 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
           <tr>
             <td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:#ffffff;padding:24px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px 0;">
+                <tr>
+                  ${
+                    logoUrl
+                      ? `<td style="vertical-align:middle;padding-right:12px;">
+                          <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="32" height="32" style="display:block;width:32px;height:32px;border-radius:6px;" />
+                        </td>`
+                      : `<td style="vertical-align:middle;padding-right:12px;">
+                          <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.12);color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
+                        </td>`
+                  }
+                  <td style="vertical-align:middle;">
+                    <span style="font-size:16px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#ffffff;">MECK</span></span>
+                  </td>
+                </tr>
+              </table>
               <p style="margin:0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#94a3b8;">Turbomeck · Admin</p>
               <h1 style="margin:6px 0 0 0;font-size:22px;font-weight:700;">Ny order mottagen</h1>
+              <p style="margin:8px 0 0 0;font-size:14px;color:#cbd5e1;line-height:1.5;">En kund har just slutfört ett köp. Sammanställningen och kunduppgifterna finns nedan – öppna ordern i admin för att hantera frakt och status.</p>
             </td>
           </tr>
           <tr>
