@@ -24,9 +24,10 @@ import {
 } from "@repo/ui/components/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal, Trash2 } from "lucide-react";
-import Image from "next/image";
+import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar";
+import { ArrowUpDown, Copy, ExternalLink, Mail, MoreHorizontal, Trash2, User } from "lucide-react";
 import Link from "next/link";
+import { toast } from "react-toastify";
 
 export type User = {
   id: string;
@@ -110,6 +111,7 @@ export const createColumns = (
   return [
     {
       id: "select",
+      enableHiding: false,
       header: ({ table }) => (
         <Checkbox
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
@@ -131,15 +133,17 @@ export const createColumns = (
       header: "Avatar",
       cell: ({ row }) => {
         const user = row.original;
+        const src = user.avatar?.trim();
         return (
-          <div className="w-9 h-9 relative">
-            <Image
-              src={user.avatar}
-              alt={user.fullName}
-              fill
-              className="rounded-full object-cover"
-            />
-          </div>
+          <Avatar className="size-9">
+            {src ? (
+              <AvatarImage src={src} alt={user.fullName} />
+            ) : null}
+            <AvatarFallback>
+              <User className="size-4 text-muted-foreground" aria-hidden />
+              <span className="sr-only">Ingen profilbild</span>
+            </AvatarFallback>
+          </Avatar>
         );
       },
     },
@@ -198,10 +202,13 @@ export const createColumns = (
 
     {
       id: "actions",
+      enableHiding: false,
       cell: ({ row }) => {
         const user = row.original;
         const isCurrentUser = currentUserId && user.id === currentUserId;
         const canDelete = !isCurrentUser && typeof onDelete === "function";
+        const emailRaw = user.email?.trim() ?? "";
+        const hasMailto = emailRaw.includes("@");
 
         return (
           <DropdownMenu>
@@ -211,22 +218,86 @@ export const createColumns = (
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Åtgärder</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium leading-tight text-foreground">
+                    {user.fullName}
+                  </span>
+                  <span className="text-xs leading-tight text-muted-foreground break-all">
+                    {user.email || "—"}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(user.id)}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(user.id);
+                    toast.success("Användar-ID kopierat till urklipp");
+                  } catch {
+                    toast.error("Kunde inte kopiera användar-ID");
+                  }
+                }}
               >
-                Kopiera användar ID
+                <Copy className="w-4 h-4 mr-2" />
+                Kopiera användar-ID
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(user.email);
+                    toast.success("E-post kopierad till urklipp");
+                  } catch {
+                    toast.error("Kunde inte kopiera e-post");
+                  }
+                }}
+                disabled={!user.email || user.email === "—"}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Kopiera e-post
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href={`/users/${user.id}`}>Visa kunddata</Link>
+                <Link href={`/users/${user.id}`}>
+                  <User className="w-4 h-4 mr-2" />
+                  Visa kunddata
+                </Link>
               </DropdownMenuItem>
-              {canDelete && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DeleteUserDialog user={user} onDelete={onDelete!} />
-                </>
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/users/${user.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Öppna i ny flik
+                </Link>
+              </DropdownMenuItem>
+              {hasMailto && (
+                <DropdownMenuItem asChild>
+                  <a href={`mailto:${emailRaw}`}>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Skicka e-post
+                  </a>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {canDelete ? (
+                <DeleteUserDialog user={user} onDelete={onDelete!} />
+              ) : (
+                <DropdownMenuItem
+                  disabled
+                  className="text-destructive focus:text-destructive"
+                  title={
+                    isCurrentUser
+                      ? "Du kan inte ta bort ditt eget konto"
+                      : "Borttagning är inte tillgänglig"
+                  }
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Ta bort användare
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

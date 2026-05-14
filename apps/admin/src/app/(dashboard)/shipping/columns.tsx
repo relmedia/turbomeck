@@ -3,13 +3,24 @@
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { Button } from "@repo/ui/components/button";
-import { MoreHorizontal } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Hash,
+  Mail,
+  MoreHorizontal,
+  Truck,
+  User,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@repo/ui/components/dropdown-menu";
+import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
 import type { ShippingRow } from "./page";
 
@@ -142,7 +153,14 @@ export const createShippingColumns = (): ColumnDef<ShippingRow>[] => [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const id = row.original.id;
+      const r = row.original;
+      const tid = toValidTrackingId(r.postNordTrackingId);
+      const statusDisplay = statusConfig[r.status]?.label ?? r.statusLabel ?? r.status;
+      const orderNumDisplay = r.orderNumber?.trim() || String(r.orderId);
+      const emailRaw = r.email?.trim() ?? "";
+      const hasMailto = emailRaw.includes("@");
+      const phoneRaw = r.phone?.trim() ?? "";
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -151,12 +169,127 @@ export const createShippingColumns = (): ColumnDef<ShippingRow>[] => [
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium leading-tight text-foreground">
+                  {r.fullName}
+                </span>
+                <span className="text-xs leading-tight text-muted-foreground">
+                  {orderNumDisplay} · {statusDisplay}
+                </span>
+                <span className="text-xs leading-tight text-muted-foreground break-all">
+                  {r.email || "—"}
+                </span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(r.id);
+                  toast.success("Order-ID kopierat till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera order-ID");
+                }
+              }}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera order-ID
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(orderNumDisplay);
+                  toast.success("Ordernummer kopierat till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera ordernummer");
+                }
+              }}
+            >
+              <Hash className="w-4 h-4 mr-2" />
+              Kopiera ordernummer
+            </DropdownMenuItem>
+            {tid ? (
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(tid);
+                    toast.success("Spårningsnummer kopierat till urklipp");
+                  } catch {
+                    toast.error("Kunde inte kopiera spårningsnummer");
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Kopiera spårningsnr
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(r.email);
+                  toast.success("E-post kopierad till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera e-post");
+                }
+              }}
+              disabled={!r.email || r.email === "—"}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera e-post
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(phoneRaw);
+                  toast.success("Telefon kopierad till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera telefon");
+                }
+              }}
+              disabled={!phoneRaw}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera telefon
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/payments/${id}`}>
-                Visa order
+              <Link href={`/payments/${r.id}`}>
+                <User className="w-4 h-4 mr-2" />
+                Visa kunddata
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={`/payments/${r.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Öppna i ny flik
+              </Link>
+            </DropdownMenuItem>
+            {tid ? (
+              <DropdownMenuItem asChild>
+                <a
+                  href={`https://www.postnord.se/en/our-tools/track-and-trace?shipmentId=${encodeURIComponent(tid)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Truck className="w-4 h-4 mr-2" />
+                  Spåra hos PostNord
+                </a>
+              </DropdownMenuItem>
+            ) : null}
+            {hasMailto ? (
+              <DropdownMenuItem asChild>
+                <a href={`mailto:${emailRaw}`}>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Skicka e-post
+                </a>
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       );

@@ -24,7 +24,7 @@ export async function GET() {
     const rows = await db.select().from(users).limit(100);
     const list = rows.map((u) => ({
       id: u.id,
-      avatar: u.image ?? "/users/1.png",
+      avatar: u.image ?? "",
       fullName: getFullName(u),
       email: u.email ?? "—",
       status: "aktiv",

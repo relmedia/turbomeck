@@ -46,6 +46,39 @@ const PaymentsPage = () => {
     }
   }, [fetchOrders]);
 
+  const handleBulkDelete = useCallback(
+    async (ids: string[]) => {
+      let removed = 0;
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            failed++;
+          } else {
+            removed++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+      if (removed > 0) {
+        toast.success(
+          removed === 1 ? "Order borttagen" : `${removed} ordrar borttagna`,
+        );
+      }
+      if (failed > 0) {
+        toast.error(
+          failed === 1
+            ? "En order kunde inte tas bort"
+            : `${failed} ordrar kunde inte tas bort`,
+        );
+      }
+      await fetchOrders();
+    },
+    [fetchOrders],
+  );
+
   const columns = useMemo(() => createColumns(handleDelete), [handleDelete]);
 
   const filteredData = data.filter((row) => {
@@ -96,7 +129,11 @@ const PaymentsPage = () => {
           Laddar ordrar...
         </div>
       ) : (
-        <DataTable columns={columns} data={filteredData} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          onBulkDelete={handleBulkDelete}
+        />
       )}
     </div>
   );

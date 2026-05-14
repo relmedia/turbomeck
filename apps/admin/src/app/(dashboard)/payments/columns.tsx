@@ -24,8 +24,18 @@ import {
 } from "@repo/ui/components/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Hash,
+  IdCard,
+  Mail,
+  MoreHorizontal,
+  Trash2,
+  User,
+} from "lucide-react";
 import Link from "next/link";
+import { toast } from "react-toastify";
 
 export type Payment = {
   id: string;
@@ -82,7 +92,7 @@ function DeleteOrderDialog({
           className="text-destructive focus:text-destructive cursor-pointer"
         >
           <Trash2 className="w-4 h-4 mr-2" />
-          Ta bort
+          Ta bort order
         </DropdownMenuItem>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -232,6 +242,18 @@ export const createColumns = (onDelete?: (id: string) => Promise<void>): ColumnD
     enableHiding: false,
     cell: ({ row }) => {
       const payment = row.original;
+      const emailRaw = payment.email?.trim() ?? "";
+      const hasMailto = emailRaw.includes("@");
+      const amountFormatted = new Intl.NumberFormat("sv-SE", {
+        style: "currency",
+        currency: "SEK",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(Number(payment.amount));
+      const statusLabel =
+        statusConfig[payment.status]?.label ?? payment.status;
+      const canDelete = typeof onDelete === "function";
+
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -240,21 +262,123 @@ export const createColumns = (onDelete?: (id: string) => Promise<void>): ColumnD
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Åtgärder</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium leading-tight text-foreground">
+                  {payment.fullName}
+                </span>
+                <span className="text-xs leading-tight text-muted-foreground">
+                  Order #{payment.orderId ?? "—"} · {amountFormatted} · {statusLabel}
+                </span>
+                <span className="text-xs leading-tight text-muted-foreground break-all">
+                  {payment.email || "—"}
+                </span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(payment.id)}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(payment.id);
+                  toast.success("Betalnings-ID kopierat till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera betalnings-ID");
+                }
+              }}
             >
-              Kopiera betalnings ID
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera betalnings-ID
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                if (payment.orderId == null) return;
+                try {
+                  await navigator.clipboard.writeText(String(payment.orderId));
+                  toast.success("Ordernummer kopierat till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera ordernummer");
+                }
+              }}
+              disabled={payment.orderId == null}
+            >
+              <Hash className="w-4 h-4 mr-2" />
+              Kopiera ordernummer
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(payment.userId);
+                  toast.success("Användar-ID kopierat till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera användar-ID");
+                }
+              }}
+              disabled={!payment.userId}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera användar-ID
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(payment.email);
+                  toast.success("E-post kopierad till urklipp");
+                } catch {
+                  toast.error("Kunde inte kopiera e-post");
+                }
+              }}
+              disabled={!payment.email || payment.email === "—"}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Kopiera e-post
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/payments/${payment.id}`} className="flex items-center">
+              <Link href={`/payments/${payment.id}`}>
+                <User className="w-4 h-4 mr-2" />
                 Visa kunddata
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={`/payments/${payment.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Öppna i ny flik
+              </Link>
+            </DropdownMenuItem>
+            {payment.userId ? (
+              <DropdownMenuItem asChild>
+                <Link href={`/users/${payment.userId}`}>
+                  <IdCard className="w-4 h-4 mr-2" />
+                  Visa kundprofil
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+            {hasMailto ? (
+              <DropdownMenuItem asChild>
+                <a href={`mailto:${emailRaw}`}>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Skicka e-post
+                </a>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
-            <DeleteOrderDialog payment={payment} onDelete={onDelete} />
+            {canDelete ? (
+              <DeleteOrderDialog payment={payment} onDelete={onDelete} />
+            ) : (
+              <DropdownMenuItem
+                disabled
+                className="text-destructive focus:text-destructive"
+                title="Borttagning är inte tillgänglig"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Ta bort order
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );

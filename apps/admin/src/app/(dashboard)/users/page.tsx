@@ -60,6 +60,55 @@ const UsersPage = () => {
     [currentUserId, fetchUsers],
   );
 
+  const handleDeleteSelected = useCallback(
+    async (selected: User[]) => {
+      const eligible = currentUserId
+        ? selected.filter((u) => u.id !== currentUserId)
+        : selected;
+
+      if (eligible.length < selected.length) {
+        toast.error("Du kan inte ta bort ditt eget konto.");
+      }
+      if (eligible.length === 0) return;
+
+      let removed = 0;
+      const errors: string[] = [];
+
+      for (const u of eligible) {
+        try {
+          const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            errors.push(
+              typeof data.error === "string" ? data.error : u.email,
+            );
+          } else {
+            removed++;
+          }
+        } catch {
+          errors.push(u.email);
+        }
+      }
+
+      if (removed > 0) {
+        toast.success(
+          removed === 1
+            ? "Användare borttagen"
+            : `${removed} användare borttagna`,
+        );
+      }
+      if (errors.length > 0) {
+        toast.error(
+          errors.length === 1
+            ? errors[0] ?? "Kunde inte ta bort en användare"
+            : `${errors.length} användare kunde inte tas bort`,
+        );
+      }
+      await fetchUsers();
+    },
+    [currentUserId, fetchUsers],
+  );
+
   const columns = useMemo(
     () => createColumns({ currentUserId, onDelete: handleDeleteUser }),
     [currentUserId, handleDeleteUser],
@@ -108,7 +157,11 @@ const UsersPage = () => {
           <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <DataTable columns={columns} data={userList} />
+        <DataTable
+          columns={columns}
+          data={userList}
+          onDeleteSelected={handleDeleteSelected}
+        />
       )}
     </div>
   );
