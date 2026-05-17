@@ -1,16 +1,30 @@
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { validatePassword, BCRYPT_COST } from "@repo/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 function generateId() {
   return randomBytes(16).toString("hex");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // SECURITY (audit M4): admin sign-up is publicly reachable (proxy.ts treats
+  // /api/auth/** as public). Without throttling an attacker can spam this
+  // endpoint to flood the `user` table or to burn bcrypt CPU at cost-12.
+  // 10 / hour / IP is plenty for the rare new-admin onboarding case; real
+  // admins are usually added via ADMIN_ALLOWLIST or the set-admin-password
+  // script.
+  const limited = rateLimit(req, {
+    bucket: "admin-sign-up",
+    windowMs: 60 * 60_000,
+    max: 10,
+  });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     // SECURITY: `role` is intentionally NOT read from the client. This endpoint

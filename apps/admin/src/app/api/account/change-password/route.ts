@@ -2,14 +2,27 @@ import { auth, validatePassword, BCRYPT_COST } from "@repo/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { requireSameOrigin } from "@/lib/same-origin";
+import { rateLimit } from "@/lib/rate-limit";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   // SECURITY (audit M3): password change must come from the admin app itself.
   const csrfDenied = requireSameOrigin(req);
   if (csrfDenied) return csrfDenied;
+
+  // SECURITY (audit M4): cap password-change attempts per IP. Each call
+  // performs bcrypt.compare + bcrypt.hash at cost 12, so unthrottled abuse
+  // by a compromised admin session (or a CSRF token leak that survives the
+  // same-origin gate) can sustain meaningful CPU load. 10 / 15 min / IP
+  // matches the storefront's forgot-password budget.
+  const limited = rateLimit(req, {
+    bucket: "admin-change-password",
+    windowMs: 15 * 60_000,
+    max: 10,
+  });
+  if (limited) return limited;
 
   try {
     const session = await auth();

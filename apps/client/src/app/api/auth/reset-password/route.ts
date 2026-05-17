@@ -1,11 +1,25 @@
 import { db } from "@repo/database";
 import { users, passwordResetTokens } from "@repo/database";
 import { eq, and, gt } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { validatePassword, BCRYPT_COST } from "@repo/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // SECURITY (audit M4): cap token-consume attempts per IP. The token itself
+  // is 32 bytes of crypto-random hex (≈2^256 brute-force space) so guessing
+  // is infeasible, but each call still drives a DB read + bcrypt.hash() at
+  // cost 12. Without a limit an attacker can drive sustained CPU load. 30
+  // requests / hour / IP is far above any plausible human flow (one click
+  // from email → submit → maybe one retry).
+  const limited = rateLimit(req, {
+    bucket: "reset-password-consume",
+    windowMs: 60 * 60_000,
+    max: 30,
+  });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const { token, password } = body as { token?: string; password?: string };

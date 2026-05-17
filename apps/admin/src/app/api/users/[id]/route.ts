@@ -91,11 +91,31 @@ export async function PATCH(
           }
         : undefined;
 
+    /**
+     * SECURITY: when an admin moves an account to a new email address, the
+     * recipient of that address has not (yet) proven they control it. We must
+     * clear `emailVerified` so the next magic-link login re-verifies the
+     * inbox. Without this, a compromised admin session could change a
+     * victim's email to the attacker's address, and the magic-link flow —
+     * which trusts already-verified emails — would let them log in as the
+     * victim. Normalize input (trim + lowercase) and skip the update if the
+     * value didn't actually change.
+     */
+    const normalizedNewEmail =
+      typeof body.email === "string" ? body.email.trim().toLowerCase() : null;
+    const emailIsChanging =
+      normalizedNewEmail != null &&
+      normalizedNewEmail.length > 0 &&
+      normalizedNewEmail !== (user.email ?? "").toLowerCase();
+
     await db
       .update(users)
       .set({
         ...(nameUpdate != null && { name: nameUpdate }),
-        ...(body.email != null && { email: body.email }),
+        ...(emailIsChanging && {
+          email: normalizedNewEmail!,
+          emailVerified: null,
+        }),
         ...(savedAddress != null && {
           metadata: { ...currentMetadata, savedAddress },
         }),

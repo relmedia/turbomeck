@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs";
 import type { DefaultSession } from "next-auth";
 import { renderMagicLinkEmail, renderPasswordResetEmail } from "./email-templates";
 import { buildSmtpTransport, type MailTransportConfig } from "./smtp-transport";
+import { consumeCredentialsAttempt } from "./bruteforce-throttle";
 
 type MailConfig = MailTransportConfig;
 
@@ -328,8 +329,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "E-post", type: "email" },
         password: { label: "Lösenord", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
+        // SECURITY (audit M4): cap credentials sign-in attempts per IP to
+        // bound bcrypt.compare CPU cost. bcrypt at cost 12 already makes
+        // password guessing infeasible per-attempt; the throttle exists so
+        // an attacker can't burn server CPU sustained from one host. We
+        // return `null` on rate-limit so NextAuth surfaces the canonical
+        // CredentialsSignin error — same shape as a wrong password — and
+        // we don't reveal that throttling kicked in.
+        const allowed = consumeCredentialsAttempt(request, {
+          bucket: "credentials-signin",
+          windowMs: 15 * 60_000,
+          max: 10,
+        });
+        if (!allowed) return null;
         const [user] = await db
           .select()
           .from(users)

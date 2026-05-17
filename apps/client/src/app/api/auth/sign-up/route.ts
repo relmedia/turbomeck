@@ -1,14 +1,28 @@
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { rateLimit } from "@/lib/rate-limit";
 
 function generateId() {
   return randomBytes(16).toString("hex");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // SECURITY (audit M4): cap account-creation attempts per IP. Without this
+  // an attacker can spam this endpoint to enumerate the existence-vs-no-
+  // existence timing difference (we already constant-shape the response, so
+  // this is belt-and-braces) and to bloat the `user` table with bogus rows
+  // that pollute the admin UI and increase storage cost. 20 / hour / IP is
+  // far above any plausible human use of the magic-link signup flow.
+  const limited = rateLimit(req, {
+    bucket: "client-sign-up",
+    windowMs: 60 * 60_000,
+    max: 20,
+  });
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const { email, name } = body as {
