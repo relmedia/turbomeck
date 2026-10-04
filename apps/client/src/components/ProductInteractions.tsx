@@ -8,6 +8,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/ui/components/select";
 
 const ProductInteraction = ({
   product,
@@ -117,22 +124,24 @@ const ProductInteraction = ({
       {hasAttributes && (
         <div className="flex flex-col gap-2 text-sm">
           <span className="text-gray-500 block">{t("common.size")}</span>
-          <select
-            value={variant}
-            onChange={(e) => {
-              const v = e.target.value;
+          <Select
+            value={variant || undefined}
+            onValueChange={(v) => {
               setVariant(v);
               onVariantChange?.(v);
             }}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-800"
           >
-            <option value="">{t("product.selectSize")}</option>
-            {allOptions.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={t("product.selectSize")} />
+            </SelectTrigger>
+            <SelectContent>
+              {allOptions.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
       {/* COLOR */}
