@@ -45,16 +45,6 @@ export type OrderRow = {
   productImage?: string | null;
 };
 
-const MOCK_ORDERS: OrderRow[] = [
-  { id: "1", orderId: 1023, userId: "1", fullName: "Theodore Bell", productName: "Tire Doodad", amount: 300, status: "processing", productImage: null },
-  { id: "2", orderId: 2045, userId: "2", fullName: "Amelia Grant", productName: "Engine Kit", amount: 450, status: "pending", productImage: null },
-  { id: "3", orderId: 3012, userId: "3", fullName: "Eleanor Ward", productName: "Brake Pad", amount: 189, status: "success", productImage: null },
-  { id: "4", orderId: 4018, userId: "4", fullName: "John Doe", productName: "Wireless Headphones", amount: 134, status: "pending", productImage: null },
-  { id: "5", orderId: 5019, userId: "5", fullName: "Jane Doe", productName: "Bluetooth Speaker", amount: 124, status: "success", productImage: null },
-  { id: "6", orderId: 6020, userId: "6", fullName: "Mike Galloway", productName: "Running Shoes", amount: 167, status: "failed", productImage: null },
-  { id: "7", orderId: 7021, userId: "7", fullName: "Minerva Robinson", productName: "Leather Wallet", amount: 156, status: "processing", productImage: null },
-  { id: "8", orderId: 8022, userId: "8", fullName: "Mable Clayton", productName: "Smart Watch", amount: 145, status: "success", productImage: null },
-];
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   processing: { label: "Behandlas", className: "bg-blue-50 text-blue-700 border border-blue-200" },
@@ -250,7 +240,7 @@ export function RecentOrders({ hideTitle, onToolbarRender, orders: ordersProp, f
     [ordersProp, firstUserId]
   );
 
-  const data = ordersProp && ordersProp.length > 0 ? ordersProp : MOCK_ORDERS;
+  const data = ordersProp ?? [];
   const table = useReactTable({
     data,
     columns,

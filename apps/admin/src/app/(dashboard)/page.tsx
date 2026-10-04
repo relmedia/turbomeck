@@ -118,7 +118,9 @@ async function getRecentOrders(): Promise<OrderRow[]> {
       status: statusMap[o.status] ?? "processing",
       productImage: o.items?.[0]?.productImage ?? null,
     }));
-  } catch {
+  } catch (err) {
+    // Without this a failing query is indistinguishable from "no orders yet".
+    console.error("[studio] getRecentOrders failed:", err);
     return [];
   }
 }

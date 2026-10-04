@@ -17,12 +17,11 @@ import {
   HoverCardTrigger,
 } from "@repo/ui/components/hover-card";
 import { Progress } from "@repo/ui/components/progress";
-import { BadgeCheck, Candy, Citrus, Shield } from "lucide-react";
+import { BadgeCheck, Shield } from "lucide-react";
 import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
 import { Button } from "@repo/ui/components/button";
 import EditUser from "@/components/EditUser";
 import { Avatar, AvatarFallback, AvatarImage } from "@repo/ui/components/avatar";
-import AppLineChart from "@/components/AppLineChart";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
@@ -79,6 +78,10 @@ async function getUserData(userId: string) {
       imageUrl: user.image,
       createdAt,
       completionPercent,
+      isAdmin: user.role === "admin",
+      emailVerifiedAt: user.emailVerified
+        ? format(new Date(user.emailVerified), "d MMM yyyy", { locale: sv })
+        : null,
     };
   } catch {
     return null;
@@ -118,69 +121,47 @@ const SingleUserPage = async ({ params }: Props) => {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="mt-4 flex flex-col xl:flex-row gap-8">
-        <div className="w-full xl:w-1/3 space-y-6">
-          <div className="bg-primary-foreground p-4 rounded-lg">
-            <h1 className="text-xl font-semibold">User Badges</h1>
-            <div className="flex gap-4 mt-4">
-              <HoverCard>
-                <HoverCardTrigger>
-                  <BadgeCheck
-                    size={36}
-                    className="rounded-full bg-blue-500/30 border-1 border-blue-500/50 p-2"
-                  />
-                </HoverCardTrigger>
-                <HoverCardContent>
-                  <h1 className="font-bold mb-2">Verified User</h1>
-                  <p className="text-sm text-muted-foreground">
-                    This user has been verified by the admin.
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
-              <HoverCard>
-                <HoverCardTrigger>
-                  <Shield
-                    size={36}
-                    className="rounded-full bg-green-800/30 border-1 border-green-800/50 p-2"
-                  />
-                </HoverCardTrigger>
-                <HoverCardContent>
-                  <h1 className="font-bold mb-2">Admin</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Admin users have access to all features and can manage
-                    users.
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
-              <HoverCard>
-                <HoverCardTrigger>
-                  <Candy
-                    size={36}
-                    className="rounded-full bg-yellow-500/30 border-1 border-yellow-500/50 p-2"
-                  />
-                </HoverCardTrigger>
-                <HoverCardContent>
-                  <h1 className="font-bold mb-2">Awarded</h1>
-                  <p className="text-sm text-muted-foreground">
-                    This user has been awarded for their contributions.
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
-              <HoverCard>
-                <HoverCardTrigger>
-                  <Citrus
-                    size={36}
-                    className="rounded-full bg-orange-500/30 border-1 border-orange-500/50 p-2"
-                  />
-                </HoverCardTrigger>
-                <HoverCardContent>
-                  <h1 className="font-bold mb-2">Popular</h1>
-                  <p className="text-sm text-muted-foreground">
-                    This user has been popular in the community.
-                  </p>
-                </HoverCardContent>
-              </HoverCard>
+        <div className="w-full space-y-6">
+          {/* Only badges backed by real account data - no decorative ones. */}
+          {(user.emailVerifiedAt || user.isAdmin) && (
+            <div className="bg-primary-foreground p-4 rounded-lg">
+              <h1 className="text-xl font-semibold">Märken</h1>
+              <div className="flex gap-4 mt-4">
+                {user.emailVerifiedAt && (
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      <BadgeCheck
+                        size={36}
+                        className="rounded-full bg-blue-500/30 border-1 border-blue-500/50 p-2"
+                      />
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      <h1 className="font-bold mb-2">Verifierad e-post</h1>
+                      <p className="text-sm text-muted-foreground">
+                        E-postadressen bekräftades {user.emailVerifiedAt}.
+                      </p>
+                    </HoverCardContent>
+                  </HoverCard>
+                )}
+                {user.isAdmin && (
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      <Shield
+                        size={36}
+                        className="rounded-full bg-green-800/30 border-1 border-green-800/50 p-2"
+                      />
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      <h1 className="font-bold mb-2">Administratör</h1>
+                      <p className="text-sm text-muted-foreground">
+                        Kontot har rollen admin och har tillgång till Studio.
+                      </p>
+                    </HoverCardContent>
+                  </HoverCard>
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div className="bg-primary-foreground p-4 rounded-lg space-y-2">
             <div className="flex items-center gap-2">
               <Avatar className="size-12">
@@ -245,12 +226,6 @@ const SingleUserPage = async ({ params }: Props) => {
             <p className="text-sm text-muted-foreground mt-4">
               Registrerings datum {user.createdAt}
             </p>
-          </div>
-        </div>
-        <div className="w-full xl:w-2/3 space-y-6">
-          <div className="bg-primary-foreground p-4 rounded-lg">
-            <h1 className="text-xl font-semibold">Användaraktivitet</h1>
-            <AppLineChart />
           </div>
         </div>
       </div>

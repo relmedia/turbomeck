@@ -4,6 +4,8 @@
  */
 
 const BRAND_COLOR = "#6ec900";
+/** CTA buttons are black, matching the storefront's primary buttons. */
+const BUTTON_COLOR = "#000000";
 const TEXT_COLOR = "#1f2937";
 const MUTED_COLOR = "#6b7280";
 const BORDER_COLOR = "#e5e7eb";
@@ -39,8 +41,8 @@ function baseWrapper(innerHtml: string) {
     : `
                     <table role="presentation" align="left" cellspacing="0" cellpadding="0">
                       <tr>
-                        <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
-                          <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
+                        <td style="padding: 8px; background: ${BG_LIGHT}; border: 1px solid ${BORDER_COLOR}; border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 28px; font-weight: 800; color: ${TEXT_COLOR};">T</span>
                         </td>
                         <td style="vertical-align: middle; padding-left: 14px;">
                           <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
@@ -65,7 +67,7 @@ function baseWrapper(innerHtml: string) {
             <td style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="background: linear-gradient(135deg, ${BRAND_COLOR} 0%, #5ab800 100%); padding: 28px 32px; text-align: left;">
+                  <td style="background-color: #ffffff; padding: 28px 32px; text-align: left; border-bottom: 1px solid ${BORDER_COLOR};">
                     ${headerContent}
                   </td>
                 </tr>
@@ -111,7 +113,7 @@ export function renderMagicLinkEmail(url: string): { html: string; text: string 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
       <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-          <a href="${url}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 6px; box-shadow: 0 2px 4px rgba(110, 201, 0, 0.3);">
+          <a href="${url}" style="display: inline-block; background-color: ${BUTTON_COLOR}; color: #ffffff !important; font-size: 14px; font-weight: 600; text-decoration: none; padding: 10px 22px; border-radius: 6px;">
             Logga in
           </a>
         </td>
@@ -158,7 +160,7 @@ export function renderPasswordResetEmail(url: string): { html: string; text: str
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
       <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-          <a href="${url}" style="display: inline-block; background-color: ${BRAND_COLOR}; color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 6px; box-shadow: 0 2px 4px rgba(110, 201, 0, 0.3);">
+          <a href="${url}" style="display: inline-block; background-color: ${BUTTON_COLOR}; color: #ffffff !important; font-size: 14px; font-weight: 600; text-decoration: none; padding: 10px 22px; border-radius: 6px;">
             Återställ lösenord
           </a>
         </td>
