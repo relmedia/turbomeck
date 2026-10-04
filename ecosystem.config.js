@@ -126,7 +126,8 @@ module.exports = {
         ...adminEnv,
         AUTH_SIGNIN_PATH: "/",
         AUTH_VERIFY_PATH: adminEnv.AUTH_VERIFY_PATH?.trim() || "/studio/verify",
-        ...((): Record<string, string> => {
+        // PM2 loads this file with plain Node - no TypeScript annotations here.
+        ...(() => {
           const raw = (
             adminEnv.ADMIN_CANONICAL_ORIGIN ||
             adminEnv.NEXTAUTH_URL ||
