@@ -9,7 +9,7 @@ import { Label } from "@repo/ui/components/label";
 import { Checkbox } from "@repo/ui/components/checkbox";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
-import { Save, RefreshCw, Trash2, Plus, Languages, Sparkles } from "lucide-react";
+import { Save, RefreshCw, Trash2, Plus, Languages, Loader2, Sparkles } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,7 +52,6 @@ import { ThumbnailsUpload } from "@/components/ThumbnailsUpload";
 import { toast } from "react-toastify";
 import { PRODUCT_API } from "@/lib/product-api";
 import { DashboardProductEditSkeleton } from "@/components/dashboard-skeletons";
-import { Skeleton } from "@repo/ui/components/skeleton";
 
 type Category = {
   id: number;
@@ -81,6 +80,27 @@ type Product = {
   updatedAt: string;
 };
 
+/** One row in the "Specifikationer" table on the product page. */
+type SpecRow = { group?: string; label: string; value: string };
+
+/**
+ * Starting point for a turbo spec sheet — mirrors how turbo retailers group their
+ * data (compressor / turbine / connections). Values are filled in per product.
+ */
+const SPEC_TEMPLATE: SpecRow[] = [
+  { group: "Kompressor", label: "Kompressorhjul", value: "" },
+  { group: "Kompressor", label: "Trim", value: "" },
+  { group: "Kompressor", label: "Lager", value: "" },
+  { group: "Turbin", label: "Turbinhjul", value: "" },
+  { group: "Turbin", label: "Turbinhus A/R", value: "" },
+  { group: "Anslutningar", label: "Fläns inlopp", value: "" },
+  { group: "Anslutningar", label: "Fläns utlopp", value: "" },
+  { group: "Anslutningar", label: "Oljeanslutning", value: "" },
+  { group: "Övrigt", label: "Vattenkyld", value: "" },
+];
+
+const SPEC_GROUPS = ["Kompressor", "Turbin", "Anslutningar", "Övrigt"];
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -99,6 +119,13 @@ export default function ProductDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isSuggestingDescription, setIsSuggestingDescription] = useState(false);
+  const [isSuggestingSpecs, setIsSuggestingSpecs] = useState(false);
+  /** Sources and caveats from the last AI spec lookup, shown under the editor. */
+  const [specSuggestion, setSpecSuggestion] = useState<{
+    sources: string[];
+    notes: string;
+    weightBasis: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -114,6 +141,7 @@ export default function ProductDetailPage() {
     weight: string;
     categoryIds: number[];
     attributes: { name: string; options: string[] }[];
+    specifications: SpecRow[];
     image: string | null;
     thumbnails: string[];
     isExchangeTurbo: boolean;
@@ -129,6 +157,7 @@ export default function ProductDetailPage() {
     weight: "",
     categoryIds: [],
     attributes: [],
+    specifications: [],
     image: null,
     thumbnails: [],
     isExchangeTurbo: false,
@@ -162,6 +191,12 @@ export default function ProductDetailPage() {
         categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
         attributes: Array.isArray(data.attributes)
           ? data.attributes.filter((a: { name?: string; options?: string[] }) => a?.name && Array.isArray(a?.options))
+          : [],
+        specifications: Array.isArray(data.specifications)
+          ? data.specifications.filter(
+              (r: { label?: string; value?: string }) =>
+                typeof r?.label === "string" && typeof r?.value === "string"
+            )
           : [],
         image: data.image || null,
         thumbnails: data.thumbnails ?? [],
@@ -312,6 +347,79 @@ export default function ProductDetailPage() {
     }
   };
 
+  const handleSuggestSpecifications = async () => {
+    const name = formData.name?.trim();
+    const shortDescription = formData.shortDescription?.trim();
+    const description = formData.description?.trim();
+    if (!name && !shortDescription && !description) {
+      toast.error("Fyll i produktnamn eller beskrivning först — AI använder dem som underlag.");
+      return;
+    }
+    setIsSuggestingSpecs(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/suggest-specifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, shortDescription, description }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error?.trim() || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as {
+        specifications: SpecRow[];
+        weightKg: number | null;
+        weightBasis: string;
+        sources: string[];
+        notes: string;
+      };
+
+      let addedRows = 0;
+      let weightFilled = false;
+      setFormData((prev) => {
+        // Never clobber rows the admin already wrote - only append labels that
+        // aren't there yet.
+        const existingLabels = new Set(
+          prev.specifications.map((r) => r.label.trim().toLowerCase())
+        );
+        const newRows = data.specifications.filter(
+          (r) => !existingLabels.has(r.label.trim().toLowerCase())
+        );
+        addedRows = newRows.length;
+        // Same for the weight: a value already entered wins over the suggestion.
+        const hasWeight = prev.weight.trim() !== "";
+        weightFilled = !hasWeight && data.weightKg != null;
+        return {
+          ...prev,
+          specifications: [...prev.specifications, ...newRows],
+          weight: weightFilled ? String(data.weightKg) : prev.weight,
+        };
+      });
+
+      setSpecSuggestion({
+        sources: data.sources,
+        notes: data.notes,
+        weightBasis: data.weightKg != null ? data.weightBasis : "",
+      });
+
+      if (addedRows === 0 && !weightFilled) {
+        toast.info("AI hittade inget nytt att fylla i.");
+      } else {
+        const parts = [];
+        if (addedRows > 0) parts.push(`${addedRows} rader`);
+        if (weightFilled) parts.push("vikt");
+        toast.success(`AI fyllde i ${parts.join(" och ")} — granska innan du sparar.`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ett fel uppstod";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSuggestingSpecs(false);
+    }
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -345,6 +453,9 @@ export default function ProductDetailPage() {
           weight: formData.weight ? Number(formData.weight) : null,
           categoryIds: Array.isArray(formData.categoryIds) ? formData.categoryIds : [],
           attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
+          specifications: formData.specifications.filter(
+            (r) => r.label.trim() !== "" && r.value.trim() !== ""
+          ),
           image: formData.image ?? null,
           thumbnails: Array.isArray(formData.thumbnails) ? formData.thumbnails : [],
           isExchangeTurbo: formData.isExchangeTurbo === true,
@@ -532,7 +643,7 @@ export default function ProductDetailPage() {
                     disabled={saving || isSuggestingDescription}
                   >
                     {isSuggestingDescription ? (
-                      <Skeleton className="h-4 w-4 mr-2 shrink-0 rounded" />
+                      <Loader2 className="h-4 w-4 mr-2 shrink-0 animate-spin" />
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
@@ -566,7 +677,7 @@ export default function ProductDetailPage() {
                     disabled={isTranslating}
                   >
                     {isTranslating ? (
-                      <Skeleton className="h-4 w-4 mr-2 shrink-0 rounded" />
+                      <Loader2 className="h-4 w-4 mr-2 shrink-0 animate-spin" />
                     ) : (
                       <Languages className="h-4 w-4 mr-2" />
                     )}
@@ -667,6 +778,167 @@ export default function ProductDetailPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Lägg till alternativ
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle>Specifikationer</CardTitle>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSuggestSpecifications}
+                  disabled={saving || isSuggestingSpecs}
+                  className="shrink-0"
+                >
+                  {isSuggestingSpecs ? (
+                    <Loader2 className="h-4 w-4 mr-2 shrink-0 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  {isSuggestingSpecs ? "Söker..." : "Hämta med AI"}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Tekniska data som visas i fliken Specifikationer på produktsidan. Grupp är valfri
+                (t.ex. Kompressor, Turbin, Anslutningar) — rader utan grupp hamnar under Allmänt.
+                AI läser produkttexten och söker på webben, fyller i vikten om den är tom och rör
+                aldrig rader du redan skrivit — granska alltid innan du sparar.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <datalist id="spec-groups">
+                {SPEC_GROUPS.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
+              {formData.specifications.length > 0 && (
+                <div className="hidden gap-2 px-1 text-xs text-muted-foreground sm:grid sm:grid-cols-[10rem_12rem_1fr_2.5rem]">
+                  <span>Grupp</span>
+                  <span>Etikett</span>
+                  <span>Värde</span>
+                  <span />
+                </div>
+              )}
+              {formData.specifications.map((row, idx) => (
+                <div
+                  key={idx}
+                  className="grid gap-2 sm:grid-cols-[10rem_12rem_1fr_2.5rem] sm:items-center"
+                >
+                  <Input
+                    list="spec-groups"
+                    placeholder="Kompressor"
+                    value={row.group ?? ""}
+                    onChange={(e) =>
+                      setFormData((prev) => {
+                        const next = [...prev.specifications];
+                        next[idx] = { ...next[idx]!, group: e.target.value };
+                        return { ...prev, specifications: next };
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="Kompressorhjul"
+                    value={row.label}
+                    onChange={(e) =>
+                      setFormData((prev) => {
+                        const next = [...prev.specifications];
+                        next[idx] = { ...next[idx]!, label: e.target.value };
+                        return { ...prev, specifications: next };
+                      })
+                    }
+                  />
+                  <Input
+                    placeholder="48,5 × 61 mm"
+                    value={row.value}
+                    onChange={(e) =>
+                      setFormData((prev) => {
+                        const next = [...prev.specifications];
+                        next[idx] = { ...next[idx]!, value: e.target.value };
+                        return { ...prev, specifications: next };
+                      })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive"
+                    aria-label="Ta bort rad"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specifications: prev.specifications.filter((_, i) => i !== idx),
+                      }))
+                    }
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      specifications: [
+                        ...prev.specifications,
+                        { group: "", label: "", value: "" },
+                      ],
+                    }))
+                  }
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Lägg till rad
+                </Button>
+                {formData.specifications.length === 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specifications: SPEC_TEMPLATE.map((r) => ({ ...r })),
+                      }))
+                    }
+                  >
+                    Använd turbomall
+                  </Button>
+                )}
+              </div>
+              {specSuggestion && (
+                <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  {specSuggestion.notes && <p>{specSuggestion.notes}</p>}
+                  {specSuggestion.weightBasis && <p>Vikt: {specSuggestion.weightBasis}</p>}
+                  {specSuggestion.sources.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">Källor</p>
+                      <ul className="space-y-0.5">
+                        {specSuggestion.sources.map((url) => (
+                          <li key={url}>
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="break-all underline hover:text-foreground"
+                            >
+                              {url}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p>Inga webbkällor — värdena kommer från produkttexten.</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

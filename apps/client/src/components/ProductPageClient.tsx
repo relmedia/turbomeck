@@ -7,6 +7,12 @@ import { fetchProduct, fetchCategories } from "@/lib/api";
 import { toSlug } from "@/lib/utils";
 import { ProductDetailContent } from "@/components/ProductDetailContent";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
+import {
+  ProductInfoTabs,
+  PRODUCT_TABS_SECTION_ID,
+  type ProductTabId,
+} from "@/components/ProductInfoTabs";
+import { ProductReviewsProvider } from "@/components/ProductReviews";
 import { notFound } from "next/navigation";
 import type { ProductType } from "@/types";
 
@@ -31,6 +37,15 @@ export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: 
   const [product, setProduct] = useState<ProductType | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<ProductTabId>("description");
+
+  /** "Read more" under the clamped description: open the description tab and jump to it. */
+  const showFullDescription = () => {
+    setActiveTab("description");
+    document
+      .getElementById(PRODUCT_TABS_SECTION_ID)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -95,22 +110,31 @@ export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: 
     : null;
 
   return (
-    <div className="flex flex-col gap-4 mt-6">
-      <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-4">
-        <div className="w-full lg:w-5/12">
-          <ProductImageGallery
-            images={product.galleryImages ?? [product.images?.default || "/products/1g.png"]}
-            alt={product.name}
-            decorativeImages
+    <ProductReviewsProvider productId={Number(product.id)}>
+      <div className="flex flex-col gap-4 mt-6">
+        <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-4">
+          <div className="w-full lg:w-5/12">
+            <ProductImageGallery
+              images={product.galleryImages ?? [product.images?.default || "/products/1g.png"]}
+              alt={product.name}
+              decorativeImages
+            />
+          </div>
+          <ProductDetailContent
+            product={product}
+            selectedSize={selectedSize}
+            selectedColor={selectedColor}
+            firstCategory={firstCategory}
+            onReadMore={showFullDescription}
           />
         </div>
-        <ProductDetailContent
+        <ProductInfoTabs
           product={product}
-          selectedSize={selectedSize}
-          selectedColor={selectedColor}
-          firstCategory={firstCategory}
+          categories={categories}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       </div>
-    </div>
+    </ProductReviewsProvider>
   );
 }

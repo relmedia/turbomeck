@@ -689,6 +689,7 @@ app.get("/api/products", async (req, res) => {
       stock: products.stock,
       weight: products.weight,
       attributes: products.attributes,
+      specifications: products.specifications,
       featuredInSlider: products.featuredInSlider,
       sliderOrder: products.sliderOrder,
       isExchangeTurbo: products.isExchangeTurbo,
@@ -746,6 +747,7 @@ app.get("/api/products", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryMap.get(p.id) ?? [],
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       featuredInSlider: (p as { featuredInSlider?: number | null }).featuredInSlider ?? 0,
       sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
@@ -796,6 +798,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        specifications: products.specifications,
         isExchangeTurbo: products.isExchangeTurbo,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
@@ -825,6 +828,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
@@ -855,6 +859,7 @@ app.get("/api/products/:id", async (req, res) => {
         stock: products.stock,
         weight: products.weight,
         attributes: products.attributes,
+        specifications: products.specifications,
         isExchangeTurbo: products.isExchangeTurbo,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
@@ -893,6 +898,7 @@ app.get("/api/products/:id", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       orderCount,
       totalRevenue,
@@ -905,10 +911,27 @@ app.get("/api/products/:id", async (req, res) => {
   }
 });
 
+/**
+ * Technical spec rows for the product page. Free-text label/value pairs with an
+ * optional group heading; anything without both label and value is dropped.
+ */
+function sanitizeSpecifications(input: unknown): { group?: string; label: string; value: string }[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+    .map((row) => ({
+      group: typeof row.group === "string" && row.group.trim() !== "" ? row.group.trim().slice(0, 60) : undefined,
+      label: typeof row.label === "string" ? row.label.trim().slice(0, 80) : "",
+      value: typeof row.value === "string" ? row.value.trim().slice(0, 200) : "",
+    }))
+    .filter((row) => row.label !== "" && row.value !== "")
+    .slice(0, 60);
+}
+
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, nameEn, shortDescriptionEn, descriptionEn, isExchangeTurbo } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, specifications, nameEn, shortDescriptionEn, descriptionEn, isExchangeTurbo } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
@@ -923,6 +946,7 @@ app.post("/api/products", async (req, res) => {
       thumbnails: thumbnails && Array.isArray(thumbnails) ? thumbnails : [],
       stock: stock || 0,
       weight: weight != null ? weight.toString() : null,
+      specifications: sanitizeSpecifications(specifications),
       nameEn: nameEn != null && String(nameEn).trim() !== "" ? String(nameEn) : null,
       shortDescriptionEn: shortDescriptionEn != null && String(shortDescriptionEn).trim() !== "" ? String(shortDescriptionEn) : null,
       descriptionEn: descriptionEn != null && String(descriptionEn).trim() !== "" ? String(descriptionEn) : null,
@@ -953,6 +977,7 @@ app.post("/api/products", async (req, res) => {
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryIdsRes,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
+      specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
@@ -967,7 +992,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, specifications, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -994,6 +1019,9 @@ app.put("/api/products/:id", async (req, res) => {
       updateData.attributes = Array.isArray(attributes)
         ? attributes.filter((a: unknown) => a && typeof a === "object" && "name" in a && "options" in a && Array.isArray((a as { options: unknown }).options))
         : [];
+    }
+    if (specifications !== undefined) {
+      updateData.specifications = sanitizeSpecifications(specifications);
     }
     if (featuredInSlider !== undefined) {
       updateData.featuredInSlider = featuredInSlider === true || featuredInSlider === 1 || featuredInSlider === "1" ? 1 : 0;
@@ -1041,6 +1069,7 @@ app.put("/api/products/:id", async (req, res) => {
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
       categoryIds: categoryIdsRes,
+      specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,

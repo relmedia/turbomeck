@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { signOut, useSession } from "next-auth/react";
 
-const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
+const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
 
 const ACTIVITY_EVENTS = [
   "mousemove",

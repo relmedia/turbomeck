@@ -13,7 +13,8 @@
     "quantity": "Quantity",
     "reviews": "reviews",
     "review": "review",
-    "kr": "kr"
+    "kr": "kr",
+    "yes": "Yes"
   },
   "nav": {
     "myAccount": "My account",
@@ -128,14 +129,35 @@
     "previousProductImage": "Previous image: {{name}}",
     "nextProductImage": "Next image: {{name}}",
     "selectGalleryThumbnail": "Select thumbnail {{n}} for {{name}}",
-    "fullscreenImage": "View image fullscreen: {{name}}"
+    "fullscreenImage": "View image fullscreen: {{name}}",
+    "readMore": "Read more",
+    "tabsLabel": "Product information",
+    "tabDescription": "Description",
+    "tabSpecifications": "Specifications",
+    "noDescription": "No description available.",
+    "specArticleNumber": "Item number",
+    "specCategory": "Category",
+    "specExchangeTurbo": "Exchange turbo",
+    "specGroupGeneral": "General",
+    "exchangeTurboNote": "This is an exchange turbo. Your old turbo (core) must be returned according to our terms."
   },
   "reviews": {
     "title": "Reviews",
     "loading": "Loading reviews...",
     "loadError": "Could not load reviews",
     "verifiedPurchase": "Verified purchase",
-    "starsLabel": "out of 5 stars"
+    "starsLabel": "out of 5 stars",
+    "empty": "No reviews yet. Be the first to review this product.",
+    "ratingDistribution": "Rating distribution",
+    "writeReview": "Write a review",
+    "writeReviewIntro": "Verified purchase – tell others what you think of the product.",
+    "loginToReview": "Log in to write a review if you have bought this product.",
+    "loginCta": "Log in",
+    "purchaseRequired": "Only customers who have bought this product can write a review.",
+    "yourReview": "Your review",
+    "alreadyReviewed": "You have already reviewed this product. You can change your review under My orders.",
+    "showAll": "Show all {{count}} reviews",
+    "showLess": "Show fewer"
   },
   "shipping": {
     "firstName": "First name",

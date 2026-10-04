@@ -23,6 +23,7 @@
     "db:set-admin": "tsx scripts/set-admin-role.ts",
     "db:set-password": "tsx scripts/set-admin-password.ts",
     "db:ensure-exchange-turbo": "tsx scripts/ensure-is-exchange-turbo.ts",
+    "db:ensure-specifications": "tsx scripts/ensure-product-specifications.ts",
     "db:backfill-order-users": "tsx scripts/backfill-order-user-ids.ts"
   },
   "dependencies": {
@@ -36,4 +37,3 @@
     "typescript": "^5.9.2"
   }
 }
-

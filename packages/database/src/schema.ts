@@ -85,6 +85,15 @@ export const products = pgTable("products", {
   thumbnails: jsonb("thumbnails").$type<string[]>().default([]), // Additional gallery images
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T","14t"] }] - customer must choose when adding to cart */
   attributes: jsonb("attributes").$type<{ name: string; options: string[] }[]>().default([]),
+  /**
+   * Technical specifications shown in the "Specifikationer" tab on the product page,
+   * e.g. [{ group: "Kompressor", label: "Kompressorhjul", value: "48,5 x 61 mm" }].
+   * `group` is a free-text heading (Kompressor / Turbin / Anslutningar ...); rows
+   * without one are listed under a generic heading.
+   */
+  specifications: jsonb("specifications")
+    .$type<{ group?: string; label: string; value: string }[]>()
+    .default([]),
   /** Homepage slider: 1 = show in slider, 0 = hide; sliderOrder = display order (lower first) */
   featuredInSlider: integer("featured_in_slider").default(0),
   sliderOrder: integer("slider_order"),

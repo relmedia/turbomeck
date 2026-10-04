@@ -74,6 +74,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+/** One row in the "Specifikationer" table on the product page. */
+type SpecRow = { group?: string; label: string; value: string };
+
+const SPEC_GROUPS = ["Kompressor", "Turbin", "Anslutningar", "Övrigt"];
+
 interface AddProductFormProps {
   onSuccess?: () => void;
 }
@@ -90,6 +95,14 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isSuggestingDescription, setIsSuggestingDescription] = useState(false);
+  const [isSuggestingSpecs, setIsSuggestingSpecs] = useState(false);
+  const [specifications, setSpecifications] = useState<SpecRow[]>([]);
+  /** Sources and caveats from the last AI spec lookup, shown under the editor. */
+  const [specSuggestion, setSpecSuggestion] = useState<{
+    sources: string[];
+    notes: string;
+    weightBasis: string;
+  } | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -191,6 +204,63 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     }
   };
 
+  const handleSuggestSpecifications = async () => {
+    const name = form.getValues("name")?.trim();
+    const shortDescription = form.getValues("shortDescription")?.trim();
+    const description = form.getValues("description")?.trim();
+    if (!name && !shortDescription && !description) {
+      setError("Fyll i produktnamn eller beskrivning först — AI använder dem som underlag.");
+      return;
+    }
+    setIsSuggestingSpecs(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/suggest-specifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, shortDescription, description }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error?.trim() || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as {
+        specifications: SpecRow[];
+        weightKg: number | null;
+        weightBasis: string;
+        sources: string[];
+        notes: string;
+      };
+
+      // Never clobber rows already written - only append unseen labels.
+      setSpecifications((prev) => {
+        const existingLabels = new Set(prev.map((r) => r.label.trim().toLowerCase()));
+        return [
+          ...prev,
+          ...data.specifications.filter(
+            (r) => !existingLabels.has(r.label.trim().toLowerCase())
+          ),
+        ];
+      });
+
+      // Same for the weight: a value already entered wins over the suggestion.
+      const currentWeight = form.getValues("weight");
+      if (data.weightKg != null && (currentWeight == null || Number.isNaN(currentWeight))) {
+        form.setValue("weight", data.weightKg);
+      }
+
+      setSpecSuggestion({
+        sources: data.sources,
+        notes: data.notes,
+        weightBasis: data.weightKg != null ? data.weightBasis : "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setIsSuggestingSpecs(false);
+    }
+  };
+
   const handleSuggestDescription = async () => {
     const name = form.getValues("name");
     const shortDescription = form.getValues("shortDescription");
@@ -258,6 +328,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           image: values.image || null,
           thumbnails: values.thumbnails ?? [],
           categoryIds: values.categoryIds ?? [],
+          specifications: specifications.filter(
+            (r) => r.label.trim() !== "" && r.value.trim() !== ""
+          ),
         }),
       });
 
@@ -268,6 +341,8 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       form.reset();
       setSelectedCategoryId("");
       setSelectedSubcategoryId("");
+      setSpecifications([]);
+      setSpecSuggestion(null);
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -762,6 +837,140 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
               </FormItem>
             )}
           />
+        </div>
+
+        <div className="border-t pt-4 mt-4 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-medium">Specifikationer (valfritt)</h3>
+              <p className="text-sm text-muted-foreground">
+                Visas i fliken Specifikationer på produktsidan. AI läser produkttexten och söker
+                på webben, fyller i vikten om den är tom och rör aldrig rader du redan skrivit —
+                granska alltid innan du sparar.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleSuggestSpecifications}
+              disabled={isSubmitting || isSuggestingSpecs}
+              className="shrink-0"
+            >
+              {isSuggestingSpecs ? (
+                <Loader2 className="h-4 w-4 mr-2 shrink-0 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              {isSuggestingSpecs ? "Söker..." : "Hämta med AI"}
+            </Button>
+          </div>
+
+          <datalist id="add-spec-groups">
+            {SPEC_GROUPS.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
+          {specifications.length > 0 && (
+            <div className="hidden gap-2 px-1 text-xs text-muted-foreground sm:grid sm:grid-cols-[10rem_12rem_1fr_2.5rem]">
+              <span>Grupp</span>
+              <span>Etikett</span>
+              <span>Värde</span>
+              <span />
+            </div>
+          )}
+          {specifications.map((row, idx) => (
+            <div
+              key={idx}
+              className="grid gap-2 sm:grid-cols-[10rem_12rem_1fr_2.5rem] sm:items-center"
+            >
+              <Input
+                list="add-spec-groups"
+                placeholder="Kompressor"
+                value={row.group ?? ""}
+                onChange={(e) =>
+                  setSpecifications((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx]!, group: e.target.value };
+                    return next;
+                  })
+                }
+              />
+              <Input
+                placeholder="Kompressorhjul"
+                value={row.label}
+                onChange={(e) =>
+                  setSpecifications((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx]!, label: e.target.value };
+                    return next;
+                  })
+                }
+              />
+              <Input
+                placeholder="48,5 × 61 mm"
+                value={row.value}
+                onChange={(e) =>
+                  setSpecifications((prev) => {
+                    const next = [...prev];
+                    next[idx] = { ...next[idx]!, value: e.target.value };
+                    return next;
+                  })
+                }
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 text-destructive"
+                aria-label="Ta bort rad"
+                onClick={() =>
+                  setSpecifications((prev) => prev.filter((_, i) => i !== idx))
+                }
+              >
+                ×
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setSpecifications((prev) => [...prev, { group: "", label: "", value: "" }])
+            }
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Lägg till rad
+          </Button>
+
+          {specSuggestion && (
+            <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+              {specSuggestion.notes && <p>{specSuggestion.notes}</p>}
+              {specSuggestion.weightBasis && <p>Vikt: {specSuggestion.weightBasis}</p>}
+              {specSuggestion.sources.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Källor</p>
+                  <ul className="space-y-0.5">
+                    {specSuggestion.sources.map((url) => (
+                      <li key={url}>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="break-all underline hover:text-foreground"
+                        >
+                          {url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p>Inga webbkällor — värdena kommer från produkttexten.</p>
+              )}
+            </div>
+          )}
         </div>
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>

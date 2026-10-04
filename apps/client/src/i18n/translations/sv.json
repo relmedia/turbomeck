@@ -13,7 +13,8 @@
     "quantity": "Antal",
     "reviews": "recensioner",
     "review": "recension",
-    "kr": "Kr"
+    "kr": "Kr",
+    "yes": "Ja"
   },
   "nav": {
     "myAccount": "Mitt konto",
@@ -128,14 +129,35 @@
     "previousProductImage": "Föregående bild: {{name}}",
     "nextProductImage": "Nästa bild: {{name}}",
     "selectGalleryThumbnail": "Välj miniatyrbild {{n}} för {{name}}",
-    "fullscreenImage": "Visa bild i fullskärm: {{name}}"
+    "fullscreenImage": "Visa bild i fullskärm: {{name}}",
+    "readMore": "Läs mer",
+    "tabsLabel": "Produktinformation",
+    "tabDescription": "Beskrivning",
+    "tabSpecifications": "Specifikationer",
+    "noDescription": "Ingen beskrivning tillgänglig.",
+    "specArticleNumber": "Artikelnummer",
+    "specCategory": "Kategori",
+    "specExchangeTurbo": "Utbytesturbo",
+    "specGroupGeneral": "Allmänt",
+    "exchangeTurboNote": "Detta är en utbytesturbo. Din gamla turbo (kärna) ska skickas in enligt köpvillkoren."
   },
   "reviews": {
     "title": "Recensioner",
     "loading": "Laddar recensioner...",
     "loadError": "Kunde inte ladda recensioner",
     "verifiedPurchase": "Verifierat köp",
-    "starsLabel": "av 5 stjärnor"
+    "starsLabel": "av 5 stjärnor",
+    "empty": "Inga recensioner än. Bli först med att recensera den här produkten.",
+    "ratingDistribution": "Betygsfördelning",
+    "writeReview": "Skriv en recension",
+    "writeReviewIntro": "Verifierat köp – berätta vad du tycker om produkten.",
+    "loginToReview": "Logga in för att skriva en recension om du har köpt produkten.",
+    "loginCta": "Logga in",
+    "purchaseRequired": "Endast kunder som har köpt produkten kan skriva en recension.",
+    "yourReview": "Din recension",
+    "alreadyReviewed": "Du har redan recenserat den här produkten. Du kan ändra din recension under Mina beställningar.",
+    "showAll": "Visa alla {{count}} recensioner",
+    "showLess": "Visa färre"
   },
   "shipping": {
     "firstName": "Förnamn",

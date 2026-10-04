@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Star, CheckCircle2 } from "lucide-react";
 import { fetchReviews, type ApiReview, type ReviewsResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,14 @@ type ReviewsContextValue = {
   data: ReviewsResponse | null;
   loading: boolean;
   error: string | null;
+  /** Re-fetch after the visitor publishes a review, so summary and list stay in sync. */
+  refresh: () => Promise<void>;
 };
 
 const ReviewsContext = createContext<ReviewsContextValue | null>(null);
 
-function useReviews() {
+/** Reviews data for the current product. Must be used within ProductReviewsProvider. */
+export function useProductReviews() {
   const ctx = useContext(ReviewsContext);
   if (!ctx) throw new Error("ProductReviewsSection must be used within ProductReviewsProvider");
   return ctx;
@@ -90,10 +93,20 @@ export function ProductReviewsProvider({
     };
   }, [productId, t]);
 
+  const refresh = useCallback(async () => {
+    try {
+      setData(await fetchReviews(productId));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("reviews.loadError"));
+    }
+  }, [productId, t]);
+
   const value: ReviewsContextValue = {
     data,
     loading,
     error,
+    refresh,
   };
 
   return (
@@ -104,7 +117,7 @@ export function ProductReviewsProvider({
 }
 
 export function ProductReviewsSummary() {
-  const { data, loading, error } = useReviews();
+  const { data, loading, error } = useProductReviews();
   const t = useTranslation();
 
   if (loading) {
@@ -149,7 +162,7 @@ export function ProductReviewsSummary() {
 }
 
 export function ProductReviewsSection() {
-  const { data, loading, error } = useReviews();
+  const { data, loading, error } = useProductReviews();
   const t = useTranslation();
 
   return (

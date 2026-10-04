@@ -28,6 +28,7 @@ export type ApiProduct = {
   weight: number | null;
   categoryIds: number[];
   attributes?: { name: string; options: string[] }[];
+  specifications?: { group?: string; label: string; value: string }[];
   isExchangeTurbo?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -71,6 +72,7 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     stock: api.stock ?? 0,
     categoryIds: api.categoryIds ?? [],
     attributes: api.attributes ?? [],
+    specifications: api.specifications ?? [],
     isExchangeTurbo: api.isExchangeTurbo === true,
     sizes: ["-"],
     colors: ["default"],
@@ -375,6 +377,24 @@ export async function fetchMyReviews(): Promise<MyReview[]> {
   if (!res.ok) return [];
   const data = await safeJson<{ reviews?: MyReview[] }>(res, {});
   return data.reviews ?? [];
+}
+
+export type ReviewEligibility = {
+  /** True when the signed-in account has an order containing this product. */
+  hasPurchased: boolean;
+  /** The review this account already wrote for the product, if any. */
+  review: MyReview | null;
+};
+
+const NOT_ELIGIBLE: ReviewEligibility = { hasPurchased: false, review: null };
+
+/** Review permissions for the signed-in user on one product (401 when logged out). */
+export async function fetchReviewEligibility(productId: number): Promise<ReviewEligibility> {
+  const res = await fetch(`/api/reviews/eligibility?productId=${productId}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return NOT_ELIGIBLE;
+  return safeJson<ReviewEligibility>(res, NOT_ELIGIBLE);
 }
 
 export async function createReview(data: {

@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const DEFAULT_CLAUDE_MODEL = "claude-opus-4-5-20251101";
+const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
 
 // SECURITY (audit M7): cap the user-controlled prompt fragments. Without
 // these limits an admin (or anyone who has compromised an admin session) can
@@ -90,6 +90,8 @@ Utöka innehållet med relevanta detaljer: passform, viktiga specifikationer, va
 
 Formatera som HTML: <p> för stycken, <ul><li> för punktlistor där det passar, <strong> för betoning.
 
+Håll texten koncis: 2–4 korta stycken, eventuellt med en punktlista på högst 6 punkter. Skriv inget inledande eller avslutande meta-prat.
+
 VIKTIGT: Svara ENDAST med HTML-fragmentet. Ingen JSON, ingen förklarande text före eller efter, inga markdown-kodblock om du kan undvika det.
 
 Produktnamn: ${safeName || "(okänt)"}
@@ -97,12 +99,26 @@ Kort beskrivning: ${safeShort}`;
 
     const message = await anthropic.messages.create({
       model,
-      max_tokens: 8192,
-      temperature: 0.45,
+      // Shares the budget with thinking on Opus 5.
+      max_tokens: 16000,
+      output_config: {
+        // Short marketing copy - low effort is both faster and cheaper here.
+        effort: "low",
+      },
       system:
         "Du skriver professionella svenska produkttexter för e-handel. Svara endast med HTML (fragment), inget annat.",
       messages: [{ role: "user", content: prompt }],
     });
+
+    // Opus 5 can decline a request (HTTP 200 with stop_reason "refusal"), so
+    // check before reading the content blocks.
+    if (message.stop_reason === "refusal") {
+      console.error("Suggest-description refused:", message.stop_details);
+      return NextResponse.json(
+        { error: "AI avböjde att skriva en beskrivning för den här texten." },
+        { status: 502 },
+      );
+    }
 
     const text = message.content
       .filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -156,7 +172,7 @@ Kort beskrivning: ${safeShort}`;
       if (err.status === 404) {
         return NextResponse.json(
           {
-            error: `Modellen finns inte eller saknar åtkomst. Sätt ANTHROPIC_MODEL i .env till en modell du har (nu: ${model}). Exempel: claude-sonnet-4-20250514`,
+            error: `Modellen finns inte eller saknar åtkomst. Sätt ANTHROPIC_MODEL i .env till en modell du har (nu: ${model}). Exempel: claude-sonnet-5`,
           },
           { status: 502 },
         );

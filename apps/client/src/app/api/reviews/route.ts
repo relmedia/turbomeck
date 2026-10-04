@@ -51,6 +51,16 @@ export async function POST(req: Request) {
       .limit(1);
     const orderId = found[0]?.orderId ?? null;
 
+    // Only verified buyers may review: the product page and the order modal both
+    // offer the form to purchasers only, so enforce the same rule here instead of
+    // trusting the client.
+    if (orderId == null) {
+      return NextResponse.json(
+        { error: "Du kan bara recensera produkter du har köpt." },
+        { status: 403 }
+      );
+    }
+
     const inserted = await db
       .insert(reviews)
       .values({
