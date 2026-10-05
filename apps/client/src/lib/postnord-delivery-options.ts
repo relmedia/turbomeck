@@ -143,57 +143,82 @@ export function getDefaultWarehouse(): PostNordWarehouse | null {
       countryCode,
     },
     orderHandling: {
-      timeOfLatestOrder: cutoffEnv ?? defaultLatestOrderToday(),
+      timeOfLatestOrder: resolveTimeOfLatestOrder(cutoffEnv),
     },
   };
 }
 
 /**
- * Returns an ISO timestamp that PostNord will accept for
+ * Returns an ISO timestamp PostNord accepts for
  * `warehouses[].orderHandling.timeOfLatestOrder`.
  *
- * PostNord rejects any date other than today (faultCode API-008), so we always
- * anchor to today’s date in the warehouse’s local time (Europe/Stockholm by
- * default). Default cut-off is 18:00 local; if 18:00 has already passed we
- * push forward to 23:59 the same day to keep the date on today.
+ * PostNord validates this field against **today in UTC** and rejects anything
+ * else with faultCode API-008 ("dates other than today are not supported").
+ *
+ * The previous version anchored to today in Europe/Stockholm, which is correct
+ * for 22 hours a day and wrong for two: between 00:00 and 02:00 Stockholm time
+ * (22:00-00:00 UTC) the Stockholm date is already tomorrow in UTC, so every
+ * delivery-options request failed with a 400 until 02:00. Anchor to the UTC
+ * date instead, and keep the instant in the future so the cut-off still reads
+ * as "orders placed before this are handled today".
+ *
+ * `POSTNORD_WAREHOUSE_LATEST_ORDER_TIME` may be:
+ *   - unset              -> computed (default cut-off 16:00 UTC = 18:00 CEST)
+ *   - a time, "HH:mm"    -> that time today, in UTC
+ *   - a full ISO stamp   -> used as-is ONLY if it falls on today's UTC date;
+ *                           a stale fixed value is ignored with a warning
+ *                           rather than taking checkout down.
+ *
+ * @param cutoffEnv raw env value, if any
+ * @param nowInput  injectable clock, for tests
  */
-function defaultLatestOrderToday(): string {
-  const now = new Date();
-  const stockholmParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Stockholm",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
+export function resolveTimeOfLatestOrder(
+  cutoffEnv?: string | null,
+  nowInput?: Date,
+): string {
+  const now = nowInput ?? new Date();
+  const utcDay = now.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
 
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    stockholmParts.find((p) => p.type === type)?.value ?? "00";
-  const date = `${get("year")}-${get("month")}-${get("day")}`;
-  const hour = Number(get("hour"));
-  const minute = Number(get("minute"));
-  const past18 = hour > 18 || (hour === 18 && minute > 0);
-  const time = past18 ? "23:59:00" : "18:00:00";
-  // Stockholm uses UTC+1 (CET) or UTC+2 (CEST). Use Intl to determine the
-  // current offset so the timestamp stays anchored to TODAY in Stockholm.
-  const offset = stockholmOffsetForDate(now);
-  return `${date}T${time}${offset}`;
-}
+  /** Keep the stamp on today's UTC date and at least a minute ahead of now. */
+  const clampToToday = (candidate: Date): string => {
+    const endOfUtcDay = new Date(`${utcDay}T23:59:59.000Z`);
+    const earliest = new Date(now.getTime() + 60_000);
+    let chosen = candidate;
+    if (chosen.getTime() < earliest.getTime()) chosen = earliest;
+    if (chosen.getTime() > endOfUtcDay.getTime()) chosen = endOfUtcDay;
+    return chosen.toISOString().replace(/\.\d{3}Z$/, ".000Z");
+  };
 
-function stockholmOffsetForDate(date: Date): string {
-  const offsetParts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Stockholm",
-    timeZoneName: "longOffset",
-  })
-    .formatToParts(date)
-    .find((p) => p.type === "timeZoneName")?.value;
-  if (offsetParts && /GMT([+-]\d{2}):?(\d{2})/.test(offsetParts)) {
-    const m = offsetParts.match(/GMT([+-]\d{2}):?(\d{2})/);
-    if (m) return `${m[1]}:${m[2]}`;
+  const raw = cutoffEnv?.trim();
+
+  if (raw) {
+    // "HH:mm" or "HH:mm:ss" -> today's UTC date at that time.
+    const timeOnly = raw.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeOnly) {
+      const [, hh, mm, ss] = timeOnly;
+      return clampToToday(new Date(`${utcDay}T${hh}:${mm}:${ss ?? "00"}.000Z`));
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      if (parsed.toISOString().slice(0, 10) === utcDay) {
+        return clampToToday(parsed);
+      }
+      console.warn(
+        "[postnord] ignoring POSTNORD_WAREHOUSE_LATEST_ORDER_TIME=" +
+          `${raw}: PostNord only accepts today's date (UTC ${utcDay}). ` +
+          "Set it to HH:mm, or leave it unset, to avoid this.",
+      );
+    } else {
+      console.warn(
+        `[postnord] POSTNORD_WAREHOUSE_LATEST_ORDER_TIME=${raw} is not a ` +
+          "valid time or ISO timestamp; computing the cut-off instead.",
+      );
+    }
   }
-  return "+01:00";
+
+  // Default: 16:00 UTC, i.e. 18:00 Stockholm in summer / 17:00 in winter.
+  return clampToToday(new Date(`${utcDay}T16:00:00.000Z`));
 }
 
 export type BuildDeliveryOptionsPayloadInput = {
