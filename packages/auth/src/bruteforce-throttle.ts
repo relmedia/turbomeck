@@ -21,11 +21,12 @@
  *   bcrypt CPU load from one host) that is good enough. Swap to a shared
  *   store (Redis/Upstash) if we ever fan out to many workers.
  *
- * Keys default to the first hop in `x-forwarded-for`, falling back to
- * `x-real-ip` and finally to a literal "unknown" bucket (which intentionally
- * shares the limit between all unknown clients so it cannot be bypassed by
- * stripping headers).
+ * Keys come from `clientIpFromHeaders` (./client-ip), which prefers nginx's
+ * `x-real-ip` and otherwise takes the hop our own proxy appended to
+ * `x-forwarded-for` — never the client-supplied first hop.
  */
+
+import { clientIpFromHeaders } from "./client-ip";
 
 type Bucket = {
   count: number;
@@ -44,17 +45,6 @@ function maybeCleanup(now: number) {
   }
 }
 
-function clientIpFromHeaders(headers: Headers): string {
-  const xff = headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const real = headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
-
 export interface CredentialsThrottleOptions {
   /** Window length in milliseconds. */
   windowMs: number;
@@ -62,6 +52,8 @@ export interface CredentialsThrottleOptions {
   max: number;
   /** Distinct bucket name; lets us share the Map between throttles. */
   bucket: string;
+  /** Optional explicit key (e.g. an email address) instead of the client IP. */
+  key?: string;
 }
 
 /**
@@ -74,12 +66,10 @@ export function consumeCredentialsAttempt(
   request: Request | undefined,
   options: CredentialsThrottleOptions,
 ): boolean {
-  const headers =
-    request?.headers ?? (new Headers() as unknown as Headers);
-  const ip = clientIpFromHeaders(headers as Headers);
+  const identity = options.key ?? clientIpFromHeaders(request?.headers);
   const now = Date.now();
   maybeCleanup(now);
-  const key = `${options.bucket}:${ip}`;
+  const key = `${options.bucket}:${identity}`;
   const existing = buckets.get(key);
   if (!existing || existing.resetAt <= now) {
     buckets.set(key, { count: 1, resetAt: now + options.windowMs });

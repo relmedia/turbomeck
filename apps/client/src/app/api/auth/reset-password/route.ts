@@ -5,8 +5,15 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { validatePassword, BCRYPT_COST } from "@repo/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { requireSameOrigin } from "@/lib/same-origin";
+import { hashResetToken } from "@/lib/reset-token";
 
 export async function POST(req: NextRequest) {
+  // SECURITY (audit M3): same-origin gate, as on the other state-changing
+  // storefront endpoints.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   // SECURITY (audit M4): cap token-consume attempts per IP. The token itself
   // is 32 bytes of crypto-random hex (≈2^256 brute-force space) so guessing
   // is infeasible, but each call still drives a DB read + bcrypt.hash() at
@@ -36,12 +43,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: pwCheck.error }, { status: 400 });
     }
 
+    // Tokens are stored hashed (see forgot-password), so look up by hash.
     const [resetRow] = await db
       .select()
       .from(passwordResetTokens)
       .where(
         and(
-          eq(passwordResetTokens.token, token),
+          eq(passwordResetTokens.token, hashResetToken(token)),
           gt(passwordResetTokens.expires, new Date())
         )
       )

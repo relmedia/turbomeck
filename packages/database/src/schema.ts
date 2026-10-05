@@ -21,7 +21,12 @@ export const users = pgTable("user", {
   image: text("image"),
   password: text("password"), // hashed, for credentials provider
   role: text("role").default("customer").notNull(), // "admin" | "customer"
-  metadata: jsonb("metadata").$type<{ savedAddress?: Record<string, string>; savedWishlist?: number[] }>(),
+  metadata: jsonb("metadata").$type<{
+    savedAddress?: Record<string, string>;
+    savedWishlist?: number[];
+    /** ISO timestamp of the terms/privacy acceptance given at sign-up. */
+    termsAcceptedAt?: string;
+  }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

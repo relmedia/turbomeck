@@ -169,6 +169,15 @@ function shopAuthHostnamesFromEnv(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Magic-link send limits. Five links an hour is far above any human use (the
+ * link is valid for 15 minutes), and 20/h per IP still allows a family or an
+ * office behind one NAT address to sign in.
+ */
+const MAGIC_LINK_WINDOW_MS = 60 * 60 * 1000;
+const MAGIC_LINK_MAX_PER_EMAIL = 5;
+const MAGIC_LINK_MAX_PER_IP = 20;
+
 function defaultStudioOrigin(): string {
   return `https://${studioHostnameFromEnv()}`;
 }
@@ -277,7 +286,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  session: { strategy: "jwt" }, // Use JWT for credentials - simpler for shared auth
+  session: {
+    // JWT (not database sessions) because the Credentials provider needs it and
+    // both apps share this config.
+    strategy: "jwt",
+    // SECURITY: Auth.js defaults to 30 days. Staff and customers live in the
+    // same `user` table, so a stolen or stale token is worth bounding more
+    // tightly; 14 days with a daily rolling refresh keeps "stay signed in"
+    // usable for shoppers.
+    maxAge: 14 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
+  },
   providers: [
     Nodemailer({
       id: "email",
@@ -285,7 +304,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       from: "noreply@localhost",
       name: "E-postlänk",
       maxAge: 15 * 60, // 15 minutes
-      sendVerificationRequest: async ({ identifier: email, url }) => {
+      sendVerificationRequest: async ({ identifier: email, url, request }) => {
+        // SECURITY: this is the cheapest abuse path in the product — one POST to
+        // /api/auth/signin/email is one SMTP send, and because there is no
+        // `signIn` callback the adapter also provisions an account on
+        // verification. Unthrottled it lets an attacker mail-bomb a victim and
+        // burn our sender reputation, which would land real order
+        // confirmations in spam. Per-email first (protects the victim), then
+        // per-IP (protects the mail server).
+        const emailKey = email.trim().toLowerCase();
+        const perEmailOk = consumeCredentialsAttempt(request, {
+          bucket: "magic-link-email",
+          windowMs: MAGIC_LINK_WINDOW_MS,
+          max: MAGIC_LINK_MAX_PER_EMAIL,
+          key: emailKey,
+        });
+        const perIpOk = consumeCredentialsAttempt(request, {
+          bucket: "magic-link-ip",
+          windowMs: MAGIC_LINK_WINDOW_MS,
+          max: MAGIC_LINK_MAX_PER_IP,
+        });
+        if (!perEmailOk || !perIpOk) {
+          // Throwing here surfaces as a generic sign-in error. Deliberately the
+          // same message whether or not the address has an account, so this
+          // cannot be used to enumerate users.
+          console.warn("[@repo/auth] magic-link send throttled");
+          throw new Error("För många inloggningsförsök. Försök igen senare.");
+        }
+
         const config = await getMailConfig();
         if (!config) {
           console.error("[Auth] Mail settings not configured. Configure SMTP in admin Settings.");

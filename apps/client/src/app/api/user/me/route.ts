@@ -4,6 +4,11 @@ import { users } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
+import { cookies } from "next/headers";
+import {
+  PENDING_PROFILE_COOKIE,
+  parsePendingProfile,
+} from "@/lib/pending-profile";
 
 export async function GET() {
   const session = await auth();
@@ -30,10 +35,34 @@ export async function GET() {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  // The sign-up form collects a name and a terms acceptance before the account
+  // exists — /api/auth/sign-up no longer writes an unverified row, so those are
+  // parked in a short-lived cookie and claimed here, on the first authenticated
+  // read after the magic link is verified.
+  let name = user.name;
+  const jar = await cookies();
+  const pending = parsePendingProfile(jar.get(PENDING_PROFILE_COOKIE)?.value);
+  if (pending && (!name || !user.metadata?.termsAcceptedAt)) {
+    name = name || pending.name || null;
+    await db
+      .update(users)
+      .set({
+        name,
+        metadata: {
+          ...(user.metadata ?? {}),
+          ...(user.metadata?.termsAcceptedAt
+            ? {}
+            : { termsAcceptedAt: pending.termsAcceptedAt }),
+        },
+      })
+      .where(eq(users.id, user.id));
+    jar.delete(PENDING_PROFILE_COOKIE);
+  }
+
   const savedAddress = user.metadata?.savedAddress;
   return NextResponse.json({
     id: user.id,
-    name: user.name,
+    name,
     email: user.email,
     image: user.image,
     createdAt: user.createdAt,

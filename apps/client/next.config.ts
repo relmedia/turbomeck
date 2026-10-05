@@ -34,6 +34,8 @@ function buildContentSecurityPolicy(): string {
     "default-src 'self'",
     [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // Cloudflare Turnstile (bot challenge on sign-up / password reset).
+      "https://challenges.cloudflare.com",
       "https://*.js.stripe.com",
       "https://js.stripe.com",
       "https://maps.googleapis.com",
@@ -51,6 +53,7 @@ function buildContentSecurityPolicy(): string {
     ["font-src 'self' data:", "https://fonts.gstatic.com"].join(" "),
     [
       "connect-src 'self'",
+      "https://challenges.cloudflare.com",
       "https://api.stripe.com",
       "https://*.stripe.com",
       "https://*.stripe.network",
@@ -72,6 +75,7 @@ function buildContentSecurityPolicy(): string {
     ].join(" "),
     [
       "frame-src 'self'",
+      "https://challenges.cloudflare.com",
       "https://*.js.stripe.com",
       "https://js.stripe.com",
       "https://hooks.stripe.com",

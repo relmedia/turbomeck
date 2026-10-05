@@ -50,12 +50,27 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const [existing] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, normalizedEmail))
+      .limit(1);
+
+    // SECURITY: this endpoint is publicly reachable (proxy.ts treats
+    // /api/auth/** as public) and both apps share one `user` table, so a 409
+    // "already exists" here was a working oracle for which STOREFRONT customers
+    // are registered. Respond identically whether or not the address is taken,
+    // and never return the row id — mirroring
+    // apps/client/src/app/api/auth/sign-up/route.ts.
+    const GENERIC_OK = {
+      success: true,
+      message: "Om e-posten är giltig kan du logga in via inloggningslänk.",
+    };
     if (existing) {
-      return NextResponse.json(
-        { error: "En användare med denna e-post finns redan" },
-        { status: 409 }
-      );
+      // Deliberately no password write: an attacker must not be able to set or
+      // replace the password on an address they do not control. The owner's
+      // recovery path is the storefront forgot-password flow.
+      return NextResponse.json(GENERIC_OK);
     }
 
     const hashedPassword = await bcrypt.hash(password as string, BCRYPT_COST);
@@ -69,7 +84,7 @@ export async function POST(req: NextRequest) {
       role: "customer",
     });
 
-    return NextResponse.json({ success: true, userId: id });
+    return NextResponse.json(GENERIC_OK);
   } catch (err) {
     console.error("Failed to create user:", err);
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIpFromHeaders } from "@repo/auth/client-ip";
 
 /**
  * Minimal per-process, in-memory rate limiter for the admin app's Route
@@ -15,10 +16,9 @@ import { NextRequest, NextResponse } from "next/server";
  * sign-up); swap to a shared store (Redis/Upstash) if we ever fan out to
  * many workers.
  *
- * Keys default to the first hop in `x-forwarded-for`, falling back to
- * `x-real-ip` and finally to a literal "unknown" bucket (which intentionally
- * shares the limit between all unknown clients so it cannot be bypassed by
- * stripping headers).
+ * Keys come from `clientIpFromHeaders` (@repo/auth/client-ip), which prefers
+ * nginx's `x-real-ip` and otherwise takes the hop our own proxy appended to
+ * `x-forwarded-for` — never the client-supplied first hop.
  */
 
 type Bucket = {
@@ -40,14 +40,7 @@ function maybeCleanup(now: number) {
 }
 
 export function clientIpFrom(request: NextRequest): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const real = request.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
+  return clientIpFromHeaders(request.headers);
 }
 
 export interface RateLimitOptions {

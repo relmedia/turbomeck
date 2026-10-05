@@ -15,6 +15,7 @@ import { Checkbox } from "@repo/ui/components/checkbox";
 import { cn } from "@/lib/utils";
 import { Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 type AuthMode = "login" | "register" | "forgot";
 
@@ -64,6 +65,8 @@ export function AuthModal({
     if (open) setMode(defaultMode);
   }, [open, defaultMode]);
 
+  /** Turnstile token for the current form; "" until solved or when expired. */
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -108,7 +111,7 @@ export function AuthModal({
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, turnstileToken }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -153,11 +156,20 @@ export function AuthModal({
     setError("");
     setLoading(true);
     try {
-      // First create the user account
+      // Validates the input, records the consent and the display name, and
+      // applies the rate limit + challenge. It deliberately does NOT create the
+      // account — the magic link below does, via the Auth.js adapter.
       const res = await fetch("/api/auth/sign-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), name: name || undefined }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          name: name || undefined,
+          // The checkbox below is a UX affordance; this is what the server
+          // records as the acceptance.
+          acceptedTerms: true,
+          turnstileToken,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -245,6 +257,7 @@ export function AuthModal({
                       className="h-10"
                     />
                   </div>
+                  <TurnstileWidget onToken={setTurnstileToken} className="flex justify-center" />
                   {error && <p className="text-sm text-destructive">{error}</p>}
                   <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
                     {loading ? t("auth.sending") : t("auth.sendResetLink")}
@@ -378,6 +391,7 @@ export function AuthModal({
                   <span className="text-destructive">*</span>
                 </span>
               </label>
+              <TurnstileWidget onToken={setTurnstileToken} className="flex justify-center" />
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading}>
                 {loading ? t("auth.creating") : t("auth.createAccount")}

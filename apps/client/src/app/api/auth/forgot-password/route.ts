@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { sendPasswordResetEmail } from "@repo/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { requireSameOrigin } from "@/lib/same-origin";
+import { requireTurnstile } from "@/lib/turnstile";
+import { hashResetToken } from "@/lib/reset-token";
 
 function generateToken() {
   return randomBytes(32).toString("hex");
@@ -24,6 +27,11 @@ function getBaseUrl(): string {
 }
 
 export async function POST(req: NextRequest) {
+  // SECURITY (audit M3): same-origin gate, as on the other state-changing
+  // storefront endpoints.
+  const csrfDenied = requireSameOrigin(req);
+  if (csrfDenied) return csrfDenied;
+
   // SECURITY (audit M4): without a per-IP cap an attacker can drive cost
   // amplification (one POST = one SMTP send + one DB write) against this
   // endpoint cheaply. 10 requests / 15 min per IP fits any human use of the
@@ -47,6 +55,23 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Per-email cap on top of the per-IP one: 10/15min per IP still lets one
+    // host fill a single victim's inbox, and cheap IPs make the IP cap porous.
+    const perEmailLimited = rateLimit(req, {
+      bucket: "forgot-password-email",
+      windowMs: 60 * 60_000,
+      max: 5,
+      key: normalizedEmail,
+    });
+    if (perEmailLimited) return perEmailLimited;
+
+    const turnstileDenied = await requireTurnstile(
+      req,
+      (body as { turnstileToken?: unknown }).turnstileToken,
+    );
+    if (turnstileDenied) return turnstileDenied;
+
     const [user] = await db
       .select()
       .from(users)
@@ -71,10 +96,13 @@ export async function POST(req: NextRequest) {
     const id = randomBytes(16).toString("hex");
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    // SECURITY: store only the hash. The plaintext token lives in the emailed
+    // URL and nowhere else, so a leaked backup or a read-only SQL injection
+    // yields nothing a reset can be performed with.
     await db.insert(passwordResetTokens).values({
       id,
       userId: user.id,
-      token,
+      token: hashResetToken(token),
       expires,
     });
 
