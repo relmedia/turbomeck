@@ -91,6 +91,32 @@ app.get('/stripe-config', (c) => {
   return c.json({ publishableKey: key })
 })
 
+/**
+ * Stripe metadata limits: at most 50 keys, keys <= 40 chars, values <= 500
+ * chars, strings only. Exceeding any of them fails the whole
+ * paymentIntents.create call, so clamp instead of trusting the caller.
+ *
+ * This copy is provenance, not the authoritative snapshot — the full payload
+ * lives in product-service's `checkout_intent` row. Having it on the
+ * PaymentIntent means an order can be reconstructed from Stripe alone, and the
+ * details are visible in the dashboard right next to the payment.
+ */
+function sanitizeStripeMetadata(
+  raw: Record<string, unknown> | undefined,
+): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (Object.keys(out).length >= 50) break
+    if (value == null) continue
+    const k = key.slice(0, 40)
+    const v = typeof value === 'string' ? value : JSON.stringify(value)
+    if (!v) continue
+    out[k] = v.slice(0, 500)
+  }
+  return out
+}
+
 app.post('/create-payment-intent', async (c) => {
   if (!stripe) {
     return c.json(
@@ -101,8 +127,8 @@ app.post('/create-payment-intent', async (c) => {
 
   try {
     const body = await c.req
-      .json<{ amount?: number }>()
-      .catch((): { amount?: number } => ({}))
+      .json<{ amount?: number; metadata?: Record<string, unknown> }>()
+      .catch((): { amount?: number; metadata?: Record<string, unknown> } => ({}))
     const amountSek = parseFloat(String(body.amount ?? 0)) || 0
 
     if (amountSek <= 0) {
@@ -119,10 +145,13 @@ app.post('/create-payment-intent', async (c) => {
 
     const amountOre = Math.round(amountSek * 100)
 
+    const metadata = sanitizeStripeMetadata(body.metadata)
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountOre,
       currency: 'sek',
       automatic_payment_methods: { enabled: true },
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     })
 
     return c.json({

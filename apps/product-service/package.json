@@ -10,6 +10,7 @@
     "check-types": "tsc --noEmit",
     "delete-r2-images": "tsx --env-file=.env scripts/delete-all-r2-images.ts",
     "migrate-images": "tsx --env-file=.env scripts/migrate-images-from-turbomeck.ts",
+    "import-stripe-order": "tsx --env-file=.env scripts/import-stripe-order.ts",
     "reprocess-images": "tsx --env-file=.env scripts/reprocess-product-images.ts",
     "set-r2-cors": "tsx --env-file=.env scripts/set-r2-cors.ts",
     "diagnose-r2": "tsx --env-file=.env scripts/diagnose-r2.ts",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@repo/auth";
+import { buildStripeCheckoutMetadata } from "@/lib/stripe-checkout-metadata";
 import {
   internalProductApiAuthHeaders,
   requireInternalProductApiSecret,
@@ -150,7 +151,16 @@ export async function POST(request: NextRequest) {
     const res = await fetch(paymentUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: amountSek }),
+      body: JSON.stringify({
+        amount: amountSek,
+        // Second copy of the checkout, on the payment itself. The database row
+        // written below is authoritative; this makes the payment
+        // self-describing in the Stripe dashboard and recoverable even if that
+        // row is missing. See lib/stripe-checkout-metadata.ts.
+        ...(checkoutSnapshot
+          ? { metadata: buildStripeCheckoutMetadata(checkoutSnapshot) }
+          : {}),
+      }),
     });
 
     const data = await res.json().catch(() => ({}));
