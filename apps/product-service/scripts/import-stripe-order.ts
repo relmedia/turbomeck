@@ -25,6 +25,12 @@
  *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts pi_xxx --send-emails
  *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts --list-orphans
  *
+ * Fields Stripe doesn't have can be supplied directly (each one is echoed in
+ * the output as an override, so the record shows what came from where):
+ *
+ *   --email=  --name=  --phone=  --address=  --postal=  --city=  --country=
+ *   --delivery=  --item=  --product-id=
+ *
  * Emails are OFF by default: recovering a weeks-old payment should not surprise
  * the customer with a fresh "thanks for your order" unless you decide so.
  */
@@ -39,11 +45,26 @@ const PLACEHOLDER_ITEM_SV =
   "Importerad betalning från Stripe – okänt innehåll, korrigera manuellt";
 
 const args = process.argv.slice(2);
-const flags = new Set(args.filter((a) => a.startsWith("--")));
+const flags = new Set(args.filter((a) => a.startsWith("--") && !a.includes("=")));
 const positional = args.filter((a) => !a.startsWith("--"));
 const dryRun = flags.has("--dry-run");
 const sendEmails = flags.has("--send-emails");
 const listOrphans = flags.has("--list-orphans");
+
+/**
+ * `--key=value` overrides, for the fields Stripe may simply not have. A card
+ * payment carries no shipping address unless the Payment Element collected one,
+ * so for an older orphan you often have to supply what the customer told you by
+ * other means. Overrides are recorded in the output, never silently applied.
+ */
+const overrides = new Map<string, string>(
+  args
+    .filter((a) => a.startsWith("--") && a.includes("="))
+    .map((a) => {
+      const eq = a.indexOf("=");
+      return [a.slice(2, eq), a.slice(eq + 1)] as [string, string];
+    }),
+);
 
 const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
 if (!stripeKey || stripeKey.includes("placeholder")) {
@@ -122,6 +143,24 @@ type Resolved = {
   note: string[];
 };
 
+/**
+ * Where the customer's name, email and address actually live on a payment.
+ *
+ * Modern Stripe API versions expose a single `latest_charge` (expanded by the
+ * retrieve call above); the `charges` array only exists on older versions.
+ * Check both, newest first — reading only `charges` is why the first run of
+ * this script could not find an email.
+ */
+function billingDetailsOf(pi: Stripe.PaymentIntent): Stripe.Charge.BillingDetails | null {
+  const latest = pi.latest_charge;
+  if (latest && typeof latest === "object" && "billing_details" in latest) {
+    return latest.billing_details ?? null;
+  }
+  const legacy = (pi as unknown as { charges?: { data?: Stripe.Charge[] } }).charges
+    ?.data?.[0];
+  return legacy?.billing_details ?? null;
+}
+
 function splitName(full: string | null | undefined): [string, string] {
   const parts = String(full ?? "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return ["", ""];
@@ -168,8 +207,7 @@ async function resolvePayload(pi: Stripe.PaymentIntent): Promise<Resolved> {
 
   // 2. Metadata the storefront attached to the payment.
   const md = pi.metadata ?? {};
-  const charge = (pi as unknown as { charges?: { data?: Array<Stripe.Charge> } }).charges?.data?.[0];
-  const billing = charge?.billing_details;
+  const billing = billingDetailsOf(pi);
   const hasMetadata = Boolean(md.customer_email || md.ship_address);
   if (hasMetadata) {
     const [first, last] = splitName(md.customer_name);
@@ -238,6 +276,38 @@ async function resolvePayload(pi: Stripe.PaymentIntent): Promise<Resolved> {
   };
 }
 
+/** Apply `--key=value` arguments over whatever Stripe/the snapshot gave us. */
+function applyOverrides(resolved: Resolved): void {
+  const setIf = (key: string, apply: (value: string) => void) => {
+    const value = overrides.get(key);
+    if (value === undefined) return;
+    apply(value);
+    resolved.note.push(`override: ${key}="${value}"`);
+  };
+
+  setIf("email", (v) => (resolved.email = v));
+  setIf("name", (v) => {
+    const [first, last] = splitName(v);
+    resolved.firstName = first;
+    resolved.lastName = last;
+  });
+  setIf("phone", (v) => (resolved.phone = v));
+  setIf("address", (v) => (resolved.address = v));
+  setIf("postal", (v) => (resolved.postalCode = v));
+  setIf("city", (v) => (resolved.city = v));
+  setIf("country", (v) => (resolved.country = v.toUpperCase()));
+  setIf("delivery", (v) => (resolved.deliveryOption = v));
+  setIf("item", (v) => {
+    const first = resolved.items[0];
+    if (first) first.productName = v;
+  });
+  setIf("product-id", (v) => {
+    const id = Number.parseInt(v, 10);
+    const first = resolved.items[0];
+    if (first && Number.isFinite(id)) first.productId = id;
+  });
+}
+
 async function findOrphans(): Promise<void> {
   console.log("Scanning the last 100 succeeded PaymentIntents for ones with no order…\n");
   const list = await stripe.paymentIntents.list({ limit: 100 });
@@ -291,6 +361,7 @@ async function main(): Promise<void> {
   }
 
   const resolved = await resolvePayload(pi);
+  applyOverrides(resolved);
   const orderNumber = await nextOrderNumber();
 
   console.log(`PaymentIntent : ${piId}`);
@@ -306,7 +377,13 @@ async function main(): Promise<void> {
   for (const n of resolved.note) console.log(`Note          : ${n}`);
 
   if (!resolved.email) {
-    console.error("\nRefusing to import: no customer email could be determined.");
+    console.error(
+      "\nRefusing to import: no customer email could be determined.\n" +
+        "Stripe has none for this payment (card payments carry no email unless\n" +
+        "the Payment Element collected one). Supply it explicitly, e.g.:\n" +
+        `  ... ${pi.id} --email=kund@example.com --name="Anna Svensson" \\\n` +
+        '      --address="Drottninggatan 1" --postal=11151 --city=Stockholm',
+    );
     process.exit(1);
   }
 
