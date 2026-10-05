@@ -6,8 +6,12 @@ import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/coupons/validate
- * Body: { code: string, subtotal: number }
- * Returns: { valid: boolean, discount?: number, discountType?: string, message?: string }
+ * Body: { code: string, subtotal: number, shipping?: number }
+ * Returns: { valid, discount?, discountType?, discountValue?, discountPercent?, message? }
+ *
+ * The discount covers goods + shipping, so `shipping` should be sent whenever it
+ * is known. Authoritative pricing lives in product-service order-pricing.ts —
+ * this endpoint only quotes what the cart shows.
  */
 export async function POST(request: NextRequest) {
   // SECURITY (audit M4): without a limit, an attacker can enumerate every
@@ -26,6 +30,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const code = String(body?.code ?? "").trim().toUpperCase();
     const subtotal = parseFloat(String(body?.subtotal ?? 0)) || 0;
+    const shipping = Math.max(0, parseFloat(String(body?.shipping ?? 0)) || 0);
+    const discountBase = subtotal + shipping;
 
     if (!code) {
       return NextResponse.json({
@@ -92,13 +98,24 @@ export async function POST(request: NextRequest) {
     const value = Number(coupon.discountValue);
     const discount =
       coupon.discountType === "percent"
-        ? Math.round(subtotal * (value / 100))
-        : Math.min(value, subtotal);
+        ? Math.round(discountBase * (value / 100))
+        : Math.min(value, discountBase);
+
+    // discountPercent is what the cart shows as "(90%)": the code's own percentage,
+    // or for a fixed-amount code the share of the order it happens to cover.
+    const discountPercent =
+      coupon.discountType === "percent"
+        ? value
+        : discountBase > 0
+          ? Math.round((discount / discountBase) * 100)
+          : 0;
 
     return NextResponse.json({
       valid: true,
       discount,
       discountType: coupon.discountType,
+      discountValue: value,
+      discountPercent,
       message: `Rabatt på ${discount.toLocaleString("sv-SE")} kr tillämpad`,
     });
   } catch (err) {

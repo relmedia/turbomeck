@@ -21,6 +21,19 @@ export async function PATCH(
     const body = await request.json();
     const updates: Record<string, unknown> = {};
 
+    // The percent ceiling has to be checked against the type the row will END UP
+    // with: a PATCH that sends only discountValue leaves discountType untouched,
+    // and testing body.discountType alone let a percent code be set to 500.
+    const [existing] = await db
+      .select({ discountType: discountCodes.discountType })
+      .from(discountCodes)
+      .where(eq(discountCodes.id, couponId))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: "Rabattkod hittades inte" }, { status: 404 });
+    }
+    const effectiveType = body.discountType ?? existing.discountType;
+
     if (body.code !== undefined) {
       updates.code = String(body.code).trim().toUpperCase();
       if (!updates.code) {
@@ -44,7 +57,7 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      if (body.discountType === "percent" && v > 100) {
+      if (effectiveType === "percent" && v > 100) {
         return NextResponse.json(
           { error: "Procentrabatt kan inte överstiga 100" },
           { status: 400 }

@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components/table";
-import { Plus, Trash2, Tag, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Tag, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { DashboardCouponsTableSkeleton } from "@/components/dashboard-skeletons";
 
 type Coupon = {
@@ -47,6 +47,17 @@ export default function CouponsPage() {
   const [maxUses, setMaxUses] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  /** Row currently being edited, with its in-progress values. */
+  const [edit, setEdit] = useState<{
+    id: number;
+    discountType: "percent" | "fixed";
+    discountValue: string;
+    minOrderAmount: string;
+    maxUses: string;
+    active: boolean;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const fetchCoupons = () => {
     setLoading(true);
@@ -87,6 +98,45 @@ export default function CouponsPage() {
       })
       .catch((err) => setError(err.message || "Kunde inte skapa rabattkod"))
       .finally(() => setSubmitting(false));
+  };
+
+  const startEdit = (c: Coupon) => {
+    setEditError("");
+    setEdit({
+      id: c.id,
+      discountType: c.discountType === "fixed" ? "fixed" : "percent",
+      discountValue: String(c.discountValue),
+      minOrderAmount: c.minOrderAmount != null ? String(c.minOrderAmount) : "",
+      maxUses: c.maxUses != null ? String(c.maxUses) : "",
+      active: c.active,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!edit) return;
+    setEditError("");
+    setSavingEdit(true);
+    fetch(`/api/coupons/${edit.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        discountType: edit.discountType,
+        discountValue: parseFloat(edit.discountValue) || 0,
+        minOrderAmount: edit.minOrderAmount.trim()
+          ? parseFloat(edit.minOrderAmount)
+          : null,
+        maxUses: edit.maxUses.trim() ? parseInt(edit.maxUses, 10) : null,
+        active: edit.active,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setEdit(null);
+        fetchCoupons();
+      })
+      .catch((err) => setEditError(err.message || "Kunde inte spara"))
+      .finally(() => setSavingEdit(false));
   };
 
   const handleDelete = (id: number) => {
@@ -221,40 +271,170 @@ export default function CouponsPage() {
                     <TableHead>Rabatt</TableHead>
                     <TableHead>Min.order</TableHead>
                     <TableHead>Använd</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {coupons.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.code}</TableCell>
-                      <TableCell>
-                        {c.discountType === "percent"
-                          ? `${c.discountValue}%`
-                          : `${c.discountValue} kr`}
-                      </TableCell>
-                      <TableCell>
-                        {c.minOrderAmount
-                          ? `${c.minOrderAmount.toLocaleString("sv-SE")} kr`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {c.maxUses != null
-                          ? `${c.usedCount} / ${c.maxUses}`
-                          : c.usedCount}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(c.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {coupons.map((c) =>
+                    edit?.id === c.id ? (
+                      <TableRow key={c.id}>
+                        <TableCell className="align-top font-medium">
+                          {c.code}
+                          {editError && (
+                            <p className="mt-1 text-xs font-normal text-red-600">
+                              {editError}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={edit.discountType === "percent" ? 100 : undefined}
+                              value={edit.discountValue}
+                              onChange={(e) =>
+                                setEdit({ ...edit, discountValue: e.target.value })
+                              }
+                              className="h-8 w-20"
+                              aria-label="Rabattvärde"
+                            />
+                            <Select
+                              value={edit.discountType}
+                              onValueChange={(v) =>
+                                setEdit({
+                                  ...edit,
+                                  discountType: v as "percent" | "fixed",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="percent">%</SelectItem>
+                                <SelectItem value="fixed">kr</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={edit.minOrderAmount}
+                            onChange={(e) =>
+                              setEdit({ ...edit, minOrderAmount: e.target.value })
+                            }
+                            placeholder="—"
+                            className="h-8 w-24"
+                            aria-label="Minstordervärde"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={edit.maxUses}
+                            onChange={(e) => setEdit({ ...edit, maxUses: e.target.value })}
+                            placeholder="Obegränsat"
+                            className="h-8 w-24"
+                            aria-label="Max användningar"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={edit.active}
+                              onChange={(e) =>
+                                setEdit({ ...edit, active: e.target.checked })
+                              }
+                              className="h-4 w-4 accent-primary"
+                            />
+                            Aktiv
+                          </label>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={handleSaveEdit}
+                              disabled={savingEdit}
+                              aria-label="Spara"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEdit(null)}
+                              disabled={savingEdit}
+                              aria-label="Avbryt"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.code}</TableCell>
+                        <TableCell>
+                          {c.discountType === "percent"
+                            ? `${c.discountValue}%`
+                            : `${c.discountValue} kr`}
+                        </TableCell>
+                        <TableCell>
+                          {c.minOrderAmount
+                            ? `${c.minOrderAmount.toLocaleString("sv-SE")} kr`
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {c.maxUses != null
+                            ? `${c.usedCount} / ${c.maxUses}`
+                            : c.usedCount}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={
+                              c.active
+                                ? "text-xs text-emerald-600"
+                                : "text-xs text-muted-foreground"
+                            }
+                          >
+                            {c.active ? "Aktiv" : "Inaktiv"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => startEdit(c)}
+                              aria-label={`Redigera ${c.code}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(c.id)}
+                              aria-label={`Ta bort ${c.code}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  )}
                 </TableBody>
               </Table>
             )}

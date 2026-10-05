@@ -90,29 +90,11 @@ const CartPage: React.FC = () => {
     0
   );
   const [couponDiscount, setCouponDiscount] = useState(0);
+  /** Percentage the applied code works out to, for the "(90%)" labels. */
+  const [couponPercent, setCouponPercent] = useState(0);
   const [lastValidatedCode, setLastValidatedCode] = useState("");
   const discount = appliedCoupon ? couponDiscount : 0;
-
-  useEffect(() => {
-    if (appliedCoupon && lastValidatedCode && subtotal > 0) {
-      fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: lastValidatedCode, subtotal }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.valid && data.discount != null) {
-            setCouponDiscount(data.discount);
-          } else {
-            setAppliedCoupon(false);
-            setCouponDiscount(0);
-            setLastValidatedCode("");
-          }
-        })
-        .catch(() => {});
-    }
-  }, [subtotal, appliedCoupon, lastValidatedCode]);
+  const discountPercent = appliedCoupon ? couponPercent : 0;
 
   useEffect(() => {
     const weightKg = Math.max(0.1, totalWeightKg);
@@ -131,6 +113,32 @@ const CartPage: React.FC = () => {
     shippingFromApi != null
       ? shippingFromApi
       : getShippingPrice(totalWeightKg, shippingCountry, deliveryOption);
+
+  // Re-quote the applied code whenever the amount it is taken from changes.
+  // The discount covers goods + shipping, so a change of delivery option or
+  // country changes the discount too.
+  useEffect(() => {
+    if (appliedCoupon && lastValidatedCode && subtotal > 0) {
+      fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: lastValidatedCode, subtotal, shipping }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.valid && data.discount != null) {
+            setCouponDiscount(data.discount);
+            setCouponPercent(Number(data.discountPercent) || 0);
+          } else {
+            setAppliedCoupon(false);
+            setCouponDiscount(0);
+            setCouponPercent(0);
+            setLastValidatedCode("");
+          }
+        })
+        .catch(() => {});
+    }
+  }, [subtotal, shipping, appliedCoupon, lastValidatedCode]);
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
@@ -199,7 +207,7 @@ const CartPage: React.FC = () => {
     fetch("/api/coupons/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, subtotal }),
+      body: JSON.stringify({ code, subtotal, shipping }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -409,7 +417,12 @@ const CartPage: React.FC = () => {
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>{t("cart.discount")}</span>
+                  <span>
+                    {t("cart.discount")}
+                    {discountPercent > 0 && (
+                      <span className="ml-1 font-medium">({discountPercent}%)</span>
+                    )}
+                  </span>
                   <span className="font-medium">
                     -
                     {discount.toLocaleString("sv-SE", {
@@ -499,6 +512,7 @@ const CartPage: React.FC = () => {
             {appliedCoupon ? (
               <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-3">
                 <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                  {discountPercent > 0 && `${discountPercent}% – `}
                   {t("cart.couponApplied", { amount: discount.toLocaleString("sv-SE") })}
                 </span>
                 <Button
@@ -509,6 +523,7 @@ const CartPage: React.FC = () => {
                   onClick={() => {
                     setAppliedCoupon(false);
                     setCouponDiscount(0);
+                    setCouponPercent(0);
                     setLastValidatedCode("");
                     setCouponCode("");
                     setCouponError("");

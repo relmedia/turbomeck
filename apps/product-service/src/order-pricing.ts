@@ -57,7 +57,15 @@ function variantAllowed(product: ProductRow, variant: string | undefined | null)
   return allowed.has(v);
 }
 
-async function resolveCouponDiscountSek(code: string, subtotal: number): Promise<number | null> {
+/**
+ * @param subtotal      goods total, used for the minimum-order test
+ * @param discountBase  what the discount is taken from: goods + shipping
+ */
+async function resolveCouponDiscountSek(
+  code: string,
+  subtotal: number,
+  discountBase: number,
+): Promise<number | null> {
   const trimmed = code.trim().toUpperCase();
   if (!trimmed) return null;
 
@@ -80,9 +88,9 @@ async function resolveCouponDiscountSek(code: string, subtotal: number): Promise
 
   const value = Number(coupon.discountValue);
   if (coupon.discountType === "percent") {
-    return Math.round(subtotal * (value / 100));
+    return Math.round(discountBase * (value / 100));
   }
-  return Math.min(value, subtotal);
+  return Math.min(value, discountBase);
 }
 
 export type ResolvedCheckout =
@@ -215,18 +223,21 @@ export async function resolveCheckoutOrder(body: {
       ? CORE_KEEP_FEE_SEK
       : 0;
 
+  const shipping = getShippingPrice(Math.max(0.1, totalWeightKg), country, deliveryOption);
+
   let discount = 0;
   const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
   if (couponCode) {
-    const d = await resolveCouponDiscountSek(couponCode, subtotal);
+    // Coupons discount goods + shipping. The core-keep fee is excluded on purpose:
+    // it is a penalty for not returning the old turbo, not part of the order value.
+    const d = await resolveCouponDiscountSek(couponCode, subtotal, subtotal + shipping);
     if (d == null) {
       return { ok: false, status: 400, error: "Invalid or inapplicable coupon code" };
     }
     discount = d;
   }
 
-  const shipping = getShippingPrice(Math.max(0.1, totalWeightKg), country, deliveryOption);
-  const total = Math.max(0, Math.round(subtotal - discount + shipping + coreKeepFeeSek));
+  const total = Math.max(0, Math.round(subtotal + shipping - discount + coreKeepFeeSek));
   const stripeChargeSek = total;
 
   return {
