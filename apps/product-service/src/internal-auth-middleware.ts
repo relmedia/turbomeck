@@ -5,7 +5,11 @@ const SECRET = process.env.INTERNAL_PRODUCT_API_SECRET?.trim();
 
 /**
  * Require `Authorization: Bearer <INTERNAL_PRODUCT_API_SECRET>` or header
- * `X-Internal-Product-Api-Secret: <same>` for every /api request except GET /api/health/db (still localhost-only there).
+ * `X-Internal-Product-Api-Secret: <same>` for every /api request except the
+ * GET health probes (/api/health/db, /api/health/stripe), which are gated to
+ * the loopback interface by the route handlers themselves. They exist to be
+ * run as a one-line curl on the box during an incident, so requiring the
+ * secret would defeat the purpose.
  */
 export function internalProductApiAuth(
   req: Request,
@@ -13,7 +17,13 @@ export function internalProductApiAuth(
   next: NextFunction
 ): void {
   // Mounted at app.use("/api", …) — path is relative (e.g. /health/db)
-  if (req.method === "GET" && (req.path === "/health/db" || req.path === "/api/health/db")) {
+  const LOCAL_HEALTH_PATHS = new Set([
+    "/health/db",
+    "/api/health/db",
+    "/health/stripe",
+    "/api/health/stripe",
+  ]);
+  if (req.method === "GET" && LOCAL_HEALTH_PATHS.has(req.path)) {
     next();
     return;
   }

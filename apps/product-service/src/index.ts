@@ -133,39 +133,165 @@ function describeStripePaymentMethod(
   return byType[pm.type] ?? pm.type.replace(/_/g, " ");
 }
 
-/** Checkout: charge must match server-computed SEK total (after pricing resolution). */
+/** Result of checking a PaymentIntent against a server-computed total. */
+type PaymentVerification =
+  | { ok: true; paymentMethodLabel: string | null }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * True when the failure is environmental (Stripe unreachable, rate
+       * limited, 5xx) rather than a verdict about this payment. Callers return
+       * 503 for these so the browser and the Stripe webhook retry, instead of
+       * burning a paid checkout on a transient blip.
+       */
+      retryable: boolean;
+    };
+
+/** `sk_test_…` vs `sk_live_…`, for log lines that have to explain a mismatch. */
+function stripeKeyMode(): string {
+  const key = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
+  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return "live";
+  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test";
+  return "unknown";
+}
+
+/**
+ * Checkout: the charge must match the server-computed SEK total.
+ *
+ * Every failure path is logged with Stripe's own error fields. The previous
+ * version swallowed the exception and returned one opaque string ("Could not
+ * verify payment with Stripe"), which told neither the customer nor the log
+ * what had actually happened — a `resource_missing` caused by two services
+ * holding keys for different Stripe accounts looked identical to a network
+ * timeout.
+ */
 async function verifyCheckoutPaymentIntent(
   paymentIntentId: string,
   expectedChargeSek: number,
-): Promise<
-  { ok: true; paymentMethodLabel: string | null } | { ok: false; error: string }
-> {
+): Promise<PaymentVerification> {
   if (!paymentIntentId.startsWith("pi_")) {
-    return { ok: false, error: "Invalid payment intent" };
+    return { ok: false, error: "Invalid payment intent", retryable: false };
   }
   if (!stripeClient) {
-    return { ok: false, error: "Stripe is not configured on product-service" };
+    console.error(
+      "[payment-verify] STRIPE_SECRET_KEY is not set on product-service — " +
+        "orders cannot be verified. Set the same key payment-service uses.",
+    );
+    return {
+      ok: false,
+      error: "Stripe is not configured on product-service",
+      retryable: false,
+    };
   }
+
   try {
     const pi = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
       expand: ["payment_method"],
     });
+
     if (pi.status !== "succeeded") {
-      return { ok: false, error: "Payment has not succeeded" };
+      console.warn("[payment-verify] not succeeded yet", {
+        paymentIntentId,
+        status: pi.status,
+      });
+      // The browser can legitimately arrive here before Stripe has settled a
+      // 3-D Secure payment, so this is worth retrying rather than failing.
+      return { ok: false, error: "Payment has not succeeded", retryable: true };
     }
+
     if (String(pi.currency || "").toLowerCase() !== "sek") {
-      return { ok: false, error: "Invalid currency" };
+      console.error("[payment-verify] unexpected currency", {
+        paymentIntentId,
+        currency: pi.currency,
+      });
+      return { ok: false, error: "Invalid currency", retryable: false };
     }
+
     const expectedOre = Math.round(expectedChargeSek * 100);
     if (pi.amount !== expectedOre) {
-      return { ok: false, error: "Payment amount does not match order" };
+      console.error("[payment-verify] amount mismatch", {
+        paymentIntentId,
+        chargedOre: pi.amount,
+        expectedOre,
+      });
+      return {
+        ok: false,
+        error: "Payment amount does not match order",
+        retryable: false,
+      };
     }
+
     return {
       ok: true,
       paymentMethodLabel: describeStripePaymentMethod(pi.payment_method),
     };
-  } catch {
-    return { ok: false, error: "Could not verify payment with Stripe" };
+  } catch (err) {
+    const e = err as {
+      type?: string;
+      code?: string;
+      statusCode?: number;
+      message?: string;
+      requestId?: string;
+    };
+    const detail = {
+      paymentIntentId,
+      keyMode: stripeKeyMode(),
+      type: e.type,
+      code: e.code,
+      statusCode: e.statusCode,
+      requestId: e.requestId,
+      message: e.message,
+    };
+
+    // The PaymentIntent exists — just not in the account this key belongs to.
+    // Nearly always a key mismatch between payment-service (which creates the
+    // intent) and product-service (which verifies it), or test vs live.
+    if (e.code === "resource_missing" || e.statusCode === 404) {
+      console.error(
+        "[payment-verify] PaymentIntent not found in this Stripe account. " +
+          "product-service and payment-service are probably using different " +
+          "STRIPE_SECRET_KEY values (or different test/live modes). " +
+          "Compare: curl -s localhost:8000/api/health/stripe and :8002/health/stripe",
+        detail,
+      );
+      return {
+        ok: false,
+        error: "Payment could not be found in the configured Stripe account",
+        retryable: false,
+      };
+    }
+
+    if (e.type === "StripeAuthenticationError" || e.statusCode === 401) {
+      console.error(
+        "[payment-verify] Stripe rejected our API key on product-service.",
+        detail,
+      );
+      return {
+        ok: false,
+        error: "Stripe credentials are invalid on the order service",
+        retryable: false,
+      };
+    }
+
+    const transient =
+      e.type === "StripeConnectionError" ||
+      e.type === "StripeAPIError" ||
+      e.type === "StripeRateLimitError" ||
+      (typeof e.statusCode === "number" && e.statusCode >= 500) ||
+      e.statusCode === 429;
+
+    console.error(
+      `[payment-verify] Stripe lookup failed (${transient ? "transient" : "permanent"})`,
+      detail,
+    );
+    return {
+      ok: false,
+      error: transient
+        ? "Could not reach Stripe to verify the payment — please try again"
+        : "Could not verify payment with Stripe",
+      retryable: transient,
+    };
   }
 }
 
@@ -312,6 +438,77 @@ app.get("/api/health/db", async (req, res) => {
     const msg = e instanceof Error ? e.message : String(e);
     const code = (e as { code?: string }).code;
     res.status(500).json({ ok: false, message: msg, code });
+  }
+});
+
+/**
+ * Localhost-only Stripe identity probe.
+ *
+ * `curl -s http://127.0.0.1:8000/api/health/stripe`
+ * `curl -s "http://127.0.0.1:8000/api/health/stripe?pi=pi_123"`
+ *
+ * Reports which Stripe account THIS service authenticates as. Compare it with
+ * payment-service (`:8002/health/stripe`): the two must match, or intents
+ * created there cannot be read here and every checkout fails verification.
+ * Pass `?pi=` to check one PaymentIntent end to end.
+ */
+app.get("/api/health/stripe", async (req, res) => {
+  if (!isLocalRequest(req)) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  const mode = stripeKeyMode();
+  if (!stripeClient) {
+    return res.json({ configured: false, mode, service: "product-service" });
+  }
+  try {
+    const account = await stripeClient.accounts.retrieve();
+    const out: Record<string, unknown> = {
+      configured: true,
+      service: "product-service",
+      mode,
+      accountId: account.id,
+      accountName: account.settings?.dashboard?.display_name ?? null,
+    };
+
+    const pi = typeof req.query.pi === "string" ? req.query.pi.trim() : "";
+    if (pi.startsWith("pi_")) {
+      try {
+        const intent = await stripeClient.paymentIntents.retrieve(pi);
+        out.paymentIntent = {
+          id: intent.id,
+          status: intent.status,
+          amount: intent.amount,
+          currency: intent.currency,
+          visible: true,
+        };
+      } catch (err) {
+        const e = err as { code?: string; message?: string; statusCode?: number };
+        out.paymentIntent = {
+          id: pi,
+          visible: false,
+          code: e.code,
+          statusCode: e.statusCode,
+          message: e.message,
+          hint:
+            e.code === "resource_missing"
+              ? "This intent belongs to a different Stripe account or mode than this service's key."
+              : undefined,
+        };
+      }
+    }
+
+    res.json(out);
+  } catch (err) {
+    const e = err as { type?: string; code?: string; message?: string; statusCode?: number };
+    res.status(500).json({
+      configured: true,
+      service: "product-service",
+      mode,
+      error: e.message,
+      type: e.type,
+      code: e.code,
+      statusCode: e.statusCode,
+    });
   }
 });
 
@@ -1434,7 +1631,12 @@ app.post("/api/checkout-intents/:paymentIntentId/finalize", async (req, res) => 
       intent.quotedChargeSek,
     );
     if (!verified.ok) {
-      return res.status(400).json({ error: verified.error });
+      // 503 keeps the Stripe webhook retrying for transient failures (and for a
+      // payment that hasn't settled yet); 400 is a final verdict, which the
+      // webhook handler treats as "stop retrying".
+      return res
+        .status(verified.retryable ? 503 : 400)
+        .json({ error: verified.error, retryable: verified.retryable });
     }
 
     // Re-price for the line breakdown (names, unit prices, VAT lines). If the
@@ -1541,16 +1743,24 @@ app.post("/api/orders", async (req, res) => {
     }
 
     const stripePaymentId = body.stripePaymentId?.trim() ?? "";
-    let payVerify:
-      | { ok: true; paymentMethodLabel: string | null }
-      | { ok: false; error: string } = { ok: true, paymentMethodLabel: null };
+    let payVerify: PaymentVerification = { ok: true, paymentMethodLabel: null };
     if (priced.stripeChargeSek > 0) {
       payVerify = await verifyCheckoutPaymentIntent(stripePaymentId, priced.stripeChargeSek);
     } else if (stripePaymentId) {
-      payVerify = { ok: false, error: "Payment not expected for zero-total order" };
+      payVerify = {
+        ok: false,
+        error: "Payment not expected for zero-total order",
+        retryable: false,
+      };
     }
     if (!payVerify.ok) {
-      return res.status(400).json({ error: payVerify.error });
+      // 503 for environmental failures (Stripe unreachable, or the intent not
+      // settled yet) so the caller retries; 400 only for a real verdict about
+      // this payment. Returning 400 for everything is what turned a 3-D Secure
+      // race into a paid order that was never created.
+      return res
+        .status(payVerify.retryable ? 503 : 400)
+        .json({ error: payVerify.error, retryable: payVerify.retryable });
     }
 
     const created = await persistOrder({

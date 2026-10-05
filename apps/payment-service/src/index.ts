@@ -83,6 +83,51 @@ app.get('/', (c) => {
   return c.text('Hello Hono!')
 })
 
+/**
+ * Stripe identity probe, to be compared with product-service's
+ * `/api/health/stripe`. The two services must authenticate as the SAME Stripe
+ * account in the SAME mode: this one creates PaymentIntents, the other reads
+ * them back to verify orders. A mismatch fails every checkout with
+ * "Could not verify payment with Stripe".
+ *
+ * Reachable on the loopback interface only (nginx does not proxy :8002).
+ */
+app.get('/health/stripe', async (c) => {
+  const key = process.env.STRIPE_SECRET_KEY?.trim() ?? ''
+  const mode = key.startsWith('sk_live_') || key.startsWith('rk_live_')
+    ? 'live'
+    : key.startsWith('sk_test_') || key.startsWith('rk_test_')
+      ? 'test'
+      : 'unknown'
+
+  if (!stripe) {
+    return c.json({ configured: false, service: 'payment-service', mode })
+  }
+  try {
+    const account = await stripe.accounts.retrieve()
+    return c.json({
+      configured: true,
+      service: 'payment-service',
+      mode,
+      accountId: account.id,
+      accountName: account.settings?.dashboard?.display_name ?? null,
+    })
+  } catch (err) {
+    const e = err as { message?: string; type?: string; code?: string }
+    return c.json(
+      {
+        configured: true,
+        service: 'payment-service',
+        mode,
+        error: e.message,
+        type: e.type,
+        code: e.code,
+      },
+      500,
+    )
+  }
+})
+
 app.get('/stripe-config', (c) => {
   const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? process.env.STRIPE_PUBLISHABLE_KEY
   if (!key?.trim() || key.includes('placeholder')) {
