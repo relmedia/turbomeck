@@ -1026,10 +1026,18 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     return false;
   }
   if (!isAdminEventEnabled(config, "newOrder")) {
+    // Logged, not silent: "no admin mail arrived" is otherwise indistinguishable
+    // from a broken SMTP server or an order that was never created.
+    console.warn(
+      "[email] admin new-order notifications are disabled in mail settings; skipping",
+    );
     return false;
   }
   const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
   if (recipients.length === 0) {
+    console.warn(
+      "[email] no admin notification recipients configured; skipping new-order mail",
+    );
     return false;
   }
 
