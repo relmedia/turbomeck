@@ -56,6 +56,47 @@ function viewToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+/**
+ * The `checkout_intent` table is newer than the payments this script exists to
+ * recover, and may not be migrated yet. Treat "relation does not exist" as
+ * simply having no snapshot rather than failing the whole import.
+ */
+async function readSnapshot(piId: string) {
+  try {
+    const [row] = await db
+      .select()
+      .from(checkoutIntents)
+      .where(eq(checkoutIntents.paymentIntentId, piId))
+      .limit(1);
+    return row ?? null;
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      if (!warnedAboutMissingTable) {
+        console.warn(
+          "[import] checkout_intent table not found — continuing without snapshots. " +
+            "Apply drizzle/0017_checkout_intent.sql to enable the webhook safety net.",
+        );
+        warnedAboutMissingTable = true;
+      }
+      return null;
+    }
+    throw err;
+  }
+}
+
+let warnedAboutMissingTable = false;
+
+function isMissingTableError(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = err;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    if ((cur as { code?: string }).code === "42P01") return true;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 async function nextOrderNumber(): Promise<string> {
   const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(orders);
   return `#${ORDER_NUMBER_START + (row?.count ?? 0)}`;
@@ -93,11 +134,7 @@ async function resolvePayload(pi: Stripe.PaymentIntent): Promise<Resolved> {
   const note: string[] = [];
 
   // 1. The authoritative snapshot.
-  const [intent] = await db
-    .select()
-    .from(checkoutIntents)
-    .where(eq(checkoutIntents.paymentIntentId, pi.id))
-    .limit(1);
+  const intent = await readSnapshot(pi.id);
   if (intent) {
     const p = intent.payload as Record<string, unknown>;
     const items = Array.isArray(p.items) ? (p.items as Array<Record<string, unknown>>) : [];
@@ -214,11 +251,7 @@ async function findOrphans(): Promise<void> {
       .limit(1);
     if (existing) continue;
     orphans += 1;
-    const [snap] = await db
-      .select({ id: checkoutIntents.paymentIntentId })
-      .from(checkoutIntents)
-      .where(eq(checkoutIntents.paymentIntentId, pi.id))
-      .limit(1);
+    const snap = await readSnapshot(pi.id);
     console.log(
       `${pi.id}  ${(pi.amount / 100).toFixed(2)} ${pi.currency.toUpperCase()}  ` +
         `${new Date(pi.created * 1000).toISOString()}  ` +
@@ -328,10 +361,14 @@ async function main(): Promise<void> {
   );
 
   // Link the snapshot, if there was one, so the webhook treats it as handled.
-  await db
-    .update(checkoutIntents)
-    .set({ consumedAt: new Date(), orderId: order.id })
-    .where(eq(checkoutIntents.paymentIntentId, piId));
+  try {
+    await db
+      .update(checkoutIntents)
+      .set({ consumedAt: new Date(), orderId: order.id })
+      .where(eq(checkoutIntents.paymentIntentId, piId));
+  } catch (err) {
+    if (!isMissingTableError(err)) throw err;
+  }
 
   console.log(`\nCreated order ${order.id} (${order.orderNumber}) for ${piId}.`);
 
