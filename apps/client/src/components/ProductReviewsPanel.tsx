@@ -18,6 +18,7 @@ import {
   type MyReview,
 } from "@/lib/api";
 import { useProductReviews } from "./ProductReviews";
+import { Skeleton } from "@/components/Skeleton";
 
 /** How many reviews are listed before the visitor asks for the rest. */
 const INITIAL_VISIBLE = 3;
@@ -259,7 +260,7 @@ function WriteReviewBlock({ productId }: { productId: number }) {
   }, [productId, status]);
 
   if (status === "loading") {
-    return <div className="h-24 animate-pulse rounded-xl bg-muted/50" />;
+    return <Skeleton className="h-24 rounded-xl" />;
   }
 
   if (status !== "authenticated") {
@@ -276,7 +277,7 @@ function WriteReviewBlock({ productId }: { productId: number }) {
   }
 
   if (!eligibility) {
-    return <div className="h-24 animate-pulse rounded-xl bg-muted/50" />;
+    return <Skeleton className="h-24 rounded-xl" />;
   }
 
   if (eligibility.review) {
@@ -356,8 +357,8 @@ export function ProductReviewsPanel({ productId }: { productId: number }) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-32 animate-pulse rounded-xl bg-muted/50" />
-        <div className="h-24 animate-pulse rounded-xl bg-muted/50" />
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
       </div>
     );
   }

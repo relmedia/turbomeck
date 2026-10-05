@@ -161,3 +161,79 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Moving/rotating border on hover (product card buy button) */
+@property --moving-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes moving-border-spin {
+  to {
+    --moving-border-angle: 360deg;
+  }
+}
+
+.moving-border {
+  position: relative;
+  isolation: isolate;
+  /* Swap these to recolor the moving border */
+  --moving-border-1: rgb(110 201 0); /* page green */
+  --moving-border-2: #38bdf8; /* sky */
+  --moving-border-3: #a855f7; /* violet */
+  --moving-border-4: #f59e0b; /* amber */
+}
+
+.moving-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--moving-border-angle),
+    var(--moving-border-1) 0deg,
+    var(--moving-border-2) 90deg,
+    var(--moving-border-3) 180deg,
+    var(--moving-border-4) 270deg,
+    var(--moving-border-1) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.moving-border:hover::before,
+.moving-border:focus-visible::before {
+  opacity: 1;
+  animation: moving-border-spin 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moving-border:hover::before,
+  .moving-border:focus-visible::before {
+    animation: none;
+    background: var(--moving-border-1);
+  }
+}
+
+/* Skeleton loader colors (consumed by components/Skeleton.tsx) */
+:root {
+  --skeleton-base: oklch(0.93 0 0);
+  --skeleton-shimmer: oklch(0.985 0 0);
+}
+
+.dark {
+  --skeleton-base: oklch(0.269 0 0);
+  --skeleton-shimmer: oklch(0.37 0 0);
+}

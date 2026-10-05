@@ -15,6 +15,7 @@ import {
 import { ProductReviewsProvider } from "@/components/ProductReviews";
 import { notFound } from "next/navigation";
 import type { ProductType } from "@/types";
+import { Skeleton } from "@/components/Skeleton";
 
 type Category = {
   id: number;
@@ -76,12 +77,12 @@ export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: 
     return (
       <div className="flex flex-col gap-4 mt-6">
         <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-4">
-          <div className="w-full lg:w-5/12 h-96 rounded-lg bg-muted/50 animate-pulse" />
+          <Skeleton className="w-full lg:w-5/12 h-96 rounded-lg" />
           <div className="w-full lg:w-7/12 flex flex-col gap-4">
-            <div className="h-6 w-3/4 bg-muted/50 animate-pulse rounded" />
-            <div className="h-4 w-full bg-muted/50 animate-pulse rounded" />
-            <div className="h-4 w-full bg-muted/50 animate-pulse rounded" />
-            <div className="h-8 w-1/4 bg-muted/50 animate-pulse rounded" />
+            <Skeleton className="h-6 w-3/4 rounded" />
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-8 w-1/4 rounded" />
           </div>
         </div>
       </div>

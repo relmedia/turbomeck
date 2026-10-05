@@ -5,6 +5,7 @@ import { Star, CheckCircle2 } from "lucide-react";
 import { fetchReviews, type ApiReview, type ReviewsResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/context";
+import { Skeleton } from "@/components/Skeleton";
 
 type ReviewsContextValue = {
   data: ReviewsResponse | null;
@@ -123,7 +124,7 @@ export function ProductReviewsSummary() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="h-4 w-4 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-4 w-4 rounded" />
         {t("reviews.loading")}
       </div>
     );

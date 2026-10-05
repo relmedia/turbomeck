@@ -10,7 +10,7 @@ import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
 import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@repo/ui/components/skeleton";
+import { Skeleton } from "@/components/Skeleton";
 import { Card, CardContent } from "@repo/ui/components/card";
 import { Button } from "@repo/ui/components/button";
 import { Badge } from "@repo/ui/components/badge";
@@ -229,7 +229,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
               </div>
             )}
             <Button
-              className="w-full shadow-none"
+              className="moving-border w-full cursor-pointer shadow-none"
               onClick={handleAddToCart}
               disabled={isAddingToCart}
             >

@@ -1,4 +1,4 @@
-import { Skeleton } from "@repo/ui/components/skeleton";
+import { Skeleton } from "@/components/Skeleton";
 
 export function ProductCardSkeleton() {
   return (
