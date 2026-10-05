@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@repo/auth";
 import {
   internalProductApiAuthHeaders,
   requireInternalProductApiSecret,
@@ -57,6 +58,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     let amountSek: number;
+    /** Set for full-checkout requests: what to snapshot once we have a pi_ id. */
+    let checkoutSnapshot: Record<string, unknown> | null = null;
 
     if (isCheckoutQuoteBody(body)) {
       requireInternalProductApiSecret();
@@ -85,6 +88,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid quote from checkout service" }, { status: 502 });
       }
       amountSek = quoteData.amount;
+      // The order payload the browser would POST after the Stripe redirect.
+      // Stored server-side so the webhook can create the order if the browser
+      // never gets the chance (3-D Secure, closed tab, cross-origin redirect).
+      const orderPayload = (body as { orderPayload?: unknown }).orderPayload;
+      if (orderPayload && typeof orderPayload === "object") {
+        const session = await auth();
+        checkoutSnapshot = {
+          ...(orderPayload as Record<string, unknown>),
+          // Trust the session, never a client-sent userId — same rule as the
+          // /api/product proxy applies on the browser's own order POST.
+          ...(session?.user?.id ? { userId: session.user.id } : { userId: undefined }),
+          couponCode: body.couponCode,
+          country: body.country,
+          deliveryOption: body.deliveryOption,
+          commitsCoreReturnWithin14: body.commitsCoreReturnWithin14,
+          items: body.items,
+        };
+      }
     } else if (isBalancePaymentBody(body)) {
       requireInternalProductApiSecret();
       const balanceQuery = body.orderToken
@@ -139,6 +160,38 @@ export async function POST(request: NextRequest) {
         { error: (data as { error?: string }).error ?? "Payment service error" },
         { status: res.status },
       );
+    }
+
+    const paymentIntentId = (data as { paymentIntentId?: string }).paymentIntentId;
+    if (checkoutSnapshot && paymentIntentId) {
+      // Best-effort: a failure here must not stop the customer from paying, it
+      // only costs us the webhook safety net for this one checkout.
+      try {
+        const storeRes = await fetch(
+          `${PRODUCT_SERVICE.replace(/\/$/, "")}/api/checkout-intents`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...internalProductApiAuthHeaders(),
+            },
+            body: JSON.stringify({
+              paymentIntentId,
+              quotedChargeSek: amountSek,
+              payload: checkoutSnapshot,
+            }),
+          },
+        );
+        if (!storeRes.ok) {
+          console.error(
+            "[stripe create-payment-intent] could not store checkout snapshot",
+            storeRes.status,
+            await storeRes.text().catch(() => ""),
+          );
+        }
+      } catch (err) {
+        console.error("[stripe create-payment-intent] snapshot store failed", err);
+      }
     }
 
     return NextResponse.json(data);

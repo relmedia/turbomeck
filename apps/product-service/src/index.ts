@@ -10,8 +10,8 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { fileURLToPath } from "url";
-import { db, products, categories, productCategories, orders, orderItems, reviews, users } from "@repo/database";
-import { eq, inArray, desc, asc, sql, or } from "drizzle-orm";
+import { db, products, categories, productCategories, orders, orderItems, reviews, users, checkoutIntents } from "@repo/database";
+import { eq, inArray, desc, asc, sql, or, and, isNull } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
 import {
@@ -1132,6 +1132,369 @@ app.post("/api/checkout-quote", async (req, res) => {
 });
 
 // POST create order (checkout) — line prices and totals computed from DB + Stripe verification
+/** Shipping/customer fields an order needs, as sent by the storefront. */
+type CheckoutOrderBody = {
+  userId?: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country?: string;
+  servicePointName?: string;
+  servicePointId?: string;
+  deliveryOption?: string;
+  couponCode?: string;
+  stripePaymentId?: string;
+  postNordTrackingId?: string;
+  locale?: "sv" | "en";
+  commitsCoreReturnWithin14?: boolean;
+  items: OrderItemInput[];
+};
+
+/**
+ * Insert the order + its lines and fire the confirmation emails.
+ *
+ * Extracted from POST /api/orders so the Stripe webhook can finish a checkout
+ * the browser never completed (see POST /api/checkout-intents/:id/finalize)
+ * without duplicating any of this.
+ */
+async function persistOrder({
+  body,
+  priced,
+  stripePaymentId,
+  paymentMethodLabel,
+}: {
+  body: CheckoutOrderBody;
+  priced: Extract<Awaited<ReturnType<typeof resolveCheckoutOrder>>, { ok: true }>;
+  stripePaymentId: string;
+  paymentMethodLabel: string | null;
+}): Promise<{
+  id: number;
+  orderNumber: string;
+  postNordTrackingId: string | null;
+  viewToken: string | null;
+}> {
+  const locale: "sv" | "en" = body.locale === "en" ? "en" : "sv";
+  const paymentMethodDisplay =
+    priced.stripeChargeSek <= 0
+      ? locale === "en"
+        ? "No payment required"
+        : "Ingen betalning krävs"
+      : paymentMethodLabel ??
+        (locale === "en" ? "Paid (card or other method)" : "Betalt (kort eller annan metod)");
+
+  const orderNumber = await generateOrderNumber();
+
+  const hasTrackingId = !!(
+    body.postNordTrackingId &&
+    String(body.postNordTrackingId).trim() &&
+    String(body.postNordTrackingId).toLowerCase() !== "null"
+  );
+  const initialStatus = hasTrackingId ? "shipped" : "confirmed";
+
+  const coreDeadline =
+    priced.commitsCoreReturnWithin14 === true
+      ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      : null;
+
+  const viewToken = generateOrderViewToken();
+  const [order] = await db
+    .insert(orders)
+    .values({
+      orderNumber,
+      userId: body.userId ?? null,
+      viewToken,
+      email: body.email,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      phone: body.phone ?? null,
+      address: body.address,
+      city: body.city,
+      postalCode: body.postalCode,
+      country: body.country ?? "SE",
+      servicePointName: body.servicePointName ?? null,
+      servicePointId: body.servicePointId ?? null,
+      deliveryOption: body.deliveryOption ?? "servicepoint",
+      subtotal: String(priced.subtotal),
+      shippingCost: String(priced.shipping),
+      discount: String(priced.discount),
+      total: String(priced.total),
+      depositAmount: null,
+      balanceDue: null,
+      commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
+      coreKeepFeeSek: priced.coreKeepFeeSek,
+      coreReturnDeadline: coreDeadline,
+      stripePaymentId: stripePaymentId || null,
+      postNordTrackingId: body.postNordTrackingId ?? null,
+      status: initialStatus,
+    })
+    .returning();
+
+  if (!order) {
+    throw new Error("Order insert returned no row");
+  }
+
+  await db.insert(orderItems).values(
+    priced.lines.map((item) => ({
+      orderId: order.id,
+      productId: item.productId,
+      productName: item.productName,
+      productImage: item.productImage ?? null,
+      variant: item.variant ?? null,
+      price: String(item.unitPrice),
+      quantity: item.quantity,
+    })),
+  );
+
+  const emailItems = priced.lines.map((item) => ({
+    productName: item.productName,
+    productImage: item.productImage,
+    variant: item.variant,
+    price: item.unitPrice,
+    quantity: item.quantity,
+  }));
+
+  sendOrderConfirmationEmail({
+    orderNumber: order.orderNumber,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    email: body.email,
+    address: body.address,
+    city: body.city,
+    postalCode: body.postalCode,
+    country: body.country ?? "SE",
+    servicePointName: body.servicePointName,
+    deliveryOption: body.deliveryOption,
+    subtotal: priced.subtotal,
+    shippingCost: priced.shipping,
+    discount: priced.discount,
+    total: priced.total,
+    trackingId: body.postNordTrackingId,
+    locale: body.locale,
+    paymentMethodDisplay,
+    items: emailItems,
+  }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
+
+  sendAdminNewOrderEmail({
+    orderNumber: order.orderNumber,
+    orderId: order.id,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    email: body.email,
+    phone: body.phone ?? null,
+    address: body.address,
+    city: body.city,
+    postalCode: body.postalCode,
+    country: body.country ?? "SE",
+    servicePointName: body.servicePointName ?? null,
+    deliveryOption: body.deliveryOption ?? null,
+    subtotal: priced.subtotal,
+    shippingCost: priced.shipping,
+    discount: priced.discount,
+    total: priced.total,
+    paymentMethodDisplay,
+    items: emailItems.map((it) => ({
+      productName: it.productName,
+      variant: it.variant ?? null,
+      price: it.price,
+      quantity: it.quantity,
+    })),
+  }).catch((err) =>
+    console.error("[order] Failed to send admin new-order email:", err),
+  );
+
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    postNordTrackingId: order.postNordTrackingId,
+    viewToken: order.viewToken,
+  };
+}
+
+/**
+ * POST /api/checkout-intents
+ *
+ * Called by the storefront right after a Stripe PaymentIntent is created, with
+ * the same payload the browser would later POST to /api/orders. Internal
+ * (Bearer secret) like every other /api route.
+ *
+ * `quotedChargeSek` must be the amount product-service quoted for this cart —
+ * the storefront passes back the `amount` from /api/checkout-quote, which is
+ * also what Stripe was told to charge.
+ */
+app.post("/api/checkout-intents", async (req, res) => {
+  try {
+    const body = req.body as {
+      paymentIntentId?: string;
+      quotedChargeSek?: number;
+      payload?: Record<string, unknown>;
+    };
+    const paymentIntentId = String(body.paymentIntentId ?? "").trim();
+    if (!paymentIntentId.startsWith("pi_")) {
+      return res.status(400).json({ error: "paymentIntentId required" });
+    }
+    const quoted = Number(body.quotedChargeSek);
+    if (!Number.isFinite(quoted) || quoted < 0) {
+      return res.status(400).json({ error: "quotedChargeSek required" });
+    }
+    if (!body.payload || typeof body.payload !== "object") {
+      return res.status(400).json({ error: "payload required" });
+    }
+
+    // The customer may re-open the payment step; keep the latest snapshot.
+    await db
+      .insert(checkoutIntents)
+      .values({
+        paymentIntentId,
+        payload: body.payload,
+        quotedChargeSek: Math.round(quoted),
+      })
+      .onConflictDoUpdate({
+        target: checkoutIntents.paymentIntentId,
+        set: {
+          payload: body.payload,
+          quotedChargeSek: Math.round(quoted),
+        },
+      });
+
+    res.status(204).end();
+  } catch (error) {
+    console.error("checkout-intents store:", error);
+    res.status(500).json({ error: "Failed to store checkout intent" });
+  }
+});
+
+/**
+ * POST /api/checkout-intents/:paymentIntentId/finalize
+ *
+ * Creates the order for a PaymentIntent that Stripe says succeeded but which
+ * the browser never managed to turn into an order (3-D Secure returning before
+ * the intent settles, a closed tab, a cross-origin redirect). Driven by the
+ * Stripe webhook, which retries for days — so this must be idempotent.
+ *
+ * Verification differs from /api/orders on purpose: the payment is checked
+ * against the amount stored at quote time, not a fresh re-price. A coupon or
+ * price edited between payment and webhook must not orphan a paid order — and
+ * the stored figure is ours, not the client's, so nothing is being trusted here
+ * that wasn't already.
+ */
+app.post("/api/checkout-intents/:paymentIntentId/finalize", async (req, res) => {
+  const paymentIntentId = String(req.params.paymentIntentId ?? "").trim();
+  try {
+    if (!paymentIntentId.startsWith("pi_")) {
+      return res.status(400).json({ error: "Invalid payment intent" });
+    }
+
+    // Idempotency 1: an order already exists for this payment (the browser won).
+    const [existingOrder] = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        postNordTrackingId: orders.postNordTrackingId,
+        viewToken: orders.viewToken,
+      })
+      .from(orders)
+      .where(eq(orders.stripePaymentId, paymentIntentId))
+      .limit(1);
+    if (existingOrder) {
+      return res.json({ created: false, reason: "order-exists", order: existingOrder });
+    }
+
+    const [intent] = await db
+      .select()
+      .from(checkoutIntents)
+      .where(eq(checkoutIntents.paymentIntentId, paymentIntentId))
+      .limit(1);
+    if (!intent) {
+      // Nothing stored (e.g. a payment from before this feature shipped).
+      return res.status(404).json({ error: "No checkout snapshot for this payment" });
+    }
+    if (intent.consumedAt && intent.orderId) {
+      return res.json({ created: false, reason: "already-finalized", orderId: intent.orderId });
+    }
+
+    const payload = intent.payload as CheckoutOrderBody;
+    if (
+      !payload?.email ||
+      !payload.firstName ||
+      !payload.lastName ||
+      !payload.address ||
+      !payload.city ||
+      !payload.postalCode
+    ) {
+      return res.status(422).json({ error: "Stored snapshot is missing shipping fields" });
+    }
+
+    // Verify with Stripe against the STORED amount.
+    const verified = await verifyCheckoutPaymentIntent(
+      paymentIntentId,
+      intent.quotedChargeSek,
+    );
+    if (!verified.ok) {
+      return res.status(400).json({ error: verified.error });
+    }
+
+    // Re-price for the line breakdown (names, unit prices, VAT lines). If the
+    // catalog moved since, the stored charge still governs what was paid, so we
+    // only reject when pricing outright fails (e.g. a product was deleted).
+    const priced = await resolveCheckoutOrder({
+      items: payload.items,
+      couponCode: payload.couponCode,
+      country: payload.country,
+      deliveryOption: payload.deliveryOption,
+      commitsCoreReturnWithin14: payload.commitsCoreReturnWithin14,
+    });
+    if (!priced.ok) {
+      return res.status(priced.status).json({ error: priced.error });
+    }
+    if (priced.stripeChargeSek !== intent.quotedChargeSek) {
+      console.warn(
+        "[checkout-intent] re-price differs from the amount charged",
+        { paymentIntentId, charged: intent.quotedChargeSek, repriced: priced.stripeChargeSek },
+      );
+    }
+
+    const created = await persistOrder({
+      body: { ...payload, stripePaymentId: paymentIntentId },
+      priced,
+      stripePaymentId: paymentIntentId,
+      paymentMethodLabel: verified.paymentMethodLabel,
+    });
+
+    // Idempotency 2: only the first finalize claims the snapshot. A second
+    // concurrent webhook delivery finds consumedAt set and does nothing.
+    const claimed = await db
+      .update(checkoutIntents)
+      .set({ consumedAt: new Date(), orderId: created.id })
+      .where(
+        and(
+          eq(checkoutIntents.paymentIntentId, paymentIntentId),
+          isNull(checkoutIntents.consumedAt),
+        ),
+      )
+      .returning({ paymentIntentId: checkoutIntents.paymentIntentId });
+    if (claimed.length === 0) {
+      console.warn(
+        "[checkout-intent] snapshot was claimed concurrently; order created twice?",
+        { paymentIntentId, orderId: created.id },
+      );
+    }
+
+    console.log("[checkout-intent] finalized from webhook", {
+      paymentIntentId,
+      orderId: created.id,
+      orderNumber: created.orderNumber,
+    });
+    res.status(201).json({ created: true, order: created });
+  } catch (error) {
+    console.error("checkout-intent finalize:", paymentIntentId, error);
+    res.status(500).json({ error: "Failed to finalize checkout" });
+  }
+});
+
 app.post("/api/orders", async (req, res) => {
   try {
     const body = req.body as {
@@ -1190,137 +1553,14 @@ app.post("/api/orders", async (req, res) => {
       return res.status(400).json({ error: payVerify.error });
     }
 
-    const locale: "sv" | "en" = body.locale === "en" ? "en" : "sv";
-    const paymentMethodDisplay =
-      priced.stripeChargeSek <= 0
-        ? locale === "en"
-          ? "No payment required"
-          : "Ingen betalning krävs"
-        : payVerify.paymentMethodLabel ??
-          (locale === "en" ? "Paid (card or other method)" : "Betalt (kort eller annan metod)");
-
-    const orderNumber = await generateOrderNumber();
-
-    const hasTrackingId = !!(
-      body.postNordTrackingId &&
-      String(body.postNordTrackingId).trim() &&
-      String(body.postNordTrackingId).toLowerCase() !== "null"
-    );
-    const initialStatus = hasTrackingId ? "shipped" : "confirmed";
-
-    const coreDeadline =
-      priced.commitsCoreReturnWithin14 === true
-        ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-        : null;
-
-    const viewToken = generateOrderViewToken();
-    const [order] = await db
-      .insert(orders)
-      .values({
-        orderNumber,
-        userId: body.userId ?? null,
-        viewToken,
-        email: body.email,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        phone: body.phone ?? null,
-        address: body.address,
-        city: body.city,
-        postalCode: body.postalCode,
-        country: body.country ?? "SE",
-        servicePointName: body.servicePointName ?? null,
-        servicePointId: body.servicePointId ?? null,
-        deliveryOption: body.deliveryOption ?? "servicepoint",
-        subtotal: String(priced.subtotal),
-        shippingCost: String(priced.shipping),
-        discount: String(priced.discount),
-        total: String(priced.total),
-        depositAmount: null,
-        balanceDue: null,
-        commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
-        coreKeepFeeSek: priced.coreKeepFeeSek,
-        coreReturnDeadline: coreDeadline,
-        stripePaymentId: stripePaymentId || null,
-        postNordTrackingId: body.postNordTrackingId ?? null,
-        status: initialStatus,
-      })
-      .returning();
-
-    await db.insert(orderItems).values(
-      priced.lines.map((item) => ({
-        orderId: order.id,
-        productId: item.productId,
-        productName: item.productName,
-        productImage: item.productImage ?? null,
-        variant: item.variant ?? null,
-        price: String(item.unitPrice),
-        quantity: item.quantity,
-      })),
-    );
-
-    const emailItems = priced.lines.map((item) => ({
-      productName: item.productName,
-      productImage: item.productImage,
-      variant: item.variant,
-      price: item.unitPrice,
-      quantity: item.quantity,
-    }));
-
-    sendOrderConfirmationEmail({
-      orderNumber: order.orderNumber,
-      firstName: body.firstName,
-      lastName: body.lastName,
-      email: body.email,
-      address: body.address,
-      city: body.city,
-      postalCode: body.postalCode,
-      country: body.country ?? "SE",
-      servicePointName: body.servicePointName,
-      deliveryOption: body.deliveryOption,
-      subtotal: priced.subtotal,
-      shippingCost: priced.shipping,
-      discount: priced.discount,
-      total: priced.total,
-      trackingId: body.postNordTrackingId,
-      locale: body.locale,
-      paymentMethodDisplay,
-      items: emailItems,
-    }).catch((err) => console.error("[order] Failed to send confirmation email:", err));
-
-    sendAdminNewOrderEmail({
-      orderNumber: order.orderNumber,
-      orderId: order.id,
-      firstName: body.firstName,
-      lastName: body.lastName,
-      email: body.email,
-      phone: body.phone ?? null,
-      address: body.address,
-      city: body.city,
-      postalCode: body.postalCode,
-      country: body.country ?? "SE",
-      servicePointName: body.servicePointName ?? null,
-      deliveryOption: body.deliveryOption ?? null,
-      subtotal: priced.subtotal,
-      shippingCost: priced.shipping,
-      discount: priced.discount,
-      total: priced.total,
-      paymentMethodDisplay,
-      items: emailItems.map((it) => ({
-        productName: it.productName,
-        variant: it.variant ?? null,
-        price: it.price,
-        quantity: it.quantity,
-      })),
-    }).catch((err) =>
-      console.error("[order] Failed to send admin new-order email:", err),
-    );
-
-    res.status(201).json({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      postNordTrackingId: order.postNordTrackingId,
-      viewToken: order.viewToken,
+    const created = await persistOrder({
+      body,
+      priced,
+      stripePaymentId,
+      paymentMethodLabel: payVerify.paymentMethodLabel,
     });
+
+    res.status(201).json(created);
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).json({ error: "Failed to create order" });

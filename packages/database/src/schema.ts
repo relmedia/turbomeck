@@ -237,6 +237,34 @@ export const orderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
 });
 
+/**
+ * Server-side snapshot of a checkout, written when the Stripe PaymentIntent is
+ * created and read back if the browser never manages to create the order.
+ *
+ * Why this exists: order creation used to happen only in the browser after the
+ * Stripe redirect, from a `sessionStorage` snapshot. Anything that interrupted
+ * that — a 3-D Secure detour that returns before the intent reaches
+ * `succeeded`, a closed tab, a cross-origin redirect — left Stripe holding a
+ * payment with no order behind it. With this row the webhook can finish the job.
+ *
+ * `quotedChargeSek` is the amount product-service itself quoted for this cart,
+ * so finalizing can verify the payment against the figure the customer was
+ * actually charged instead of a fresh re-price (prices and coupons can change
+ * between payment and webhook, and that mismatch rejected real paid orders).
+ */
+export const checkoutIntents = pgTable("checkout_intent", {
+  /** Stripe PaymentIntent id (pi_...), one checkout per intent. */
+  paymentIntentId: text("payment_intent_id").primaryKey(),
+  /** The order payload the storefront would have POSTed itself. */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  /** SEK amount quoted (and charged) at intent-creation time. */
+  quotedChargeSek: integer("quoted_charge_sek").notNull(),
+  /** Set once an order has been created from this snapshot. */
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  consumedAt: timestamp("consumed_at", { mode: "date" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const ordersRelations = relations(orders, ({ many }) => ({
   items: many(orderItems, {
     relationName: "order_items",
@@ -314,6 +342,9 @@ export const discountCodes = pgTable("discount_codes", {
 // ============ TYPE EXPORTS ============
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type CheckoutIntent = typeof checkoutIntents.$inferSelect;
+export type NewCheckoutIntent = typeof checkoutIntents.$inferInsert;
 
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;

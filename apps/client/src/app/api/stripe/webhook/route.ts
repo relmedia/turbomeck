@@ -3,6 +3,78 @@ import Stripe from "stripe";
 import { db } from "@repo/database";
 import { orders } from "@repo/database/schema";
 import { eq, or } from "drizzle-orm";
+import {
+  internalProductApiAuthHeaders,
+  requireInternalProductApiSecret,
+} from "@/lib/internal-product-api";
+
+const PRODUCT_SERVICE =
+  process.env.PRODUCT_SERVICE_URL ||
+  process.env.NEXT_PUBLIC_PRODUCT_API_URL ||
+  "http://localhost:8000";
+
+/**
+ * Ask product-service to create the order for a succeeded payment that has no
+ * order yet, from the snapshot stored when the PaymentIntent was created.
+ *
+ * This is the safety net for the gap between "Stripe took the money" and "the
+ * browser POSTed the order": a 3-D Secure detour can return before the intent
+ * reaches `succeeded` (the order POST is then rejected with "Payment has not
+ * succeeded"), the customer can close the tab, or a cross-origin redirect can
+ * strand the sessionStorage snapshot. Stripe retries webhooks for days, and
+ * the endpoint is idempotent, so the order lands exactly once.
+ *
+ * Throws on transient failures: the caller returns 500 and Stripe retries.
+ */
+async function finalizeCheckoutFromSnapshot(piId: string): Promise<boolean> {
+  requireInternalProductApiSecret();
+  const res = await fetch(
+    `${PRODUCT_SERVICE.replace(/\/$/, "")}/api/checkout-intents/${encodeURIComponent(piId)}/finalize`,
+    {
+      method: "POST",
+      headers: { ...internalProductApiAuthHeaders() },
+      cache: "no-store",
+    },
+  );
+
+  if (res.status === 404) {
+    // No snapshot: a payment from before this existed, or another app on the
+    // same Stripe account. Nothing to do, and no point making Stripe retry.
+    console.warn("[stripe webhook] no checkout snapshot for PI", piId);
+    return false;
+  }
+  if (res.status === 422) {
+    // Snapshot is unusable (incomplete shipping fields). Retrying won't fix it.
+    console.error(
+      "[stripe webhook] unusable checkout snapshot for PI",
+      piId,
+      await res.text().catch(() => ""),
+    );
+    return false;
+  }
+  if (!res.ok) {
+    throw new Error(
+      `finalize failed (${res.status}): ${await res.text().catch(() => "")}`,
+    );
+  }
+
+  const data = (await res.json().catch(() => ({}))) as {
+    created?: boolean;
+    order?: { id?: number; orderNumber?: string };
+    reason?: string;
+  };
+  if (data.created) {
+    console.log(
+      "[stripe webhook] created order from snapshot",
+      piId,
+      data.order?.id,
+      data.order?.orderNumber,
+    );
+  } else {
+    console.log("[stripe webhook] finalize no-op", piId, data.reason);
+  }
+  return Boolean(data.created);
+}
 
 /**
  * Stripe webhook handler.
@@ -160,12 +232,9 @@ async function handlePaymentSucceeded(pi: Stripe.PaymentIntent): Promise<void> {
     .limit(1);
 
   if (!order) {
-    // PI didn't match any order — could be a checkout that never persisted,
-    // or a different app sharing the Stripe account. Log and ignore.
-    console.warn(
-      "[stripe webhook] payment_intent.succeeded for unknown PI",
-      piId,
-    );
+    // No order for a succeeded payment: the browser never completed checkout.
+    // Create it from the server-side snapshot instead of dropping the payment.
+    await finalizeCheckoutFromSnapshot(piId);
     return;
   }
 

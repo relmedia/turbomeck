@@ -277,6 +277,10 @@ const CartPage: React.FC = () => {
             servicePointName: shippingForm!.servicePoint?.name,
             servicePointId: shippingForm!.servicePoint?.servicePointId,
             deliveryOption: deliveryOption,
+            // Must be here: without it the post-redirect re-price loses the
+            // discount and the payment no longer matches the order total.
+            couponCode:
+              appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
             subtotal,
             shippingCost: shipping,
             discount,

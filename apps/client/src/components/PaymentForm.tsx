@@ -300,6 +300,10 @@ export default function PaymentForm({
             country: checkoutQuoteBody.country,
             deliveryOption: checkoutQuoteBody.deliveryOption,
             commitsCoreReturnWithin14: checkoutQuoteBody.commitsCoreReturnWithin14,
+            // Snapshotted server-side against the PaymentIntent so the Stripe
+            // webhook can create the order if this browser never does. Amounts
+            // in here are ignored — the server re-quotes and stores its own.
+            orderPayload: getOrderPayload(),
           }
         : balanceOrder
           ? {
