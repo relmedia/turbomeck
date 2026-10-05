@@ -19,6 +19,7 @@
     "db:check": "pnpm --filter @repo/database db:check",
     "db:products": "pnpm --filter @repo/database db:products",
     "debug:products": "node scripts/debug/product-pipeline.mjs",
+    "fix:env-encoding": "node scripts/fix-env-mojibake.mjs",
     "delete-r2-images": "pnpm --filter product-service delete-r2-images",
     "migrate-images": "pnpm --filter product-service migrate-images"
   },
