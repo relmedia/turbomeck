@@ -24,6 +24,7 @@
  *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts pi_xxx --dry-run
  *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts pi_xxx --send-emails
  *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts --list-orphans
+ *   pnpm --filter product-service exec tsx scripts/import-stripe-order.ts --db-info
  *
  * Fields Stripe doesn't have can be supplied directly (each one is echoed in
  * the output as an override, so the record shows what came from where):
@@ -38,7 +39,7 @@ import "../src/load-local-env.js";
 import Stripe from "stripe";
 import { randomBytes } from "node:crypto";
 import { db, orders, orderItems, checkoutIntents } from "@repo/database";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 
 const ORDER_NUMBER_START = 257;
 const PLACEHOLDER_ITEM_SV =
@@ -331,7 +332,64 @@ async function findOrphans(): Promise<void> {
   console.log(`\n${orphans} succeeded payment(s) without an order.`);
 }
 
+/**
+ * Print which database this script is actually talking to, and what it contains.
+ *
+ * Worth checking before an import: this script resolves DATABASE_URL from
+ * `apps/product-service/.env`, while the running service gets its env from PM2
+ * (which snapshots `ecosystem.config.js` and can hold a different value — that
+ * mismatch has bitten this deployment before). Writing a recovered order into
+ * the wrong database would be silent and confusing.
+ */
+async function showDbInfo(): Promise<void> {
+  const url = process.env.DATABASE_URL ?? "(unset — using the dev default)";
+  const redacted = url.replace(/\/\/[^@]*@/, "//***:***@");
+  console.log(`DATABASE_URL : ${redacted}`);
+
+  const [counts] = await db
+    .select({ orders: sql<number>`count(*)::int` })
+    .from(orders);
+  console.log(`orders rows  : ${counts?.orders ?? 0}`);
+
+  const latest = await db
+    .select({ id: orders.id, orderNumber: orders.orderNumber, createdAt: orders.createdAt })
+    .from(orders)
+    .orderBy(desc(orders.id))
+    .limit(5);
+  if (latest.length === 0) {
+    console.log("latest       : (none)");
+  } else {
+    for (const o of latest) {
+      console.log(`latest       : ${o.orderNumber} (id ${o.id}) ${o.createdAt?.toISOString() ?? ""}`);
+    }
+  }
+
+  try {
+    const [snap] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(checkoutIntents);
+    console.log(`checkout_intent rows : ${snap?.n ?? 0}`);
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      console.log("checkout_intent rows : table not migrated yet");
+    } else {
+      throw err;
+    }
+  }
+
+  console.log(
+    "\nIf 'orders rows' disagrees with what the admin UI lists, this script is\n" +
+      "pointed at a different database than the app — do not import until that\n" +
+      "is resolved.",
+  );
+}
+
 async function main(): Promise<void> {
+  if (flags.has("--db-info")) {
+    await showDbInfo();
+    process.exit(0);
+  }
+
   if (listOrphans) {
     await findOrphans();
     process.exit(0);
