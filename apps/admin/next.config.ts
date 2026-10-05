@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const ADMIN_STUDIO_HOST = process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.cloud";
+const ADMIN_STUDIO_HOST = process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.se";
 const SHOP_APEX_HOSTS = new Set(
-  (process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud")
+  (process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.se,www.turbomeck.se,turbomeck.cloud,www.turbomeck.cloud")
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean),
@@ -135,7 +135,7 @@ const nextConfig: NextConfig = {
         ? "http://localhost:3001"
         : `https://${ADMIN_STUDIO_HOST}`),
     NEXT_PUBLIC_SHOP_LOGIN_HOSTS:
-      process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud",
+      process.env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.se,www.turbomeck.se,turbomeck.cloud,www.turbomeck.cloud",
   },
   turbopack: {
     root: path.resolve(__dirname, "../.."),

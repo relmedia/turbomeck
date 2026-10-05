@@ -1,9 +1,19 @@
 import type { NextRequest } from "next/server";
 
-const SHOP_APEX = new Set(["turbomeck.cloud", "www.turbomeck.cloud"]);
+/** Shop apex hosts whose magic links must be rewritten to the studio host.
+ *  Keep in sync with ADMIN_SHOP_AUTH_HOSTNAMES / @repo/auth defaults. */
+const SHOP_APEX = new Set(
+  (
+    process.env.ADMIN_SHOP_AUTH_HOSTNAMES ||
+    "turbomeck.se,www.turbomeck.se,turbomeck.cloud,www.turbomeck.cloud"
+  )
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+);
 
 function studioHostname(): string {
-  return process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.cloud";
+  return process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.se";
 }
 
 /** If .env still points at shop apex, magic links must use studio host. */
@@ -23,7 +33,7 @@ function normalizeCanonical(url: string): string {
 
 /**
  * Auth.js reads AUTH_URL / NEXTAUTH_URL while handling this request. Sync from disk env first,
- * then fall back to Host headers so email callbacks always match studio.turbomeck.cloud.
+ * then fall back to Host headers so email callbacks always match the studio host.
  */
 export function syncAuthPublicUrlFromRequest(req: NextRequest): void {
   let canonical = (

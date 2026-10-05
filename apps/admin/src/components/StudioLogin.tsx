@@ -68,7 +68,7 @@ function SignInContent() {
     return () => clearInterval(id);
   }, []);
 
-  /* Staff login must run on studio host; shop apex serves :3000 and mails turbomeck.cloud links. */
+  /* Staff login must run on studio host; shop apex serves :3000 and mails shop-host links. */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const adminOrigin = (process.env.NEXT_PUBLIC_ADMIN_ORIGIN || "").replace(/\/$/, "");

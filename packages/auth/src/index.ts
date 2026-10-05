@@ -151,22 +151,33 @@ function isStudioAdminProcess(): boolean {
   );
 }
 
+/** Canonical staff host. Override per-deploy with ADMIN_STUDIO_HOSTNAME. */
+const DEFAULT_STUDIO_HOSTNAME = "studio.turbomeck.se";
+/** Shop apex hosts whose magic links must be rewritten to the studio host.
+ *  The .cloud pair stays listed while that domain still resolves to the shop. */
+const DEFAULT_SHOP_AUTH_HOSTNAMES =
+  "turbomeck.se,www.turbomeck.se,turbomeck.cloud,www.turbomeck.cloud";
+
+function studioHostnameFromEnv(): string {
+  return process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || DEFAULT_STUDIO_HOSTNAME;
+}
+
+function shopAuthHostnamesFromEnv(): string[] {
+  return (process.env["ADMIN_SHOP_AUTH_HOSTNAMES"] || DEFAULT_SHOP_AUTH_HOSTNAMES)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function defaultStudioOrigin(): string {
-  const host = process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || "studio.turbomeck.cloud";
-  return `https://${host}`;
+  return `https://${studioHostnameFromEnv()}`;
 }
 
 /** When admin .env uses shop apex for NEXTAUTH_URL, force studio host (matches apps/admin/next.config). */
 function coerceMagicLinkBaseForStudioProcess(baseRaw: string): string {
   if (!isStudioAdminProcess()) return baseRaw;
-  const studio =
-    process.env["ADMIN_STUDIO_HOSTNAME"]?.trim() || "studio.turbomeck.cloud";
-  const apex = new Set(
-    (process.env["ADMIN_SHOP_AUTH_HOSTNAMES"] || "turbomeck.cloud,www.turbomeck.cloud")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+  const studio = studioHostnameFromEnv();
+  const apex = new Set(shopAuthHostnamesFromEnv());
   try {
     const normalized = baseRaw.replace(/\/$/, "");
     const u = new URL(normalized.includes("://") ? normalized : `https://${normalized}`);
@@ -284,9 +295,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const link = magicLinkUrlForThisApp(url);
         if (isStudioAdminProcess()) {
           try {
+            const studioHost = studioHostnameFromEnv();
+            const linkHost = (() => {
+              try {
+                return new URL(link).hostname;
+              } catch {
+                return "";
+              }
+            })();
             const stillShop =
-              /\/\/(www\.)?turbomeck\.cloud(\/|\?|$)/i.test(link) &&
-              !link.includes("studio.turbomeck.cloud");
+              shopAuthHostnamesFromEnv().includes(linkHost) && linkHost !== studioHost;
             if (stillShop) {
               console.error(
                 "[@repo/auth] Magic link still on shop host after rewrite. Check admin env / deploy.",

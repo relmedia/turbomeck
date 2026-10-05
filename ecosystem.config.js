@@ -40,9 +40,9 @@ function loadDotenv(relDirFromRepoRoot) {
 function coerceAdminMagicLinkOrigin(env, raw) {
   if (!raw || typeof raw !== "string") return raw;
   const t = raw.trim();
-  const studio = (env.ADMIN_STUDIO_HOSTNAME || "studio.turbomeck.cloud").trim();
+  const studio = (env.ADMIN_STUDIO_HOSTNAME || "studio.turbomeck.se").trim();
   const apex = new Set(
-    (env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.cloud,www.turbomeck.cloud")
+    (env.ADMIN_SHOP_AUTH_HOSTNAMES || "turbomeck.se,www.turbomeck.se,turbomeck.cloud,www.turbomeck.cloud")
       .split(",")
       .map((h) => h.trim())
       .filter(Boolean),
