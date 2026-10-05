@@ -27,7 +27,7 @@ function orderEmailHeaderBrandInner(logoUrl: string): string {
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 14px;">
-                          <img src="${logoUrl}" alt="Turbomeck" width="35" height="35" style="display: block; width: 35px; height: 35px;" />
+                          <img src="${logoUrl}" alt="Turbomeck" width="44" height="44" style="display: block; width: 44px; height: 44px;" />
                         </td>
                         <td style="vertical-align: middle;">
                           <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
@@ -37,8 +37,8 @@ function orderEmailHeaderBrandInner(logoUrl: string): string {
     : `
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                       <tr>
-                        <td style="padding: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
-                          <span style="font-size: 28px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">T</span>
+                        <td style="padding: 8px; background: #0f172a; border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 28px; font-weight: 800; color: #ffffff;">T</span>
                         </td>
                         <td style="vertical-align: middle; padding-left: 14px;">
                           <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
@@ -254,6 +254,15 @@ const translations = {
     sweden: "Sverige",
     norway: "Norge",
     paymentMethod: "Betalningsmetod",
+    // Same wording as the order success page (client i18n: orderSuccess.nextStep*)
+    nextStepsTitle: "Vad händer nu?",
+    nextStep1Title: "Bekräftelse",
+    nextStep1Body: "Vi har mejlat en orderbekräftelse till dig.",
+    nextStep2Title: "Packning",
+    nextStep2Body: "Vi plockar och packar din order inom 1–2 arbetsdagar.",
+    nextStep3Title: "Leverans",
+    nextStep3Body:
+      "PostNord levererar normalt på 2–4 arbetsdagar. Du får ett mejl med spårningsnummer när paketet skickas.",
   },
   en: {
     title: "Order Confirmation",
@@ -291,6 +300,14 @@ const translations = {
     sweden: "Sweden",
     norway: "Norway",
     paymentMethod: "Payment method",
+    nextStepsTitle: "What happens next?",
+    nextStep1Title: "Confirmation",
+    nextStep1Body: "We've emailed an order confirmation to you.",
+    nextStep2Title: "Packing",
+    nextStep2Body: "We'll pick and pack your order within 1–2 business days.",
+    nextStep3Title: "Delivery",
+    nextStep3Body:
+      "PostNord delivers in 2–4 business days. You'll receive an email with the tracking number when your parcel ships.",
   },
 };
 
@@ -372,6 +389,30 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
     )
     .join("");
 
+  // "Vad hander nu?" steps, mirroring the ordered list on the order success page.
+  const nextStepsHtml = [
+    { icon: "&#9993;&#65039;", title: t.nextStep1Title, body: t.nextStep1Body },
+    { icon: "&#128230;", title: t.nextStep2Title, body: t.nextStep2Body },
+    { icon: "&#128666;", title: t.nextStep3Title, body: t.nextStep3Body },
+  ]
+    .map(
+      (step, idx) => `
+                <tr>
+                  <td width="28" style="width: 28px; vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 0;">
+                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius: 9999px; background-color: #eef2f7;">
+                      <tr>
+                        <td width="28" height="28" style="width: 28px; height: 28px; border-radius: 9999px; background-color: #eef2f7; text-align: center; vertical-align: middle; line-height: 28px; mso-line-height-rule: exactly; font-size: 12px; font-weight: 700; color: #111827;">${idx + 1}</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td style="vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 12px;">
+                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #111827;">${step.icon} ${step.title}</p>
+                    <p style="margin: 3px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.55;">${step.body}</p>
+                  </td>
+                </tr>`,
+    )
+    .join("");
+
   const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
 
   return `
@@ -386,11 +427,11 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table cellpadding="0" cellspacing="0" border="0" width="680" style="max-width: 680px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           
           <!-- Header brand: same markup as magic-link mail (packages/auth email-templates baseWrapper header) -->
           <tr>
-            <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 28px 32px; text-align: left;">
+            <td style="padding: 32px 32px 12px 32px; text-align: center;">
               ${headerBrandInner}
             </td>
           </tr>
@@ -556,6 +597,21 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
             </td>
           </tr>
           
+          <!-- What happens next: same steps as the order success page -->
+          <tr>
+            <td style="padding: 0 40px 32px 40px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 22px 24px;">
+                    <h4 style="margin: 0 0 16px 0; font-size: 15px; font-weight: 600; color: #111827;">${t.nextStepsTitle}</h4>
+                    <table cellpadding="0" cellspacing="0" border="0" width="100%">${nextStepsHtml}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
           <!-- Footer -->
           <tr>
             <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -636,9 +692,9 @@ function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): strin
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
     <tr>
       <td align="center">
-        <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table cellpadding="0" cellspacing="0" border="0" width="680" style="max-width: 680px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <tr>
-            <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 28px 32px; text-align: center;">
+            <td style="padding: 32px 32px 12px 32px; text-align: center;">
               ${headerBrandInner}
             </td>
           </tr>
