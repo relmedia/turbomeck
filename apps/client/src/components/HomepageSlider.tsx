@@ -412,7 +412,7 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   return (
     <section
       ref={sliderContainerRef}
-      className="group/slider relative mb-12 w-full overflow-hidden shadow-lg border border-gray-200"
+      className="group/slider relative w-full overflow-hidden border border-b-0 border-gray-200"
       style={{ perspective: "1000px" }}
       aria-roledescription="carousel"
       aria-label={t("slider.regionLabel")}
@@ -783,11 +783,6 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         </>
       )}
 
-      {/* Bottom dark accent bar */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 h-2 md:h-3 bg-gray-900"
-        aria-hidden
-      />
     </section>
   );
 }

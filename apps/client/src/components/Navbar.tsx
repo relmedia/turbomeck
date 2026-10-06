@@ -8,7 +8,7 @@ import SearchBar from "./SearchBar";
 import { MobileSearch } from "./MobileSearch";
 import { MobileMenu } from "./MobileMenu";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { User, LogOut, MapPin } from "lucide-react";
+import { User, LogOut, MapPin, Mail} from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import {
   Avatar,
@@ -26,6 +26,7 @@ import {
 } from "@repo/ui/components/dropdown-menu";
 import { Button } from "@repo/ui/components/button";
 import { AuthModal } from "./AuthModal";
+import { ContactModal } from "./ContactModal";
 import { NavCategoriesInline } from "./NavCategoriesInline";
 
 const Navbar = () => {
@@ -34,6 +35,7 @@ const Navbar = () => {
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [contactOpen, setContactOpen] = useState(false);
   // Categories nav is shown on the storefront pages (homepage + product list
   // + product detail at /products/[slug]).
   const showInlineCategories =
@@ -45,6 +47,7 @@ const Navbar = () => {
       <div className="flex min-w-0 shrink items-center gap-3">
         <Suspense fallback={null}>
           <MobileMenu
+            onContactClick={() => setContactOpen(true)}
             onAuthClick={() => {
               setAuthMode("login");
               setAuthOpen(true);
@@ -65,6 +68,23 @@ const Navbar = () => {
             <NavCategoriesInline />
           </Suspense>
         )}
+        {/* Page links. Kontakt opens a modal instead of navigating so a visitor
+            mid-browse doesn't lose their place.
+
+            Always visible: the label shows from `sm` up, and below that it
+            collapses to the mail icon so it survives a 360px phone without
+            pushing the logo or the cart off the row. */}
+        <nav aria-label={t("nav.pages")} className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={() => setContactOpen(true)}
+            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
+            aria-label={t("contact.navLabel")}
+          >
+            <Mail className="size-4 sm:hidden" aria-hidden />
+            <span className="hidden sm:inline">{t("contact.navLabel")}</span>
+          </button>
+        </nav>
       </div>
       {/*RIGHT*/}
       <div className="flex shrink-0 items-center gap-4 sm:gap-5 md:gap-6">
@@ -154,6 +174,11 @@ const Navbar = () => {
           </>
         )}
       </div>
+
+      {/* Mounted outside the session-dependent branches above: the contact
+          modal has to exist for signed-in visitors and during session loading,
+          not only for signed-out ones. */}
+      <ContactModal open={contactOpen} onOpenChange={setContactOpen} />
     </nav>
   );
 };

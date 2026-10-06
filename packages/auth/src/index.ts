@@ -8,7 +8,9 @@ import { db, users, accounts, sessions, verificationTokens, appSettings } from "
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import type { DefaultSession } from "next-auth";
-import { renderMagicLinkEmail, renderPasswordResetEmail } from "./email-templates";
+import { renderMagicLinkEmail, renderPasswordResetEmail,
+  renderContactMessageEmail,
+} from "./email-templates";
 import { buildSmtpTransport, type MailTransportConfig } from "./smtp-transport";
 import { consumeCredentialsAttempt } from "./bruteforce-throttle";
 
@@ -483,3 +485,67 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: authSignInPath,
   },
 });
+
+/** Where contact-form messages go. */
+function contactRecipients(config: MailConfig): string[] {
+  const explicit = process.env.CONTACT_EMAIL_TO?.trim();
+  if (explicit) {
+    return explicit
+      .split(/[,;\s]+/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.includes("@"));
+  }
+  // `adminNotificationEmails` is stored on the mail settings row but is not
+  // part of the transport type, so read it defensively rather than widening
+  // MailTransportConfig for one consumer.
+  const admins = (
+    (config as { adminNotificationEmails?: string }).adminNotificationEmails ?? ""
+  )
+    .split(/[,;\s]+/)
+    .map((s: string) => s.trim())
+    .filter((s: string) => s.includes("@"));
+  if (admins.length > 0) return admins;
+  const fallback = (config.from || config.user || "").trim();
+  return fallback.includes("@") ? [fallback] : [];
+}
+
+/**
+ * Deliver a contact-form message to the shop.
+ *
+ * Returns false when mail is not configured or no recipient can be resolved,
+ * so the route can tell the visitor honestly instead of pretending it sent.
+ * Throws on transport errors, which the route turns into a 502.
+ */
+export async function sendContactMessageEmail(args: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) {
+    console.error("[contact] Mail settings not configured; cannot deliver message.");
+    return false;
+  }
+  const to = contactRecipients(config);
+  if (to.length === 0) {
+    console.error(
+      "[contact] No recipient resolved. Set CONTACT_EMAIL_TO, or admin notification emails in mail settings.",
+    );
+    return false;
+  }
+
+  const transporter = buildSmtpTransport(config);
+  const { html, text } = renderContactMessageEmail(args);
+  await transporter.sendMail({
+    from: config.from || config.user || "noreply@localhost",
+    to,
+    // The visitor's address must not be the envelope sender (SPF/DKIM), but it
+    // should be one click away for whoever answers.
+    replyTo: `${args.name} <${args.email}>`,
+    subject: `Kontakt: ${args.subject}`,
+    html,
+    text,
+  });
+  return true;
+}

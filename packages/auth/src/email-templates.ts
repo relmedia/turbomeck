@@ -212,3 +212,66 @@ Detta är en testmail från Turbomeck Studio. Om du läser detta meddelande har 
 
   return { html, text };
 }
+
+/**
+ * Contact-form submission, sent to the shop (not to the customer).
+ *
+ * The visitor's address goes in Reply-To rather than From: sending as the
+ * visitor would fail SPF/DKIM for our domain and land in spam, while Reply-To
+ * still lets staff answer with one click.
+ */
+export function renderContactMessageEmail(args: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}): { html: string; text: string } {
+  const safe = (v: string) =>
+    v
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const name = safe(args.name);
+  const email = safe(args.email);
+  const subject = safe(args.subject);
+  // Preserve the visitor's line breaks without letting any markup through.
+  const message = safe(args.message).replace(/\r?\n/g, "<br>");
+
+  const html = baseWrapper(`
+    <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: ${TEXT_COLOR};">
+      Nytt meddelande fr\u00e5n kontaktformul\u00e4ret
+    </h2>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: ${BG_LIGHT}; border: 1px solid ${BORDER_COLOR}; border-radius: 8px;">
+      <tr>
+        <td style="padding: 16px 18px; font-size: 14px; line-height: 1.7; color: ${TEXT_COLOR};">
+          <strong>Namn:</strong> ${name}<br>
+          <strong>E-post:</strong> <a href="mailto:${email}" style="color: ${BRAND_COLOR};">${email}</a><br>
+          <strong>\u00c4rende:</strong> ${subject}
+        </td>
+      </tr>
+    </table>
+    <p style="margin: 20px 0 8px 0; font-size: 13px; font-weight: 600; color: ${MUTED_COLOR}; text-transform: uppercase; letter-spacing: 0.08em;">
+      Meddelande
+    </p>
+    <p style="margin: 0; font-size: 15px; line-height: 1.7; color: ${TEXT_COLOR}; white-space: pre-line;">
+      ${message}
+    </p>
+    <p style="margin: 24px 0 0 0; font-size: 12px; color: ${MUTED_COLOR};">
+      Svara direkt p\u00e5 detta mail f\u00f6r att n\u00e5 kunden.
+    </p>
+  `);
+
+  const text = `Nytt meddelande fr\u00e5n kontaktformul\u00e4ret
+
+Namn: ${args.name}
+E-post: ${args.email}
+\u00c4rende: ${args.subject}
+
+${args.message}
+
+Svara direkt p\u00e5 detta mail f\u00f6r att n\u00e5 kunden.`;
+
+  return { html, text };
+}

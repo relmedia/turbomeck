@@ -258,6 +258,9 @@ export function ProductImageGallery({
       <DialogContent
         className="!max-w-[95vw] !max-h-[95vh] w-[95vw] h-[95vh] p-0 gap-0 overflow-hidden border-0 bg-black/90 [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:text-white"
         showCloseButton={true}
+        /* A lightbox has nothing to say beyond its title; this is Radix's
+           documented way to declare that, and it silences the warning. */
+        aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">
           Bildgalleri: {alt}

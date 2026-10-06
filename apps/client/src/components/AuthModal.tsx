@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from "@repo/ui/components/dialog";
 import { Button } from "@repo/ui/components/button";
@@ -205,11 +206,11 @@ export function AuthModal({
               {mode === "register" && "Skapa konto"}
               {mode === "forgot" && "Glömt lösenord?"}
             </DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
+            <DialogDescription className="text-sm mt-1">
               {mode === "login" && "Ange din e-post så skickar vi en inloggningslänk till din mejl"}
               {mode === "register" && "Fyll i uppgifterna för att registrera dig"}
               {mode === "forgot" && "Ange din e-post så skickar vi en återställningslänk"}
-            </p>
+            </DialogDescription>
           </div>
 
           {mode === "forgot" ? (

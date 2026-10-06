@@ -122,7 +122,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
   return (
     <Link href={productUrl(product)} className="block h-full">
-      <Card className="h-full w-full max-w-sm overflow-hidden group bg-background text-foreground shadow-none rounded-md flex flex-col pt-0 pb-4 gap-3">
+      <Card className="h-full w-full max-w-sm overflow-hidden group bg-background text-foreground shadow-none rounded-none flex flex-col pt-0 pb-4 gap-3">
         {/* Image carousel */}
         <div className="relative aspect-square overflow-hidden bg-muted">
           {!imageLoaded && (

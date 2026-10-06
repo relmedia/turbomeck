@@ -24,7 +24,8 @@
     "login": "Log in",
     "home": "Home",
     "shop": "Shop",
-    "language": "Language"
+    "language": "Language",
+    "pages": "Pages"
   },
   "auth": {
     "login": "Log in",
@@ -446,6 +447,46 @@
     "nextSlide": "Next slide",
     "goToSlide": "Go to slide {{n}}",
     "position": "{{current}} / {{total}}"
+  },
+  "trustBar": {
+    "sectionLabel": "Why shop with Turbomeck",
+    "shippingTitle": "Fast delivery",
+    "shippingBody": "Shipped with PostNord, usually 2–4 business days.",
+    "paymentTitle": "Secure checkout",
+    "paymentBody": "Encrypted checkout via Stripe – we never store your card details.",
+    "exchangeTitle": "Exchange turbo",
+    "exchangeBody": "Send your old turbo back within 14 days – no extra fee.",
+    "supportTitle": "Help choosing",
+    "supportBody": "Not sure which model fits? Email us at shop@turbomeck.se."
+  },
+  "landing": {
+    "browseEyebrow": "Range",
+    "browseTitle": "Find your turbo",
+    "browseLead": "Pick a car make, or browse turbo parts directly.",
+    "browseAll": "All products",
+    "modelCount": "{{count}} models",
+    "partCount": "{{count}} categories",
+    "productsEyebrow": "In stock",
+    "productsTitle": "Our products",
+    "viewCategory": "View"
+  },
+  "contact": {
+    "title": "Contact us",
+    "lead": "Ask about a turbo, a price or an order – we normally reply within one business day.",
+    "name": "Name",
+    "email": "Email",
+    "subject": "Subject",
+    "subjectPlaceholder": "e.g. Turbo for Saab 9-5 2.0t",
+    "message": "Message",
+    "messagePlaceholder": "Tell us the car model, year and engine if it is about a specific turbo.",
+    "send": "Send message",
+    "sending": "Sending...",
+    "sentTitle": "Thanks for your message!",
+    "sentBody": "We have received your question and will reply to your email address as soon as we can.",
+    "close": "Close",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "orEmail": "Or email us directly at",
+    "navLabel": "Contact"
   },
   "footer": {
     "quickLinks": "Quick links",

@@ -24,7 +24,8 @@
     "login": "Logga in",
     "home": "Start",
     "shop": "Produkter",
-    "language": "Språk"
+    "language": "Språk",
+    "pages": "Sidor"
   },
   "auth": {
     "login": "Logga in",
@@ -446,6 +447,46 @@
     "nextSlide": "Nästa",
     "goToSlide": "Gå till slide {{n}}",
     "position": "{{current}} / {{total}}"
+  },
+  "trustBar": {
+    "sectionLabel": "Varför handla hos Turbomeck",
+    "shippingTitle": "Snabb leverans",
+    "shippingBody": "Skickas med PostNord, normalt 2–4 arbetsdagar.",
+    "paymentTitle": "Säker betalning",
+    "paymentBody": "Krypterad kassa via Stripe – vi lagrar aldrig dina kortuppgifter.",
+    "exchangeTitle": "Utbytesturbo",
+    "exchangeBody": "Skicka in din gamla turbo inom 14 dagar – ingen extra avgift.",
+    "supportTitle": "Hjälp att välja rätt",
+    "supportBody": "Osäker på modellen? Mejla oss på shop@turbomeck.se."
+  },
+  "landing": {
+    "browseEyebrow": "Sortiment",
+    "browseTitle": "Hitta din turbo",
+    "browseLead": "Välj bilmärke eller leta direkt bland turbodelar.",
+    "browseAll": "Alla produkter",
+    "modelCount": "{{count}} modeller",
+    "partCount": "{{count}} kategorier",
+    "productsEyebrow": "Lager",
+    "productsTitle": "Våra produkter",
+    "viewCategory": "Visa"
+  },
+  "contact": {
+    "title": "Kontakta oss",
+    "lead": "Ställ en fråga om en turbo, ett pris eller en beställning – vi svarar normalt inom en arbetsdag.",
+    "name": "Namn",
+    "email": "E-post",
+    "subject": "Ärende",
+    "subjectPlaceholder": "T.ex. Turbo till Saab 9-5 2.0t",
+    "message": "Meddelande",
+    "messagePlaceholder": "Beskriv bilmodell, årsmodell och motor om det gäller en specifik turbo.",
+    "send": "Skicka meddelande",
+    "sending": "Skickar...",
+    "sentTitle": "Tack för ditt meddelande!",
+    "sentBody": "Vi har tagit emot din fråga och svarar till din e-postadress så snart vi kan.",
+    "close": "Stäng",
+    "errorGeneric": "Något gick fel. Försök igen.",
+    "orEmail": "Eller mejla oss direkt på",
+    "navLabel": "Kontakt"
   },
   "footer": {
     "quickLinks": "Snabb länkar",

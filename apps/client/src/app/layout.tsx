@@ -55,7 +55,7 @@ export default function RootLayout({
             }}
           >
             <VisitTracker />
-            <div className="mx-auto max-w-screen-xl px-4 pb-6 pt-3 sm:p-4 sm:pb-6">
+            <div className="mx-auto max-w-[1600px] px-4 pb-6 pt-3 sm:px-6 sm:pb-6 sm:pt-4">
               <Navbar />
               {children}
               <Footer />
