@@ -10,6 +10,7 @@ import { MobileMenu } from "./MobileMenu";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { User, LogOut, MapPin, Mail} from "lucide-react";
 import { useTranslation } from "@/i18n/context";
+import { cn } from "@/lib/utils";
 import {
   Avatar,
   AvatarFallback,
@@ -28,6 +29,7 @@ import { Button } from "@repo/ui/components/button";
 import { AuthModal } from "./AuthModal";
 import { ContactModal } from "./ContactModal";
 import { NavCategoriesInline } from "./NavCategoriesInline";
+import { inlineItemStyle } from "./Categories";
 
 const Navbar = () => {
   const t = useTranslation();
@@ -68,23 +70,21 @@ const Navbar = () => {
             <NavCategoriesInline />
           </Suspense>
         )}
-        {/* Page links. Kontakt opens a modal instead of navigating so a visitor
+        {/* Kontakt is a menu item like the categories beside it — same style,
+            same row — but opens a modal rather than navigating, so a visitor
             mid-browse doesn't lose their place.
 
-            Always visible: the label shows from `sm` up, and below that it
-            collapses to the mail icon so it survives a 360px phone without
-            pushing the logo or the cart off the row. */}
-        <nav aria-label={t("nav.pages")} className="flex items-center gap-5">
-          <button
-            type="button"
-            onClick={() => setContactOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
-            aria-label={t("contact.navLabel")}
-          >
-            <Mail className="size-4 sm:hidden" aria-hidden />
-            <span className="hidden sm:inline">{t("contact.navLabel")}</span>
-          </button>
-        </nav>
+            Below `lg` the category menu hides itself and MobileMenu takes over;
+            Kontakt stays as the mail icon so it is reachable at every width. */}
+        <button
+          type="button"
+          onClick={() => setContactOpen(true)}
+          className={cn(inlineItemStyle, "cursor-pointer whitespace-nowrap")}
+          aria-label={t("contact.navLabel")}
+        >
+          <Mail className="size-4 lg:hidden" aria-hidden />
+          <span className="hidden lg:inline">{t("contact.navLabel")}</span>
+        </button>
       </div>
       {/*RIGHT*/}
       <div className="flex shrink-0 items-center gap-4 sm:gap-5 md:gap-6">

@@ -1,46 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIpFromHeaders } from "@repo/auth/client-ip";
 
 /**
  * GET /api/geo/country
- * Returns the user's country code (ISO 3166-1 alpha-2) based on IP geolocation.
- * Uses Vercel/Cloudflare headers when available, otherwise falls back to ip-api.com.
+ *
+ * The visitor's country (ISO 3166-1 alpha-2), used to pick sensible defaults in
+ * the cart and on a product page (Swedish vs. export rules). A guess: never
+ * trusted for pricing, tax or the charge currency, all of which come from the
+ * shipping country the customer actually selects.
+ *
+ * Shares its signals with `lib/display-currency.ts` — edge header first, then
+ * one HTTPS lookup — so the shop has exactly one geolocation provider to name
+ * in the privacy policy rather than two.
+ *
  * Response: { country: string } or { country: null }
  */
+
+const LOOKUP_TIMEOUT_MS = 1500;
+
 export async function GET(request: NextRequest) {
-  // 1. Vercel injects geo at the edge
-  const vercelCountry = request.headers.get("x-vercel-ip-country");
-  if (vercelCountry && vercelCountry.length === 2) {
-    return NextResponse.json({ country: vercelCountry.toUpperCase() });
+  // Free, instant and nothing leaves the server: whatever the edge already
+  // knows. Installing nginx's GeoIP2 module later populates x-country here.
+  for (const name of ["cf-ipcountry", "x-country", "x-vercel-ip-country"]) {
+    const value = request.headers.get(name)?.trim().toUpperCase();
+    if (value && value.length === 2 && value !== "XX") {
+      return NextResponse.json({ country: value });
+    }
   }
 
-  // 2. Cloudflare
-  const cfCountry = request.headers.get("cf-ipcountry");
-  if (cfCountry && cfCountry.length === 2 && cfCountry !== "XX") {
-    return NextResponse.json({ country: cfCountry.toUpperCase() });
-  }
-
-  // 3. Fallback: get client IP and call ip-api.com (free, no key)
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const cfConnectingIp = request.headers.get("cf-connecting-ip");
-  const clientIp =
-    cfConnectingIp ?? realIp ?? forwarded?.split(",")[0]?.trim() ?? null;
-
-  if (!clientIp) {
+  // Not `x-forwarded-for[0]`: that hop is whatever the client sent and is
+  // trivially spoofed. clientIpFromHeaders walks the chain the way the proxy
+  // in front of us actually writes it.
+  const clientIp = clientIpFromHeaders(request.headers);
+  if (!clientIp || clientIp === "unknown") {
     return NextResponse.json({ country: null });
   }
 
   try {
+    // ipwho.is over HTTPS. The previous implementation called ip-api.com over
+    // plain http://, which put the visitor's IP address on the wire in the
+    // clear for every network between here and there.
     const res = await fetch(
-      `http://ip-api.com/json/${clientIp}?fields=status,countryCode`,
-      { next: { revalidate: 3600 } }
+      `https://ipwho.is/${encodeURIComponent(clientIp)}?fields=success,country_code`,
+      {
+        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+      },
     );
-    const data = (await res.json()) as { status?: string; countryCode?: string };
-    if (data?.status === "success" && data?.countryCode) {
-      return NextResponse.json({ country: data.countryCode.toUpperCase() });
+    const data = (await res.json()) as {
+      success?: boolean;
+      country_code?: string;
+    };
+    if (data?.success && data?.country_code) {
+      return NextResponse.json({ country: data.country_code.toUpperCase() });
     }
   } catch {
-    // Non-blocking
+    // Non-blocking: an unknown country just means no pre-filled default.
   }
 
   return NextResponse.json({ country: null });

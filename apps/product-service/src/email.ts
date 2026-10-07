@@ -47,11 +47,15 @@ function orderEmailHeaderBrandInner(logoUrl: string): string {
                     </table>`;
 }
 
-/** "kr" for SEK, the ISO code otherwise. Mirrors @repo/currency's suffix rule;
- *  duplicated rather than imported to keep this mail module dependency-free. */
+/** "kr" for SEK, "EUR" for the euro, the ISO code otherwise. Mirrors
+ *  @repo/currency's suffix rule; duplicated rather than imported to keep this
+ *  mail module dependency-free. DKK deliberately stays "DKK" — it shares "kr"
+ *  with SEK, and an invoice must leave no doubt which krona was charged. */
 function currencySuffix(currency: string | undefined): string {
   const c = (currency ?? "SEK").toUpperCase();
-  return c === "SEK" ? "kr" : c;
+  if (c === "SEK") return "kr";
+  if (c === "EUR") return "€";
+  return c;
 }
 
 /** 25 % moms inkluderad i bruttopris: moms = brutto × 25/125 */

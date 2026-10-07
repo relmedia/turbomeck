@@ -6,12 +6,21 @@ import { Input } from "@repo/ui/components/input";
 import { useTranslation } from "@/i18n/context";
 import { cn } from "@/lib/utils";
 import { useProductFilters } from "./useProductFilters";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
+import { currencySuffix } from "@repo/currency";
 
 /**
  * Dual-thumb price slider with numeric inputs and preset range chips.
  * Commits to the URL only when the user finishes dragging (`onValueCommit`)
  * or blurs an input — dragging fires many events so we'd thrash the
  * router otherwise.
+ *
+ * All internal state, the slider geometry and the URL stay in SEK, because the
+ * catalogue is priced in SEK and the API filters on those numbers. Only what
+ * the customer reads and types is converted, at the boundary — so a visitor
+ * browsing in euro filters in euro without the query params ever changing
+ * meaning. For SEK (rate 1) every conversion here is the identity, so the
+ * Swedish case behaves exactly as before.
  */
 export function PriceRangeFilter({
   bounds,
@@ -21,6 +30,12 @@ export function PriceRangeFilter({
 }) {
   const t = useTranslation();
   const { state, update } = useProductFilters();
+  const { currency, rate, convert } = useCurrency();
+  const suffix = currencySuffix(currency);
+  /** Display units -> SEK, for a number the customer typed. */
+  const toSek = (shown: number) => Math.round(shown / rate);
+  /** SEK -> the number the customer reads (no suffix). */
+  const fmt = (sek: number) => convert(sek).toLocaleString("sv-SE");
 
   const minBound = Math.floor(bounds.min);
   const maxBound = Math.ceil(bounds.max);
@@ -60,8 +75,10 @@ export function PriceRangeFilter({
   // always fall inside the available range. Hidden when the data range
   // is too narrow to make distinct buckets meaningful (<3x).
   const presets = useMemo(
-    () => computePresets(minBound, maxBound),
-    [minBound, maxBound],
+    () => computePresets(minBound, maxBound, fmt, suffix),
+    // fmt closes over the rate, which is fixed for the life of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [minBound, maxBound, currency, rate],
   );
 
   const isPresetActive = (preset: { from: number | null; to: number | null }) =>
@@ -77,15 +94,13 @@ export function PriceRangeFilter({
     commit(next);
   };
 
-  const fmt = (n: number) => n.toLocaleString("sv-SE");
-
   return (
     <div className="space-y-4">
       {/* Live value readout */}
       <div className="flex items-center justify-between gap-2 text-xs">
-        <ValuePill value={fmt(draft[0])} suffix="kr" />
+        <ValuePill value={fmt(draft[0])} suffix={suffix} />
         <span className="text-muted-foreground/40 select-none">—</span>
-        <ValuePill value={fmt(draft[1])} suffix="kr" />
+        <ValuePill value={fmt(draft[1])} suffix={suffix} />
       </div>
 
       {/* Slider — px-2.5 keeps the 20px thumb + hover ring inside the
@@ -106,22 +121,27 @@ export function PriceRangeFilter({
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
         <PriceInput
           label={t("products.filterPriceFrom")}
-          min={minBound}
-          max={draft[1]}
-          value={draft[0]}
+          suffix={suffix}
+          min={convert(minBound)}
+          max={convert(draft[1])}
+          value={convert(draft[0])}
           onChange={(n) =>
-            setDraft(([_, max]) => [Number.isFinite(n) ? n : minBound, max])
+            setDraft(([_, max]) => [
+              Number.isFinite(n) ? toSek(n) : minBound,
+              max,
+            ])
           }
           onCommit={() => commit(draft)}
         />
         <span className="pb-2.5 text-muted-foreground/50">–</span>
         <PriceInput
           label={t("products.filterPriceTo")}
-          min={draft[0]}
-          max={maxBound}
-          value={draft[1]}
+          suffix={suffix}
+          min={convert(draft[0])}
+          max={convert(maxBound)}
+          value={convert(draft[1])}
           onChange={(n) =>
-            setDraft(([min]) => [min, Number.isFinite(n) ? n : maxBound])
+            setDraft(([min]) => [min, Number.isFinite(n) ? toSek(n) : maxBound])
           }
           onCommit={() => commit(draft)}
         />
@@ -164,6 +184,7 @@ function ValuePill({ value, suffix }: { value: string; suffix: string }) {
 
 function PriceInput({
   label,
+  suffix,
   min,
   max,
   value,
@@ -171,6 +192,7 @@ function PriceInput({
   onCommit,
 }: {
   label: string;
+  suffix: string;
   min: number;
   max: number;
   value: number;
@@ -199,7 +221,7 @@ function PriceInput({
           className="h-9 pr-7 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-          kr
+          {suffix}
         </span>
       </div>
     </label>
@@ -225,7 +247,13 @@ type PricePreset = {
  * Builds 4 quick-pick price ranges scaled to the actual product bounds.
  * Skips presets entirely when the range is too narrow to be useful.
  */
-function computePresets(min: number, max: number): PricePreset[] {
+function computePresets(
+  min: number,
+  max: number,
+  /** Formats a SEK threshold as the number the customer reads. */
+  fmt: (sek: number) => string,
+  suffix: string,
+): PricePreset[] {
   const range = max - min;
   if (range < 200) return [];
 
@@ -239,12 +267,10 @@ function computePresets(min: number, max: number): PricePreset[] {
   const t2 = round(min + range * 0.5);
   const t3 = round(min + range * 0.75);
 
-  const fmt = (n: number) => n.toLocaleString("sv-SE");
-
   return [
-    { id: "lt1", label: `< ${fmt(t1)} kr`, from: null, to: t1 },
-    { id: "1to2", label: `${fmt(t1)}–${fmt(t2)} kr`, from: t1, to: t2 },
-    { id: "2to3", label: `${fmt(t2)}–${fmt(t3)} kr`, from: t2, to: t3 },
-    { id: "gt3", label: `> ${fmt(t3)} kr`, from: t3, to: null },
+    { id: "lt1", label: `< ${fmt(t1)} ${suffix}`, from: null, to: t1 },
+    { id: "1to2", label: `${fmt(t1)}–${fmt(t2)} ${suffix}`, from: t1, to: t2 },
+    { id: "2to3", label: `${fmt(t2)}–${fmt(t3)} ${suffix}`, from: t2, to: t3 },
+    { id: "gt3", label: `> ${fmt(t3)} ${suffix}`, from: t3, to: null },
   ];
 }

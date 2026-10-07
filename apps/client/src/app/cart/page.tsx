@@ -347,6 +347,8 @@ const CartPage: React.FC = () => {
             shippingCost: shipping,
             discount,
             total,
+            currency,
+            chargedTotal: quote?.total,
             commitsCoreReturnWithin14:
               (shippingForm!.country ?? "SE").toUpperCase() === "SE" &&
               cartNeedsCoreReturn

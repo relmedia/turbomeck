@@ -66,6 +66,7 @@ export function PrivacyContent() {
             <li>{t("privacyPage.s2li2")}</li>
             <li>{t("privacyPage.s2li3")}</li>
             <li>{t("privacyPage.s2li4")}</li>
+            <li>{t("privacyPage.s2li5")}</li>
           </ul>
         </section>
 
@@ -97,6 +98,7 @@ export function PrivacyContent() {
             <li>{t("privacyPage.s5li1")}</li>
             <li>{t("privacyPage.s5li2")}</li>
             <li>{t("privacyPage.s5li3")}</li>
+            <li>{t("privacyPage.s5liGeo")}</li>
             <li>{t("privacyPage.s5li4")}</li>
           </ul>
           <p className="mt-2">{t("privacyPage.s5p2")}</p>

@@ -178,6 +178,15 @@ export type Order = {
   shippingCost: number;
   discount: number;
   total: number;
+  /**
+   * The currency these amounts were charged in. Optional because orders
+   * written before multi-currency have no value, and absent means SEK.
+   *
+   * Format a past order with `formatAmount(amount, order.currency)` — never
+   * with the live display currency, which would restate what the customer paid
+   * at today's exchange rate.
+   */
+  currency?: string;
   status: string;
   postNordTrackingId: string | null;
   stripePaymentId: string | null;

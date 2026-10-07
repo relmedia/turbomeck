@@ -2,6 +2,12 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useLanguage, useTranslation } from "@/i18n/context";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
+import {
+  formatAmount,
+  normalizeCurrency,
+  type SupportedCurrency,
+} from "@repo/currency";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -76,6 +82,7 @@ type UserProfile = {
 
 export default function AccountPage() {
   const { locale } = useLanguage();
+  const { price: displayPrice } = useCurrency();
   const t = useTranslation();
   const searchParams = useSearchParams();
 
@@ -347,7 +354,26 @@ export default function AccountPage() {
     );
   }
 
-  const totalSpent = orders.reduce((sum, o) => sum + Number(o.total ?? 0), 0);
+  /**
+   * Lifetime spend, kept per currency rather than added into one number: a
+   * customer with a 2 400 kr order and a 2 677 NOK order has not spent
+   * "5 077 kr" of anything. Renders exactly as before for the normal
+   * single-currency case.
+   */
+  const spentByCurrency = orders.reduce<Partial<Record<SupportedCurrency, number>>>(
+    (acc, o) => {
+      const c = normalizeCurrency((o as { currency?: string }).currency);
+      acc[c] = (acc[c] ?? 0) + Number(o.total ?? 0);
+      return acc;
+    },
+    {},
+  );
+  const totalSpentText =
+    Object.entries(spentByCurrency)
+      .map(([c, amount]) =>
+        formatAmount(Math.round(amount ?? 0), c as SupportedCurrency, locale as "sv" | "en"),
+      )
+      .join(" + ") || formatAmount(0, "SEK", locale as "sv" | "en");
   const deliveredCount = orders.filter(
     (o) => o.status === "delivered" || o.status === "shipped"
   ).length;
@@ -501,7 +527,7 @@ export default function AccountPage() {
                           </p>
                         </Link>
                         <p className="text-sm text-muted-foreground">
-                          {Number(product.price ?? 0).toLocaleString("sv-SE")} kr
+                          {displayPrice(Number(product.price ?? 0))}
                         </p>
                       </div>
                       <button
@@ -540,11 +566,7 @@ export default function AccountPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-semibold">
-                    {loading
-                      ? "—"
-                      : `${totalSpent.toLocaleString("sv-SE", {
-                          maximumFractionDigits: 0,
-                        })} kr`}
+                    {loading ? "—" : totalSpentText}
                   </p>
                   <p className="text-sm text-muted-foreground">{t("account.totalSpent")}</p>
                 </div>
@@ -657,10 +679,13 @@ export default function AccountPage() {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              {Number(order.total ?? 0).toLocaleString(
-                                locale === "en" ? "en-GB" : "sv-SE",
-                              )}{" "}
-                              {t("common.kr")}
+                              {formatAmount(
+                                Number(order.total ?? 0),
+                                normalizeCurrency(
+                                  (order as { currency?: string }).currency,
+                                ),
+                                locale as "sv" | "en",
+                              )}
                               <span className="text-border mx-1.5">·</span>
                               <span
                                 className={cn(

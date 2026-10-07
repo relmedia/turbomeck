@@ -8,7 +8,8 @@ import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTranslation } from "@/i18n/context";
+import { useLanguage, useTranslation } from "@/i18n/context";
+import { formatAmount, normalizeCurrency } from "@repo/currency";
 
 /** Always use Next.js proxy (adds INTERNAL_PRODUCT_API_SECRET server-side). */
 const PRODUCT_API = "/api/product";
@@ -17,6 +18,8 @@ type BalanceInfo = {
   orderId: number;
   orderNumber: string;
   balanceDue: number;
+  /** Currency the original order was charged in; absent on legacy orders. */
+  currency?: string;
   customerName: string;
 };
 
@@ -24,6 +27,7 @@ export default function PayBalancePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslation();
+  const { locale } = useLanguage();
   const orderId = searchParams.get("orderId");
   const orderToken = searchParams.get("token");
   const [balance, setBalance] = useState<BalanceInfo | null>(null);
@@ -114,11 +118,11 @@ export default function PayBalancePage() {
           <div className="rounded-lg border bg-muted/50 p-4">
             <p className="text-sm text-muted-foreground">Att betala</p>
             <p className="text-2xl font-semibold">
-              {balance.balanceDue.toLocaleString("sv-SE", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}{" "}
-              {t("common.kr")}
+              {formatAmount(
+                balance.balanceDue,
+                normalizeCurrency(balance.currency),
+                locale as "sv" | "en",
+              )}
             </p>
           </div>
           <PaymentForm

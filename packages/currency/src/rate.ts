@@ -35,11 +35,14 @@ const FETCH_TIMEOUT_MS = 4000;
  * Built-in last resort, kept close to the real rate rather than padded.
  *
  * A padded rate would over-charge the customer, which is worse than the shop
- * absorbing a fraction of a percent. Checked 2026-10-07 at 0.954; set
- * `FX_RATE_SEK_NOK` to pin an exact value without editing this.
+ * absorbing a fraction of a percent. Checked 2026-10-07: NOK 0.954, DKK 0.666,
+ * EUR 0.089. Set `FX_RATE_SEK_<CUR>` to pin an exact value without editing
+ * this.
  */
 const FALLBACK_RATES: Record<string, number> = {
   NOK: 0.96,
+  DKK: 0.67,
+  EUR: 0.09,
 };
 
 type CacheEntry = { rate: number; fetchedAt: number };

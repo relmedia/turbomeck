@@ -34,6 +34,15 @@ export type PendingOrderPayload = {
   discount: number;
   total: number;
   commitsCoreReturnWithin14?: boolean;
+  /**
+   * What the server actually quoted, and in which currency. Display-only: the
+   * order is re-priced server-side from `items`, and the charge is verified
+   * against the stored checkout snapshot. These exist so the confirmation page
+   * can say "2 677 NOK" instead of restating the client's SEK estimate with a
+   * kronor suffix.
+   */
+  currency?: string;
+  chargedTotal?: number;
   postNordTrackingId?: string;
   /** PostNord Shipping Module session — completed after payment (incl. Stripe return flow). */
   postNordSessionId?: string;

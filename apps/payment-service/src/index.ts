@@ -206,8 +206,9 @@ app.post('/create-payment-intent', async (c) => {
     // methods Stripe offers (Klarna requires it to match the buyer's country),
     // and an unexpected value would create an uncharg eable intent. The caller
     // is product-service's quote, which derives it from the shipping country.
+    const SUPPORTED = ['sek', 'nok', 'dkk', 'eur']
     const requested = (body.currency ?? 'sek').toLowerCase()
-    const currency = requested === 'nok' ? 'nok' : 'sek'
+    const currency = SUPPORTED.includes(requested) ? requested : 'sek'
     if (requested !== currency) {
       console.warn(`[stripe] unsupported currency "${requested}"; charging SEK`)
     }

@@ -1,6 +1,10 @@
 import { cookies, headers } from "next/headers";
 import { clientIpFromHeaders } from "@repo/auth/client-ip";
-import { normalizeCurrency, type SupportedCurrency } from "@repo/currency";
+import {
+  currencyForCountry,
+  normalizeCurrency,
+  type SupportedCurrency,
+} from "@repo/currency";
 import { getSekRate } from "@repo/currency/rate";
 
 /**
@@ -18,16 +22,19 @@ import { getSekRate } from "@repo/currency/rate";
  * the destination, not the browser.
  *
  * Signal order, strongest first:
- *   1. `tm-currency` cookie — an explicit choice from the switcher. Always wins;
- *      a detected country must never override what the customer picked.
+ *   1. `tm-currency` cookie — a manual override. There is no switcher in the
+ *      UI (detection only, by decision), but the branch is kept because it is
+ *      how you preview another currency without a VPN: set the cookie in
+ *      devtools and reload.
  *   2. A country header, if the edge provides one (`cf-ipcountry`,
  *      `x-country`, `x-vercel-ip-country`). Free, instant, no third party.
  *      Installing nginx's GeoIP2 module later activates this path with no code
  *      change.
  *   3. IP geolocation via `ipwho.is` — one call per IP, cached in memory for
  *      12h. Disabled by setting GEOIP_LOOKUP=off.
- *   4. `Accept-Language` (nb/nn/no → NOK). Catches most Norwegians even when
- *      the lookup is unavailable.
+ *   4. `Accept-Language`, for languages that map to exactly one currency
+ *      (da → DKK, nb/nn → NOK, fi/de/nl/… → EUR). Catches most visitors even
+ *      when the lookup is unavailable; English is excluded on purpose.
  *   5. SEK.
  *
  * Privacy note: step 3 sends the visitor's IP to ipwho.is. That belongs in the
@@ -38,12 +45,6 @@ import { getSekRate } from "@repo/currency/rate";
 export const CURRENCY_COOKIE = "tm-currency";
 
 const COUNTRY_HEADERS = ["cf-ipcountry", "x-country", "x-vercel-ip-country"];
-
-/** country code -> display currency. Mirrors the charge-side mapping. */
-const COUNTRY_CURRENCY: Record<string, SupportedCurrency> = {
-  NO: "NOK",
-  SE: "SEK",
-};
 
 const LOOKUP_TTL_MS = 12 * 60 * 60 * 1000;
 const LOOKUP_TIMEOUT_MS = 1500;
@@ -57,12 +58,20 @@ export type DisplayCurrency = {
   source: "cookie" | "header" | "geoip" | "language" | "default";
 };
 
+/**
+ * Reuses the charge-side mapping so display and charge can never disagree about
+ * what a country's currency is — but returns null for countries we don't price
+ * locally, where `currencyForCountry` would answer SEK. The difference matters:
+ * "unknown, keep looking" is not the same as "this country uses SEK".
+ */
 function currencyForDetectedCountry(
   code: string | null | undefined,
 ): SupportedCurrency | null {
   const cc = (code ?? "").trim().toUpperCase();
   if (!cc) return null;
-  return COUNTRY_CURRENCY[cc] ?? null;
+  const mapped = currencyForCountry(cc);
+  if (mapped !== "SEK") return mapped;
+  return cc === "SE" ? "SEK" : null;
 }
 
 /**
@@ -99,13 +108,42 @@ async function geoipCountry(ip: string): Promise<string | null> {
   }
 }
 
+/**
+ * Last resort before SEK, and only for languages that map to one currency.
+ *
+ * English is deliberately absent: an `en-GB` browser says nothing about where
+ * the shopper is or what they want to pay in, and guessing EUR for every
+ * English speaker would be worse than defaulting to SEK.
+ */
+const LANGUAGE_CURRENCY: Array<[string, SupportedCurrency]> = [
+  ["sv", "SEK"],
+  ["nb", "NOK"],
+  ["nn", "NOK"],
+  ["no", "NOK"],
+  ["da", "DKK"],
+  ["fi", "EUR"],
+  ["de", "EUR"],
+  ["nl", "EUR"],
+  ["fr", "EUR"],
+  ["es", "EUR"],
+  ["it", "EUR"],
+  ["pt", "EUR"],
+  ["el", "EUR"],
+  ["et", "EUR"],
+  ["lv", "EUR"],
+  ["lt", "EUR"],
+  ["sk", "EUR"],
+  ["sl", "EUR"],
+  ["hr", "EUR"],
+  ["ga", "EUR"],
+];
+
 function currencyFromAcceptLanguage(value: string | null): SupportedCurrency | null {
   if (!value) return null;
   const first = value.split(",")[0]?.trim().toLowerCase() ?? "";
-  if (first.startsWith("nb") || first.startsWith("nn") || first.startsWith("no")) {
-    return "NOK";
+  for (const [prefix, currency] of LANGUAGE_CURRENCY) {
+    if (first.startsWith(prefix)) return currency;
   }
-  if (first.startsWith("sv")) return "SEK";
   return null;
 }
 

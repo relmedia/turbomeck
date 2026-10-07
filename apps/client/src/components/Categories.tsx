@@ -30,7 +30,9 @@ const barItemStyle = cn(
 
 // Inline navbar item style — classic top-nav text links, no segmented chrome.
 // Sits flush in the navbar so it shares the navbar's background.
-const inlineItemStyle = cn(
+// Exported so other navbar entries (Kontakt) look identical by construction
+// rather than by a copied class string that drifts.
+export const inlineItemStyle = cn(
   "group inline-flex h-9 w-max items-center justify-center gap-1.5 rounded-md px-3 py-2",
   "text-sm font-medium text-foreground/80 transition-colors",
   "hover:bg-accent hover:text-foreground",

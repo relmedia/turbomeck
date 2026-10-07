@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { Order } from "@/lib/api";
 import { resolveImageUrl } from "@/lib/api";
 import { useLanguage, useTranslation } from "@/i18n/context";
+import { formatAmount, normalizeCurrency } from "@repo/currency";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import OrderTrackingPanel from "@/components/OrderTrackingPanel";
 import { Button } from "@repo/ui/components/button";
@@ -109,7 +110,14 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 className: "border-border bg-muted/60 text-foreground",
               };
 
-  const numberLocale = locale === "en" ? "en-GB" : "sv-SE";
+  /**
+   * A past order is shown in the currency it was charged in, not in the
+   * visitor's display currency: this is a receipt, and re-converting it at
+   * today's rate would misstate what the customer actually paid.
+   */
+  const orderCurrency = normalizeCurrency(order?.currency);
+  const money = (amount: number) =>
+    formatAmount(amount, orderCurrency, locale as "sv" | "en");
   const displayRef = normalizeShopOrderNumber(order.orderNumber);
 
   const trackingUrl = order.postNordTrackingId
@@ -263,13 +271,11 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                           `${t("orderDetail.product")} #${item.productId ?? item.id}`}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {item.quantity} × {Number(item.price).toLocaleString(numberLocale)}{" "}
-                        {t("common.kr")}
+                        {item.quantity} × {money(Number(item.price))}
                       </p>
                     </div>
                     <p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                      {(Number(item.price) * item.quantity).toLocaleString(numberLocale)}{" "}
-                      {t("common.kr")}
+                      {money(Number(item.price) * item.quantity)}
                     </p>
                   </li>
                 ))}
@@ -288,33 +294,33 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">{t("orderDetail.subtotal")}</dt>
                 <dd className="tabular-nums font-medium text-foreground">
-                  {order.subtotal.toLocaleString(numberLocale)} {t("common.kr")}
+                  {money(order.subtotal)}
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">{t("orderDetail.shipping")}</dt>
                 <dd className="tabular-nums text-foreground">
-                  {order.shippingCost.toLocaleString(numberLocale)} {t("common.kr")}
+                  {money(order.shippingCost)}
                 </dd>
               </div>
               {order.discount > 0 && (
                 <div className="flex justify-between gap-4 text-emerald-600 dark:text-emerald-400">
                   <dt>{t("orderDetail.discount")}</dt>
                   <dd className="tabular-nums font-medium">
-                    −{order.discount.toLocaleString(numberLocale)} {t("common.kr")}
+                    −{money(order.discount)}
                   </dd>
                 </div>
               )}
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">{t("orderDetail.vat")}</dt>
                 <dd className="tabular-nums text-foreground">
-                  {Math.round(order.total * 0.2).toLocaleString(numberLocale)} {t("common.kr")}
+                  {money(Math.round(order.total * 0.2))}
                 </dd>
               </div>
               <div className="mt-3 flex justify-between gap-4 border-t border-border/60 pt-3">
                 <dt className="text-base font-semibold text-foreground">{t("orderDetail.total")}</dt>
                 <dd className="text-base font-semibold tabular-nums text-foreground">
-                  {order.total.toLocaleString(numberLocale)} {t("common.kr")}
+                  {money(order.total)}
                 </dd>
               </div>
             </dl>

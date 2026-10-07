@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
   convertFromSek,
   formatAmount,
@@ -16,6 +15,8 @@ import { useLanguage } from "@/i18n/context";
  * first paint is already correct — no flash of SEK prices followed by a
  * client-side conversion, and no FX lookup from the visitor's browser.
  *
+ * The currency is detected server-side and is not user-switchable by design.
+ *
  * Catalogue prices are stored in SEK, so everything here takes a SEK amount and
  * renders it in the display currency. Historical amounts (a past order, an
  * invoice) must NOT go through this: they were charged in a specific currency
@@ -27,19 +28,15 @@ type CurrencyContextValue = {
   currency: SupportedCurrency;
   /** SEK -> currency multiplier. 1 when displaying SEK. */
   rate: number;
-  /** Was this detected, or chosen by the customer? Drives the switcher's hint. */
+  /** How the currency was decided. Diagnostics only — nothing renders it. */
   source: "cookie" | "header" | "geoip" | "language" | "default";
   /** SEK amount -> formatted string in the display currency. */
   price: (amountSek: number) => string;
   /** SEK amount -> numeric amount in the display currency. */
   convert: (amountSek: number) => number;
-  /** Persist an explicit choice; overrides detection from then on. */
-  setCurrency: (currency: SupportedCurrency) => void;
 };
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
-
-const COOKIE_MAX_AGE_DAYS = 180;
 
 export function CurrencyProvider({
   currency,
@@ -52,7 +49,6 @@ export function CurrencyProvider({
   source: CurrencyContextValue["source"];
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const { locale } = useLanguage();
 
   const convert = useCallback(
@@ -65,22 +61,9 @@ export function CurrencyProvider({
     [convert, currency, locale],
   );
 
-  const setCurrency = useCallback(
-    (next: SupportedCurrency) => {
-      const secure = window.location.protocol === "https:" ? "; Secure" : "";
-      document.cookie =
-        `tm-currency=${next}; Path=/; Max-Age=${COOKIE_MAX_AGE_DAYS * 24 * 60 * 60}` +
-        `; SameSite=Lax${secure}`;
-      // The server resolves the currency, so a refresh is what applies it —
-      // this also re-renders every price on the page from one source.
-      router.refresh();
-    },
-    [router],
-  );
-
   const value = useMemo<CurrencyContextValue>(
-    () => ({ currency, rate, source, price, convert, setCurrency }),
-    [currency, rate, source, price, convert, setCurrency],
+    () => ({ currency, rate, source, price, convert }),
+    [currency, rate, source, price, convert],
   );
 
   return (
@@ -102,6 +85,5 @@ export function useCurrency(): CurrencyContextValue {
     source: "default",
     price: (amountSek: number) => formatAmount(amountSek, "SEK"),
     convert: (amountSek: number) => Math.round(amountSek),
-    setCurrency: () => {},
   };
 }

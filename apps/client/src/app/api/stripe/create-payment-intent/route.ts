@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    let amountSek: number;
+    /** In `currency`, not necessarily SEK — a NOK order is quoted in NOK. */
+    let amount: number;
     /** Currency the quote priced in; must travel with the amount. */
     let currency = "sek";
     /** Set for full-checkout requests: what to snapshot once we have a pi_ id. */
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       if (typeof quoteData.amount !== "number" || !Number.isFinite(quoteData.amount) || quoteData.amount <= 0) {
         return NextResponse.json({ error: "Invalid quote from checkout service" }, { status: 502 });
       }
-      amountSek = quoteData.amount;
+      amount = quoteData.amount;
       // Derived server-side from the shipping country (NO -> NOK), never from
       // the client: the currency decides which payment methods Stripe offers.
       currency = (quoteData.currency ?? "sek").toLowerCase();
@@ -134,6 +135,7 @@ export async function POST(request: NextRequest) {
       const balanceData = (await balanceRes.json().catch(() => ({}))) as {
         error?: string;
         balanceDue?: number;
+        currency?: string;
       };
       if (!balanceRes.ok) {
         return NextResponse.json(
@@ -151,7 +153,10 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      amountSek = balanceData.balanceDue;
+      amount = balanceData.balanceDue;
+      // The balance is in the order's own currency. Charging it as SEK would
+      // collect the wrong sum and offer the wrong local payment methods.
+      currency = (balanceData.currency ?? "sek").toLowerCase();
     } else {
       return NextResponse.json(
         { error: "Invalid payment request" },
@@ -163,7 +168,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        amount: amountSek,
+        amount,
         currency,
         // Second copy of the checkout, on the payment itself. The database row
         // written below is authoritative; this makes the payment
@@ -199,7 +204,7 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({
               paymentIntentId,
-              quotedChargeSek: amountSek,
+              quotedChargeSek: amount,
               payload: checkoutSnapshot,
             }),
           },

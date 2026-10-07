@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, X } from "lucide-react";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { useTranslation } from "@/i18n/context";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -56,6 +57,7 @@ function getSearchRelevance(p: ProductType, q: string): number {
 
 export function MobileSearch() {
   const t = useTranslation();
+  const { price: displayPrice } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -278,10 +280,7 @@ export function MobileSearch() {
                             {product.name}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {product.price.toLocaleString("sv-SE", {
-                              maximumFractionDigits: 0,
-                            })}{" "}
-                            {t("common.kr")}
+                            {displayPrice(product.price)}
                           </p>
                         </div>
                       </Link>

@@ -24,6 +24,7 @@ import {
 } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
+import { normalizeCurrency } from "@repo/currency";
 import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -87,7 +88,8 @@ const stripeClient =
 
 async function verifySucceededBalancePaymentIntent(
   paymentIntentId: string,
-  expectedBalanceSek: number,
+  expectedBalance: number,
+  expectedCurrency: string = "sek",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!stripeClient) {
     return { ok: false, error: "Stripe is not configured on product-service" };
@@ -97,11 +99,15 @@ async function verifySucceededBalancePaymentIntent(
     if (pi.status !== "succeeded") {
       return { ok: false, error: "Payment has not succeeded" };
     }
-    if (String(pi.currency || "").toLowerCase() !== "sek") {
+    // The balance is denominated in the currency the order was charged in, so
+    // a NOK order's balance must be collected in NOK. Without this check the
+    // amount comparison below would silently accept unlike units: 2 677 NOK
+    // would satisfy a 2 677 SEK balance and under-collect by the FX spread.
+    if (String(pi.currency || "").toLowerCase() !== expectedCurrency.toLowerCase()) {
       return { ok: false, error: "Invalid currency" };
     }
-    const expectedOre = Math.round(Number(expectedBalanceSek) * 100);
-    if (pi.amount !== expectedOre) {
+    const expectedMinor = Math.round(Number(expectedBalance) * 100);
+    if (pi.amount !== expectedMinor) {
       return { ok: false, error: "Amount mismatch" };
     }
     return { ok: true };
@@ -2014,6 +2020,9 @@ app.get("/api/orders", async (req, res) => {
           shippingCost: parseFloat(o.shippingCost),
           discount: parseFloat(o.discount),
           total: parseFloat(o.total),
+          // The currency these amounts were charged in. They must never be
+          // re-converted at today's rate — the order records what was paid.
+          currency: normalizeCurrency((o as { currency?: string | null }).currency),
           depositAmount: (o as { depositAmount?: string | null }).depositAmount != null ? parseFloat((o as { depositAmount: string }).depositAmount) : undefined,
           balanceDue: (o as { balanceDue?: string | null }).balanceDue != null ? parseFloat((o as { balanceDue: string }).balanceDue) : undefined,
           commitsCoreReturnWithin14: (o as { commitsCoreReturnWithin14?: boolean | null }).commitsCoreReturnWithin14 ?? undefined,
@@ -2076,6 +2085,7 @@ app.get("/api/orders/:id", async (req, res) => {
       shippingCost: parseFloat(order.shippingCost),
       discount: parseFloat(order.discount),
       total: parseFloat(order.total),
+      currency: normalizeCurrency((order as { currency?: string | null }).currency),
       depositAmount: (order as { depositAmount?: string | null }).depositAmount != null ? parseFloat((order as { depositAmount: string }).depositAmount) : undefined,
       balanceDue: (order as { balanceDue?: string | null }).balanceDue != null ? parseFloat((order as { balanceDue: string }).balanceDue) : undefined,
       commitsCoreReturnWithin14: (order as { commitsCoreReturnWithin14?: boolean | null }).commitsCoreReturnWithin14 ?? undefined,
@@ -2126,6 +2136,9 @@ app.get("/api/orders/:id/balance", async (req, res) => {
       orderId: order.id,
       orderNumber: order.orderNumber,
       balanceDue: bal,
+      // Whatever the order was charged in. Orders predating multi-currency
+      // have no value here and normalise to SEK, which is what they were.
+      currency: normalizeCurrency((order as { currency?: string | null }).currency),
       customerName: `${order.firstName} ${order.lastName}`.trim(),
     });
   } catch (error) {
@@ -2167,7 +2180,11 @@ app.patch("/api/orders/:id/balance-paid", async (req, res) => {
     if (piUsed && piUsed.id !== id) {
       return res.status(400).json({ error: "Payment intent already used" });
     }
-    const verified = await verifySucceededBalancePaymentIntent(stripePaymentId, balanceNum);
+    const verified = await verifySucceededBalancePaymentIntent(
+      stripePaymentId,
+      balanceNum,
+      normalizeCurrency((order as { currency?: string | null }).currency).toLowerCase(),
+    );
     if (!verified.ok) {
       return res.status(400).json({ error: verified.error });
     }

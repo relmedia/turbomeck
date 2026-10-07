@@ -9,6 +9,8 @@ import {
 import { useTranslation } from "@/i18n/context";
 import { categorySlug, cn } from "@/lib/utils";
 import { useProductFilters } from "./useProductFilters";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
+import { currencySuffix } from "@repo/currency";
 import { CategoryFilter } from "./CategoryFilter";
 import { PriceRangeFilter } from "./PriceRangeFilter";
 import { StockFilter, ExchangeTurboFilter } from "./ToggleFilters";
@@ -42,6 +44,7 @@ export function FilterSidebar({
 }) {
   const t = useTranslation();
   const { state, activeCount, clearAll } = useProductFilters();
+  const { currency, convert } = useCurrency();
 
   const categoryName = (() => {
     if (!state.category || state.category === "alla-produkter") return null;
@@ -50,12 +53,13 @@ export function FilterSidebar({
   })();
 
   const priceSummary = (() => {
-    const fmt = (n: number) => n.toLocaleString("sv-SE");
+    const suffix = currencySuffix(currency);
+    const fmt = (sek: number) => convert(sek).toLocaleString("sv-SE");
     if (state.minPrice != null && state.maxPrice != null) {
-      return `${fmt(state.minPrice)}–${fmt(state.maxPrice)} kr`;
+      return `${fmt(state.minPrice)}–${fmt(state.maxPrice)} ${suffix}`;
     }
-    if (state.minPrice != null) return `> ${fmt(state.minPrice)} kr`;
-    if (state.maxPrice != null) return `< ${fmt(state.maxPrice)} kr`;
+    if (state.minPrice != null) return `> ${fmt(state.minPrice)} ${suffix}`;
+    if (state.maxPrice != null) return `< ${fmt(state.maxPrice)} ${suffix}`;
     return null;
   })();
 

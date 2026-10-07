@@ -23,6 +23,11 @@ import useCartStore from "@/stores/cartStore";
 import { useLanguage, useTranslation } from "@/i18n/context";
 import { completePostNordSessionFromCheckoutPayload } from "@/lib/complete-postnord-session";
 import type { PendingOrderPayload } from "@/components/PaymentForm";
+import {
+  formatAmount,
+  normalizeCurrency,
+  type SupportedCurrency,
+} from "@repo/currency";
 
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
@@ -47,6 +52,12 @@ function OrderSuccessContent() {
     email?: string | null;
     servicePointName?: string | null;
   } | null>(null);
+  /**
+   * Currency the order was charged in, carried over from checkout. A receipt
+   * must name what was actually paid; converting it at today's rate would make
+   * the page disagree with the customer's bank statement.
+   */
+  const [orderCurrency, setOrderCurrency] = useState<SupportedCurrency>("SEK");
   const [clientTotal, setClientTotal] = useState<number | null>(null);
   const clearCart = useCartStore((s) => s.clearCart);
 
@@ -64,6 +75,12 @@ function OrderSuccessContent() {
     const total = !isNaN(fromUrl) ? fromUrl : !isNaN(fromStorage) ? fromStorage : NaN;
     if (!isNaN(total)) {
       setOrderDetails({ total, createdAt: new Date() });
+    }
+    try {
+      const stored = sessionStorage.getItem("orderSuccessCurrency");
+      if (stored) setOrderCurrency(normalizeCurrency(stored));
+    } catch {
+      /* ignore */
     }
   }, [totalParam, pendingCreate, createError]);
 
@@ -97,10 +114,15 @@ function OrderSuccessContent() {
       setPendingCreate(false);
       return;
     }
-    const totalNum = Number(payload.total);
+    // The server-quoted charge when checkout recorded one, otherwise the
+    // client estimate — the same precedence the cart's own summary used.
+    const totalNum = Number(payload.chargedTotal ?? payload.total);
+    const currency = normalizeCurrency(payload.currency);
     setOrderDetails({ total: totalNum, createdAt: new Date() });
+    setOrderCurrency(currency);
     try {
       sessionStorage.setItem("orderSuccessTotal", String(totalNum));
+      sessionStorage.setItem("orderSuccessCurrency", currency);
     } catch { /* non-blocking */ }
 
     (async () => {
@@ -311,7 +333,13 @@ function OrderSuccessContent() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("orderSuccess.amountPaid")}</span>
               <span className="font-medium">
-                {isValidTotal ? `${Number(totalDisplay).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} kr` : "—"}
+                {isValidTotal
+                  ? formatAmount(
+                      Number(totalDisplay),
+                      orderCurrency,
+                      locale as "sv" | "en",
+                    )
+                  : "—"}
               </span>
             </div>
             <div className="flex justify-between">
