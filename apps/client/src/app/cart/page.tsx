@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { getShippingPrice } from "@/lib/postnord";
+import { formatAmount, normalizeCurrency } from "@repo/currency";
 import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
@@ -139,6 +140,67 @@ const CartPage: React.FC = () => {
         .catch(() => {});
     }
   }, [subtotal, shipping, appliedCoupon, lastValidatedCode]);
+
+  /**
+   * Server-priced totals, in the currency the customer will actually be
+   * charged (NOK for Norwegian deliveries, so Klarna is offered).
+   *
+   * The client-side figures below stay as the instant-feedback fallback while
+   * this is in flight, but anything the customer is asked to agree to comes
+   * from here: the same endpoint that prices the PaymentIntent, so the
+   * displayed total and the charge cannot disagree.
+   */
+  const [quote, setQuote] = useState<{
+    currency: string;
+    subtotal: number;
+    shipping: number;
+    discount: number;
+    coreKeepFeeSek: number;
+    total: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setQuote(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch("/api/checkout/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: mapItemsForCheckout(),
+        couponCode:
+          appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
+        country: shippingCountry,
+        deliveryOption,
+        commitsCoreReturnWithin14:
+          (shippingCountry ?? "SE").toUpperCase() === "SE" && cartNeedsCoreReturn
+            ? coreReturnChoice === "return"
+            : undefined,
+      }),
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data.total === "number") setQuote(data);
+      })
+      .catch(() => {
+        /* keep the client-side estimate */
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cart,
+    shippingCountry,
+    deliveryOption,
+    appliedCoupon,
+    lastValidatedCode,
+    coreReturnChoice,
+  ]);
+
+  const currency = normalizeCurrency(quote?.currency);
+  const money = (amount: number) => formatAmount(amount, currency, locale as "sv" | "en");
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
@@ -408,16 +470,14 @@ const CartPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                 <span className="font-medium">
-                  {subtotal.toLocaleString("sv-SE", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  kr
+                  {money(quote?.subtotal ?? subtotal)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.shipping")}</span>
-                <span className="font-medium">{shipping} kr</span>
+                <span className="font-medium">
+                  {money(quote?.shipping ?? shipping)}
+                </span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-600">
@@ -428,12 +488,7 @@ const CartPage: React.FC = () => {
                     )}
                   </span>
                   <span className="font-medium">
-                    -
-                    {discount.toLocaleString("sv-SE", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    })}{" "}
-                    kr
+                    -{money(quote?.discount ?? discount)}
                   </span>
                 </div>
               )}
@@ -474,35 +529,25 @@ const CartPage: React.FC = () => {
                 <div className="flex justify-between text-muted-foreground">
                   <span>{t("cart.coreKeepFeeLine")}</span>
                   <span className="font-medium">
-                    {coreKeepFeeApplied.toLocaleString("sv-SE", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    })}{" "}
-                    kr
+                    {money(quote?.coreKeepFeeSek ?? coreKeepFeeApplied)}
                   </span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.vat")}</span>
                 <span className="font-medium">
-                  {Math.round(
-                    (subtotal - discount + shipping + coreKeepFeeApplied) * 0.2
-                  ).toLocaleString("sv-SE", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  kr
+                  {money(
+                    Math.round(
+                      ((quote?.total ?? amountToCharge) -
+                        (quote?.coreKeepFeeSek ?? coreKeepFeeApplied)) *
+                        0.2,
+                    ),
+                  )}
                 </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-1">
                 <span>{t("cart.total")}</span>
-                <span>
-                  {amountToCharge.toLocaleString("sv-SE", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })}{" "}
-                  kr
-                </span>
+                <span>{money(quote?.total ?? amountToCharge)}</span>
               </div>
             </div>
           </div>

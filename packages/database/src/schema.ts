@@ -193,6 +193,13 @@ export const orders = pgTable("orders", {
   servicePointName: text("service_point_name"),
   servicePointId: text("service_point_id"),
   deliveryOption: text("delivery_option").default("servicepoint"), // home | servicepoint
+  /** ISO code actually charged. SEK is the base; NO deliveries are charged NOK
+   *  so Klarna and other local methods are offered (they require the charge
+   *  currency to match the buyer's country). */
+  currency: text("currency").default("SEK").notNull(),
+  /** SEK->currency rate used at checkout; NULL/1 for SEK. Stored so a sale can
+   *  be reconciled against the rate that priced it. */
+  fxRateFromSek: decimal("fx_rate_from_sek", { precision: 12, scale: 6 }),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0").notNull(),

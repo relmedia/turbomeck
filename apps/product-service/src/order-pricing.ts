@@ -1,4 +1,10 @@
 import { db, products, discountCodes } from "@repo/database";
+import {
+  convertFromSek,
+  currencyForCountry,
+  type SupportedCurrency,
+} from "@repo/currency";
+import { getSekRate } from "@repo/currency/rate";
 import { sql, inArray } from "drizzle-orm";
 import { getShippingPrice } from "./shipping-pricing.js";
 
@@ -97,12 +103,17 @@ export type ResolvedCheckout =
   | { ok: false; status: number; error: string }
   | {
       ok: true;
+      /** All money below is in `currency`, already converted and rounded. */
+      currency: SupportedCurrency;
+      /** SEK->currency multiplier used (1 for SEK). Stored on the order. */
+      fxRate: number;
       subtotal: number;
       discount: number;
       shipping: number;
       coreKeepFeeSek: number;
       commitsCoreReturnWithin14: boolean | null;
       total: number;
+      /** Amount to charge, in `currency`. Named for history; not SEK-specific. */
       stripeChargeSek: number;
       lines: Array<{
         productId: number;
@@ -237,18 +248,46 @@ export async function resolveCheckoutOrder(body: {
     discount = d;
   }
 
-  const total = Math.max(0, Math.round(subtotal + shipping - discount + coreKeepFeeSek));
+  // Everything above is SEK, because the catalogue, the shipping tiers and the
+  // coupons are all SEK. Convert once, here, so there is exactly one place
+  // where the charge currency is decided — and convert each component, not
+  // just the total, so the order reconciles from its own rounded parts.
+  const currency = currencyForCountry(country);
+  const fxRate = await getSekRate(currency);
+  const toCharge = (amountSek: number) => convertFromSek(amountSek, currency, fxRate);
+
+  const convertedLines = lineAcc.map((line) => ({
+    ...line,
+    unitPrice: toCharge(line.unitPrice),
+  }));
+  const convertedSubtotal = convertedLines.reduce(
+    (sum, line) => sum + line.unitPrice * line.quantity,
+    0,
+  );
+  const convertedShipping = toCharge(shipping);
+  const convertedDiscount = Math.min(
+    toCharge(discount),
+    convertedSubtotal + convertedShipping,
+  );
+  const convertedCoreFee = toCharge(coreKeepFeeSek);
+
+  const total = Math.max(
+    0,
+    convertedSubtotal + convertedShipping - convertedDiscount + convertedCoreFee,
+  );
   const stripeChargeSek = total;
 
   return {
     ok: true,
-    subtotal: Math.round(subtotal),
-    discount,
-    shipping,
-    coreKeepFeeSek,
+    currency,
+    fxRate,
+    subtotal: convertedSubtotal,
+    discount: convertedDiscount,
+    shipping: convertedShipping,
+    coreKeepFeeSek: convertedCoreFee,
     commitsCoreReturnWithin14,
     total,
     stripeChargeSek,
-    lines: lineAcc,
+    lines: convertedLines,
   };
 }

@@ -47,6 +47,13 @@ function orderEmailHeaderBrandInner(logoUrl: string): string {
                     </table>`;
 }
 
+/** "kr" for SEK, the ISO code otherwise. Mirrors @repo/currency's suffix rule;
+ *  duplicated rather than imported to keep this mail module dependency-free. */
+function currencySuffix(currency: string | undefined): string {
+  const c = (currency ?? "SEK").toUpperCase();
+  return c === "SEK" ? "kr" : c;
+}
+
 /** 25 % moms inkluderad i bruttopris: moms = brutto × 25/125 */
 function vatFromGrossIncl25(grossSek: number): number {
   return Math.round(Number(grossSek) * 0.2);
@@ -191,6 +198,8 @@ async function getMailConfig(): Promise<MailConfig | null> {
 
 type OrderEmailData = {
   orderNumber: string;
+  /** ISO code the order was charged in. Defaults to SEK when absent. */
+  currency?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -322,6 +331,10 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   const locale = data.locale || "sv";
   const t = translations[locale];
   const dateLocale = locale === "en" ? "en-GB" : "sv-SE";
+  // A Norwegian order is charged in NOK; printing "kr" on it would state the
+  // wrong amount. Suffix follows the order, not the shop's home currency.
+  const money = (amount: number) =>
+    `${Number(amount).toLocaleString(dateLocale)} ${currencySuffix(data.currency)}`;
   const logoUrl = getOrderEmailLogoUrl();
 
   const trackingUrl = data.trackingId
@@ -377,8 +390,8 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                 <p style="margin: 0; font-size: 13px; color: #6b7280;">${t.quantity}: ${item.quantity}</p>
               </td>
               <td style="vertical-align: top; text-align: right; white-space: nowrap;">
-                <p style="margin: 0; font-weight: 600; color: #111827;">${lineGross.toLocaleString(dateLocale)} kr</p>
-                <p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.35;">${t.lineVat}<br/>${lineVat.toLocaleString(dateLocale)} kr</p>
+                <p style="margin: 0; font-weight: 600; color: #111827;">${money(lineGross)}</p>
+                <p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.35;">${t.lineVat}<br/>${money(lineVat)}</p>
               </td>
             </tr>
           </table>
@@ -546,18 +559,18 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
               <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top: 2px solid #e5e7eb; padding-top: 16px;">
                 <tr>
                   <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">${t.subtotal}</td>
-                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${data.subtotal.toLocaleString(dateLocale)} kr</td>
+                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${money(data.subtotal)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">${t.shipping}</td>
-                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${data.shippingCost > 0 ? `${data.shippingCost.toLocaleString(dateLocale)} kr` : t.free}</td>
+                  <td style="padding: 8px 0; text-align: right; color: #111827; font-size: 14px;">${data.shippingCost > 0 ? `${money(data.shippingCost)}` : t.free}</td>
                 </tr>
                 ${
                   data.discount > 0
                     ? `
                 <tr>
                   <td style="padding: 8px 0; color: #16a34a; font-size: 14px;">${t.discount}</td>
-                  <td style="padding: 8px 0; text-align: right; color: #16a34a; font-size: 14px;">-${data.discount.toLocaleString(dateLocale)} kr</td>
+                  <td style="padding: 8px 0; text-align: right; color: #16a34a; font-size: 14px;">-${money(data.discount)}</td>
                 </tr>
                 `
                     : ""
@@ -567,11 +580,11 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; font-weight: 700; font-size: 18px; color: #111827;">${t.total}</td>
-                  <td style="padding: 4px 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${data.total.toLocaleString(dateLocale)} kr</td>
+                  <td style="padding: 4px 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${money(data.total)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 4px 0; color: #6b7280; font-size: 12px;">${t.vatIncluded} (${locale === "en" ? "order total" : "order totalt"})</td>
-                  <td style="padding: 4px 0; text-align: right; color: #6b7280; font-size: 12px;">${vatAmount.toLocaleString(dateLocale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr</td>
+                  <td style="padding: 4px 0; text-align: right; color: #6b7280; font-size: 12px;">${money(vatAmount)}</td>
                 </tr>
               </table>
             </td>
@@ -831,6 +844,8 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
 // ——— Admin notification: a customer just placed an order ———
 
 export type AdminNewOrderEmailData = {
+  /** ISO code the order was charged in. Defaults to SEK when absent. */
+  currency?: string;
   orderNumber: string;
   /** Internal order id (used to build the admin deep-link). */
   orderId: number | string;
@@ -858,6 +873,8 @@ export type AdminNewOrderEmailData = {
 };
 
 function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
+  const adminMoney = (amount: number) =>
+    `${Number(amount).toLocaleString("sv-SE")} ${currencySuffix(data.currency)}`;
   const adminBase = (
     process.env.NEXT_PUBLIC_ADMIN_URL ||
     process.env.ADMIN_URL ||
@@ -872,7 +889,7 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
       const variant = it.variant ? ` (${escapeHtml(it.variant)})` : "";
       return `<tr>
         <td style="padding:6px 0;color:#111827;font-size:14px;">${escapeHtml(it.productName)}${variant}</td>
-        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right;white-space:nowrap;">${it.quantity} × ${it.price.toLocaleString("sv-SE")} kr</td>
+        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right;white-space:nowrap;">${it.quantity} × ${adminMoney(it.price)}</td>
       </tr>`;
     })
     .join("");
@@ -958,17 +975,17 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="padding:6px 0;color:#6b7280;font-size:14px;">Delsumma</td>
-                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${data.subtotal.toLocaleString("sv-SE")} kr</td>
+                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${adminMoney(data.subtotal)}</td>
                 </tr>
                 <tr>
                   <td style="padding:6px 0;color:#6b7280;font-size:14px;">Frakt</td>
-                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${data.shippingCost > 0 ? `${data.shippingCost.toLocaleString("sv-SE")} kr` : "Gratis"}</td>
+                  <td style="padding:6px 0;color:#111827;font-size:14px;text-align:right;">${data.shippingCost > 0 ? `${adminMoney(data.shippingCost)}` : "Gratis"}</td>
                 </tr>
                 ${
                   data.discount > 0
                     ? `<tr>
                         <td style="padding:6px 0;color:#16a34a;font-size:14px;">Rabatt</td>
-                        <td style="padding:6px 0;color:#16a34a;font-size:14px;text-align:right;">-${data.discount.toLocaleString("sv-SE")} kr</td>
+                        <td style="padding:6px 0;color:#16a34a;font-size:14px;text-align:right;">-${adminMoney(data.discount)}</td>
                       </tr>`
                     : ""
                 }
@@ -977,7 +994,7 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
                 </tr>
                 <tr>
                   <td style="padding:8px 0;color:#111827;font-size:16px;font-weight:700;">Totalt</td>
-                  <td style="padding:8px 0;color:#111827;font-size:16px;font-weight:700;text-align:right;">${data.total.toLocaleString("sv-SE")} kr</td>
+                  <td style="padding:8px 0;color:#111827;font-size:16px;font-weight:700;text-align:right;">${adminMoney(data.total)}</td>
                 </tr>
               </table>
             </td>
@@ -1060,7 +1077,7 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     await transporter.sendMail({
       from: `"Turbomeck Admin" <${config.from}>`,
       to: recipients.join(", "),
-      subject: `Ny order #${orderRef} – ${customer} (${data.total.toLocaleString("sv-SE")} kr)`,
+      subject: `Ny order #${orderRef} – ${customer} (${Number(data.total).toLocaleString("sv-SE")} ${currencySuffix(data.currency)})`,
       html,
     });
     console.log(

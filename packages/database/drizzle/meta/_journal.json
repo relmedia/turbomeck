@@ -127,6 +127,13 @@
       "when": 1791235902000,
       "tag": "0017_checkout_intent",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791383881085,
+      "tag": "0018_order_currency",
+      "breakpoints": true
     }
   ]
 }

@@ -276,6 +276,9 @@ importers:
       '@repo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@repo/currency':
+        specifier: workspace:*
+        version: link:../../packages/currency
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -450,6 +453,9 @@ importers:
       '@imgly/background-removal-node':
         specifier: ^1.4.5
         version: 1.4.5
+      '@repo/currency':
+        specifier: workspace:*
+        version: link:../../packages/currency
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -530,6 +536,15 @@ importers:
       sharp:
         specifier: 0.32.6
         version: 0.32.6
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
+  packages/currency:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       typescript:
         specifier: ^5.9.2
         version: 5.9.2

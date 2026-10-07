@@ -169,6 +169,7 @@ function stripeKeyMode(): string {
 async function verifyCheckoutPaymentIntent(
   paymentIntentId: string,
   expectedChargeSek: number,
+  expectedCurrency: string = "sek",
 ): Promise<PaymentVerification> {
   if (!paymentIntentId.startsWith("pi_")) {
     return { ok: false, error: "Invalid payment intent", retryable: false };
@@ -200,10 +201,15 @@ async function verifyCheckoutPaymentIntent(
       return { ok: false, error: "Payment has not succeeded", retryable: true };
     }
 
-    if (String(pi.currency || "").toLowerCase() !== "sek") {
-      console.error("[payment-verify] unexpected currency", {
+    // The intent must be in the currency the order was priced in — otherwise a
+    // NOK charge could satisfy a SEK total (or vice versa) and the amount check
+    // below would be comparing unlike units.
+    const expected = expectedCurrency.toLowerCase();
+    if (String(pi.currency || "").toLowerCase() !== expected) {
+      console.error("[payment-verify] currency mismatch", {
         paymentIntentId,
-        currency: pi.currency,
+        charged: pi.currency,
+        expected,
       });
       return { ok: false, error: "Invalid currency", retryable: false };
     }
@@ -1326,6 +1332,10 @@ app.post("/api/checkout-quote", async (req, res) => {
     }
     res.json({
       amount: priced.stripeChargeSek,
+      // The caller must pass this to payment-service: the amount above is
+      // meaningless without it.
+      currency: priced.currency,
+      fxRate: priced.fxRate,
       subtotal: priced.subtotal,
       discount: priced.discount,
       shipping: priced.shipping,
@@ -1425,6 +1435,8 @@ async function persistOrder({
       servicePointName: body.servicePointName ?? null,
       servicePointId: body.servicePointId ?? null,
       deliveryOption: body.deliveryOption ?? "servicepoint",
+      currency: priced.currency,
+      fxRateFromSek: String(priced.fxRate),
       subtotal: String(priced.subtotal),
       shippingCost: String(priced.shipping),
       discount: String(priced.discount),
@@ -1466,6 +1478,7 @@ async function persistOrder({
 
   sendOrderConfirmationEmail({
     orderNumber: order.orderNumber,
+    currency: priced.currency,
     firstName: body.firstName,
     lastName: body.lastName,
     email: body.email,
@@ -1488,6 +1501,7 @@ async function persistOrder({
   sendAdminNewOrderEmail({
     orderNumber: order.orderNumber,
     orderId: order.id,
+    currency: priced.currency,
     firstName: body.firstName,
     lastName: body.lastName,
     email: body.email,
@@ -1639,6 +1653,7 @@ app.post("/api/checkout-intents/:paymentIntentId/finalize", async (req, res) => 
     const verified = await verifyCheckoutPaymentIntent(
       paymentIntentId,
       intent.quotedChargeSek,
+      (intent.payload as { currency?: string }).currency ?? "sek",
     );
     if (!verified.ok) {
       // 503 keeps the Stripe webhook retrying for transient failures (and for a
@@ -1755,7 +1770,11 @@ app.post("/api/orders", async (req, res) => {
     const stripePaymentId = body.stripePaymentId?.trim() ?? "";
     let payVerify: PaymentVerification = { ok: true, paymentMethodLabel: null };
     if (priced.stripeChargeSek > 0) {
-      payVerify = await verifyCheckoutPaymentIntent(stripePaymentId, priced.stripeChargeSek);
+      payVerify = await verifyCheckoutPaymentIntent(
+        stripePaymentId,
+        priced.stripeChargeSek,
+        priced.currency,
+      );
     } else if (stripePaymentId) {
       payVerify = {
         ok: false,

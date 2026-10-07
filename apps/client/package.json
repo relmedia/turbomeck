@@ -27,6 +27,7 @@
     "@radix-ui/react-slot": "^1.2.0",
     "@radix-ui/react-switch": "^1.1.4",
     "@repo/auth": "workspace:*",
+    "@repo/currency": "workspace:*",
     "@repo/database": "workspace:*",
     "@repo/sanitize-html": "workspace:*",
     "@repo/ui": "workspace:*",

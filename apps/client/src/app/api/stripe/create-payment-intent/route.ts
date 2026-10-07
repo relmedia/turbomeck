@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     let amountSek: number;
+    /** Currency the quote priced in; must travel with the amount. */
+    let currency = "sek";
     /** Set for full-checkout requests: what to snapshot once we have a pi_ id. */
     let checkoutSnapshot: Record<string, unknown> | null = null;
 
@@ -78,7 +80,12 @@ export async function POST(request: NextRequest) {
           commitsCoreReturnWithin14: body.commitsCoreReturnWithin14,
         }),
       });
-      const quoteData = (await quoteRes.json().catch(() => ({}))) as { error?: string; amount?: number };
+      const quoteData = (await quoteRes.json().catch(() => ({}))) as {
+        error?: string;
+        amount?: number;
+        currency?: string;
+        fxRate?: number;
+      };
       if (!quoteRes.ok) {
         return NextResponse.json(
           { error: quoteData.error ?? "Could not quote checkout" },
@@ -89,6 +96,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid quote from checkout service" }, { status: 502 });
       }
       amountSek = quoteData.amount;
+      // Derived server-side from the shipping country (NO -> NOK), never from
+      // the client: the currency decides which payment methods Stripe offers.
+      currency = (quoteData.currency ?? "sek").toLowerCase();
       // The order payload the browser would POST after the Stripe redirect.
       // Stored server-side so the webhook can create the order if the browser
       // never gets the chance (3-D Secure, closed tab, cross-origin redirect).
@@ -97,6 +107,7 @@ export async function POST(request: NextRequest) {
         const session = await auth();
         checkoutSnapshot = {
           ...(orderPayload as Record<string, unknown>),
+          currency,
           // Trust the session, never a client-sent userId — same rule as the
           // /api/product proxy applies on the browser's own order POST.
           ...(session?.user?.id ? { userId: session.user.id } : { userId: undefined }),
@@ -153,6 +164,7 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: amountSek,
+        currency,
         // Second copy of the checkout, on the payment itself. The database row
         // written below is authoritative; this makes the payment
         // self-describing in the Stripe dashboard and recoverable even if that

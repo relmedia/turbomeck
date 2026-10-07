@@ -172,8 +172,18 @@ app.post('/create-payment-intent', async (c) => {
 
   try {
     const body = await c.req
-      .json<{ amount?: number; metadata?: Record<string, unknown> }>()
-      .catch((): { amount?: number; metadata?: Record<string, unknown> } => ({}))
+      .json<{
+        amount?: number
+        currency?: string
+        metadata?: Record<string, unknown>
+      }>()
+      .catch(
+        (): {
+          amount?: number
+          currency?: string
+          metadata?: Record<string, unknown>
+        } => ({}),
+      )
     const amountSek = parseFloat(String(body.amount ?? 0)) || 0
 
     if (amountSek <= 0) {
@@ -192,9 +202,19 @@ app.post('/create-payment-intent', async (c) => {
 
     const metadata = sanitizeStripeMetadata(body.metadata)
 
+    // Allowlisted, never free-form: the currency decides which local payment
+    // methods Stripe offers (Klarna requires it to match the buyer's country),
+    // and an unexpected value would create an uncharg eable intent. The caller
+    // is product-service's quote, which derives it from the shipping country.
+    const requested = (body.currency ?? 'sek').toLowerCase()
+    const currency = requested === 'nok' ? 'nok' : 'sek'
+    if (requested !== currency) {
+      console.warn(`[stripe] unsupported currency "${requested}"; charging SEK`)
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountOre,
-      currency: 'sek',
+      currency,
       automatic_payment_methods: { enabled: true },
       ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     })
