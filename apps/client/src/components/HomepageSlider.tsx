@@ -7,6 +7,7 @@ import gsap from "gsap";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchSliderProducts } from "@/lib/api";
 import { useLanguage } from "@/i18n/context";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { ProductType } from "@/types";
 import { ImageWithFallback } from "./ImageWithFallback";
 
@@ -53,6 +54,7 @@ type HomepageSliderProps = {
 
 export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const { locale, t } = useLanguage();
+  const { price: displayPrice } = useCurrency();
   const reducedMotion = useReducedMotion();
   const [products, setProducts] = useState<ProductType[]>(initialProducts);
   const [loading, setLoading] = useState(initialProducts.length === 0);
@@ -595,7 +597,10 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             const imgSrc = product.galleryImages?.[0] || product.images?.default || "/logo.svg";
             const slug = product.slug || productSlug(product.name) || String(product.id);
             const href = `/products/${slug}`;
-            const priceStr = formatPriceKr(product.price, locale);
+            const priceStr =
+              typeof product.price === "number"
+                ? displayPrice(product.price)
+                : formatPriceKr(product.price, locale);
             const shortDesc = product.shortDescription?.trim() || product.description?.slice(0, 120);
 
             return (

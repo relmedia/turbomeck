@@ -26,12 +26,14 @@ import {
 import { ImageWithFallback } from "./ImageWithFallback";
 import { toast } from "react-toastify";
 import { useTranslation } from "@/i18n/context";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 
 const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   product,
   priority = false,
 }) => {
   const t = useTranslation();
+  const { price: displayPrice } = useCurrency();
   const router = useRouter();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -304,11 +306,9 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
             {/* Price */}
             <div className="flex items-baseline gap-2">
+              {/* Catalogue prices are SEK; shown in the visitor's currency. */}
               <span className="text-lg font-semibold">
-                {product.price.toLocaleString("sv-SE", {
-                  maximumFractionDigits: 0,
-                })}{" "}
-                {t("common.kr")}
+                {displayPrice(product.price)}
               </span>
             </div>
 

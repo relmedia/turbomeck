@@ -1,7 +1,13 @@
-// Explicit .js extension: product-service compiles with moduleResolution
-// nodenext, which rejects extensionless relative imports. This is the same
-// error @repo/database still throws; no reason to inherit it here.
-import { BASE_CURRENCY, type SupportedCurrency } from "./index.js";
+// Type-only import, deliberately: two toolchains consume this file and they
+// disagree about relative specifiers. product-service compiles with
+// moduleResolution "nodenext", which demands the ".js" extension; Next's
+// webpack cannot resolve ".js" to a ".ts" file and fails the build. A
+// type-only import is erased before webpack ever sees it, so both are happy —
+// and the one runtime value needed is declared locally below.
+import type { SupportedCurrency } from "./index.js";
+
+/** Kept local rather than imported: see the note above. Must match ./index.ts. */
+const BASE_CURRENCY = "SEK";
 
 /**
  * SEK -> target-currency rate, fetched server-side and cached in memory.

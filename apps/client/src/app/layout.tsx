@@ -4,6 +4,8 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { WishlistProvider } from "@/components/providers/WishlistProvider";
 import { LanguageProvider } from "@/i18n/context";
+import { CurrencyProvider } from "@/components/providers/CurrencyProvider";
+import { resolveDisplayCurrency } from "@/lib/display-currency";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -30,16 +32,25 @@ export const metadata: Metadata = {
     "Turbomeck är en svensk webshop som specialiserar sig på högpresterande turbodelar och avgassystem för bilar — allt från kompressorhjul och turbinaxlar till downpipes, intercoolers, dumpventiler och mätare.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolved on the server so the first paint already shows local prices —
+  // no flash of SEK, and the visitor's IP never leaves our backend.
+  const display = await resolveDisplayCurrency();
+
   return (
     <html lang="sv" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
           <LanguageProvider>
+          <CurrencyProvider
+            currency={display.currency}
+            rate={display.rate}
+            source={display.source}
+          >
           <WishlistProvider>
           <CookieConsentProvider
             config={{
@@ -65,6 +76,7 @@ export default function RootLayout({
             <ToastContainer position="top-right" />
           </CookieConsentProvider>
           </WishlistProvider>
+          </CurrencyProvider>
           </LanguageProvider>
         </SessionProvider>
       </body>

@@ -17,6 +17,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { categorySlug, cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n/context";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
 
 type Category = {
@@ -104,6 +105,7 @@ export function ProductDetailContent({
   onReadMore,
 }: Props) {
   const t = useTranslation();
+  const { price: displayPrice } = useCurrency();
   const { isSweden } = useGeoCountry();
 
   const breadcrumbItems = [
@@ -152,10 +154,8 @@ export function ProductDetailContent({
       {isSweden && (
         <p className="text-sm text-muted-foreground">{t("product.coreExchangeCheckoutHint")}</p>
       )}
-      <h2 className="text-2xl font-semibold">
-        {product.price.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}{" "}
-        {t("common.kr")}
-      </h2>
+      {/* Catalogue price is SEK; rendered in the visitor's display currency. */}
+      <h2 className="text-2xl font-semibold">{displayPrice(product.price)}</h2>
       <ProductInteraction
         product={product}
         selectedSize={selectedSize}

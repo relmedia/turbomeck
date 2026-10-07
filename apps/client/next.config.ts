@@ -139,7 +139,11 @@ const nextConfig: NextConfig = {
   // ESM .js with a conditional `exports` map (`browser` / `default`). Adding
   // it back forces webpack to resolve via `main` and bundles `jsdom` into
   // the client bundle, which breaks the build against modern undici.
-  transpilePackages: ["@repo/ui"],
+  // Workspace packages that ship raw TypeScript must be listed here, or a
+  // client component importing one fails the production build with
+  // "Module not found". @repo/auth and @repo/database are absent on
+  // purpose: they are only ever imported from server code.
+  transpilePackages: ["@repo/ui", "@repo/currency"],
   async headers() {
     return [
       {
