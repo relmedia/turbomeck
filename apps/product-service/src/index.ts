@@ -480,6 +480,14 @@ app.get("/api/health/stripe", async (req, res) => {
           amount: intent.amount,
           currency: intent.currency,
           visible: true,
+          // Which methods Stripe actually considered eligible for this
+          // checkout. The storefront never lists methods itself
+          // (automatic_payment_methods), so if a method you enabled in the
+          // Dashboard is missing here, the cause is account capability,
+          // test/live mode, the amount, or the customer's country — not the
+          // frontend. This is the fastest way to tell those apart.
+          eligiblePaymentMethods: intent.payment_method_types,
+          automaticPaymentMethods: intent.automatic_payment_methods ?? null,
         };
       } catch (err) {
         const e = err as { code?: string; message?: string; statusCode?: number };
@@ -491,7 +499,9 @@ app.get("/api/health/stripe", async (req, res) => {
           message: e.message,
           hint:
             e.code === "resource_missing"
-              ? "This intent belongs to a different Stripe account or mode than this service's key."
+              ? "Either the id is wrong, or this intent belongs to a different " +
+                "Stripe account/mode than this service's key. Compare accountId " +
+                "above with payment-service (:8002/health/stripe)."
               : undefined,
         };
       }
