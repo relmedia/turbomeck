@@ -47,7 +47,7 @@ function orderEmailHeaderBrandInner(logoUrl: string): string {
                     </table>`;
 }
 
-/** "kr" for SEK, "EUR" for the euro, the ISO code otherwise. Mirrors
+/** "kr" for SEK, the euro sign for EUR, the ISO code otherwise. Mirrors
  *  @repo/currency's suffix rule; duplicated rather than imported to keep this
  *  mail module dependency-free. DKK deliberately stays "DKK" — it shares "kr"
  *  with SEK, and an invoice must leave no doubt which krona was charged. */
@@ -56,6 +56,39 @@ function currencySuffix(currency: string | undefined): string {
   if (c === "SEK") return "kr";
   if (c === "EUR") return "€";
   return c;
+}
+
+/**
+ * Grouping and decimal marks per charge currency, matching
+ * @repo/currency's CURRENCY_STYLE so a receipt reads the same as the site did.
+ *
+ * Only the four charge currencies can appear on an order, so this needs no
+ * display-only entries. The reader's language is deliberately not an input: an
+ * amount is written the way its currency is written.
+ */
+function currencyNumberFormat(currency: string | undefined): {
+  locale: string;
+  decimals: 0 | 2;
+} {
+  switch ((currency ?? "SEK").toUpperCase()) {
+    case "NOK":
+      return { locale: "nb-NO", decimals: 0 };
+    case "DKK":
+      return { locale: "da-DK", decimals: 0 };
+    case "EUR":
+      return { locale: "fr-FR", decimals: 2 };
+    default:
+      return { locale: "sv-SE", decimals: 0 };
+  }
+}
+
+function formatMoney(amount: unknown, currency: string | undefined): string {
+  const { locale, decimals } = currencyNumberFormat(currency);
+  const n = Number(amount).toLocaleString(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${n} ${currencySuffix(currency)}`;
 }
 
 /** 25 % moms inkluderad i bruttopris: moms = brutto × 25/125 */
@@ -338,7 +371,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   // A Norwegian order is charged in NOK; printing "kr" on it would state the
   // wrong amount. Suffix follows the order, not the shop's home currency.
   const money = (amount: number) =>
-    `${Number(amount).toLocaleString(dateLocale)} ${currencySuffix(data.currency)}`;
+    formatMoney(amount, data.currency);
   const logoUrl = getOrderEmailLogoUrl();
 
   const trackingUrl = data.trackingId
@@ -878,7 +911,7 @@ export type AdminNewOrderEmailData = {
 
 function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
   const adminMoney = (amount: number) =>
-    `${Number(amount).toLocaleString("sv-SE")} ${currencySuffix(data.currency)}`;
+    formatMoney(amount, data.currency);
   const adminBase = (
     process.env.NEXT_PUBLIC_ADMIN_URL ||
     process.env.ADMIN_URL ||
@@ -1081,7 +1114,7 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     await transporter.sendMail({
       from: `"Turbomeck Admin" <${config.from}>`,
       to: recipients.join(", "),
-      subject: `Ny order #${orderRef} – ${customer} (${Number(data.total).toLocaleString("sv-SE")} ${currencySuffix(data.currency)})`,
+      subject: `Ny order #${orderRef} – ${customer} (${formatMoney(data.total, data.currency)})`,
       html,
     });
     console.log(

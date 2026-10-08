@@ -1,9 +1,10 @@
 import { cookies, headers } from "next/headers";
 import { clientIpFromHeaders } from "@repo/auth/client-ip";
 import {
-  currencyForCountry,
-  normalizeCurrency,
-  type SupportedCurrency,
+  displayCurrencyForCountry,
+  displayCurrencyForLanguage,
+  normalizeDisplayCurrency,
+  type DisplayCurrencyCode,
 } from "@repo/currency";
 import { getSekRate } from "@repo/currency/rate";
 
@@ -15,11 +16,12 @@ import { getSekRate } from "@repo/currency/rate";
  * (the charge is derived from it), and a browser-side lookup would disclose
  * every visitor's IP to a third party from their own device.
  *
- * DISPLAY ONLY. What a customer is actually charged is decided at checkout from
- * the shipping country they select (`@repo/currency` `currencyForCountry`), not
- * from this. A visitor detected in Norway who ships to Sweden browses in NOK
- * and is charged in SEK — correct, because Klarna and the tax treatment follow
- * the destination, not the browser.
+ * DISPLAY ONLY, and the display list is far wider than the list of currencies
+ * the shop can bill in. A visitor in London browses in GBP and is charged in
+ * SEK, because sterling is not a charge currency; the cart states that before
+ * they pay. What a customer is charged is decided at checkout from the shipping
+ * country they select (`currencyForCountry`), never from this — Klarna and the
+ * tax treatment follow the destination, not the browser.
  *
  * Signal order, strongest first:
  *   1. `tm-currency` cookie — a manual override. There is no switcher in the
@@ -32,10 +34,11 @@ import { getSekRate } from "@repo/currency/rate";
  *      change.
  *   3. IP geolocation via `ipwho.is` — one call per IP, cached in memory for
  *      12h. Disabled by setting GEOIP_LOOKUP=off.
- *   4. `Accept-Language`, for languages that map to exactly one currency
- *      (da → DKK, nb/nn → NOK, fi/de/nl/… → EUR). Catches most visitors even
- *      when the lookup is unavailable; English is excluded on purpose.
- *   5. SEK.
+ *   4. `Accept-Language`, for tags that imply one currency (`en-GB` → GBP,
+ *      `da` → DKK, `de` → EUR). Catches most visitors even when the lookup is
+ *      unavailable. Region-less `en` is excluded on purpose: it says nothing
+ *      about where the shopper is.
+ *   5. SEK — the catalogue currency, so no conversion and no rate risk.
  *
  * Privacy note: step 3 sends the visitor's IP to ipwho.is. That belongs in the
  * privacy policy. Steps 2 and 4 send nothing, which is why they are tried
@@ -51,7 +54,7 @@ const LOOKUP_TIMEOUT_MS = 1500;
 const lookupCache = new Map<string, { country: string | null; at: number }>();
 
 export type DisplayCurrency = {
-  currency: SupportedCurrency;
+  currency: DisplayCurrencyCode;
   /** SEK -> currency multiplier; 1 for SEK. */
   rate: number;
   /** Where the decision came from, for debugging and for the UI's wording. */
@@ -59,20 +62,12 @@ export type DisplayCurrency = {
 };
 
 /**
- * Reuses the charge-side mapping so display and charge can never disagree about
- * what a country's currency is — but returns null for countries we don't price
- * locally, where `currencyForCountry` would answer SEK. The difference matters:
- * "unknown, keep looking" is not the same as "this country uses SEK".
+ * One shared country table, in `@repo/currency`, so a country can never mean
+ * one currency here and another at checkout. It returns null for a country we
+ * have no opinion about, which is the distinction that matters: "unknown, keep
+ * looking" is not the same answer as "this country uses SEK".
  */
-function currencyForDetectedCountry(
-  code: string | null | undefined,
-): SupportedCurrency | null {
-  const cc = (code ?? "").trim().toUpperCase();
-  if (!cc) return null;
-  const mapped = currencyForCountry(cc);
-  if (mapped !== "SEK") return mapped;
-  return cc === "SE" ? "SEK" : null;
-}
+const currencyForDetectedCountry = displayCurrencyForCountry;
 
 /**
  * One IP lookup per address per 12h. Never throws and never blocks a page for
@@ -108,51 +103,12 @@ async function geoipCountry(ip: string): Promise<string | null> {
   }
 }
 
-/**
- * Last resort before SEK, and only for languages that map to one currency.
- *
- * English is deliberately absent: an `en-GB` browser says nothing about where
- * the shopper is or what they want to pay in, and guessing EUR for every
- * English speaker would be worse than defaulting to SEK.
- */
-const LANGUAGE_CURRENCY: Array<[string, SupportedCurrency]> = [
-  ["sv", "SEK"],
-  ["nb", "NOK"],
-  ["nn", "NOK"],
-  ["no", "NOK"],
-  ["da", "DKK"],
-  ["fi", "EUR"],
-  ["de", "EUR"],
-  ["nl", "EUR"],
-  ["fr", "EUR"],
-  ["es", "EUR"],
-  ["it", "EUR"],
-  ["pt", "EUR"],
-  ["el", "EUR"],
-  ["et", "EUR"],
-  ["lv", "EUR"],
-  ["lt", "EUR"],
-  ["sk", "EUR"],
-  ["sl", "EUR"],
-  ["hr", "EUR"],
-  ["ga", "EUR"],
-];
-
-function currencyFromAcceptLanguage(value: string | null): SupportedCurrency | null {
-  if (!value) return null;
-  const first = value.split(",")[0]?.trim().toLowerCase() ?? "";
-  for (const [prefix, currency] of LANGUAGE_CURRENCY) {
-    if (first.startsWith(prefix)) return currency;
-  }
-  return null;
-}
-
 export async function resolveDisplayCurrency(): Promise<DisplayCurrency> {
   const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
 
   const chosen = cookieStore.get(CURRENCY_COOKIE)?.value;
   if (chosen) {
-    const currency = normalizeCurrency(chosen);
+    const currency = normalizeDisplayCurrency(chosen);
     return { currency, rate: await getSekRate(currency), source: "cookie" };
   }
 
@@ -177,7 +133,7 @@ export async function resolveDisplayCurrency(): Promise<DisplayCurrency> {
     };
   }
 
-  const fromLanguage = currencyFromAcceptLanguage(headerList.get("accept-language"));
+  const fromLanguage = displayCurrencyForLanguage(headerList.get("accept-language"));
   if (fromLanguage) {
     return {
       currency: fromLanguage,

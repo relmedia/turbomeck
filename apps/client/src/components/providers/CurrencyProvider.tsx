@@ -4,9 +4,8 @@ import { createContext, useCallback, useContext, useMemo } from "react";
 import {
   convertFromSek,
   formatAmount,
-  type SupportedCurrency,
+  type DisplayCurrencyCode,
 } from "@repo/currency";
-import { useLanguage } from "@/i18n/context";
 
 /**
  * Display currency for the whole storefront.
@@ -17,6 +16,11 @@ import { useLanguage } from "@/i18n/context";
  *
  * The currency is detected server-side and is not user-switchable by design.
  *
+ * This is the DISPLAY currency, which may well not be a currency the shop can
+ * bill in — a visitor in London browses in GBP and pays in SEK. The cart gets
+ * its figures from the server quote instead, in the real charge currency, and
+ * states the difference before the customer pays.
+ *
  * Catalogue prices are stored in SEK, so everything here takes a SEK amount and
  * renders it in the display currency. Historical amounts (a past order, an
  * invoice) must NOT go through this: they were charged in a specific currency
@@ -25,7 +29,7 @@ import { useLanguage } from "@/i18n/context";
  */
 
 type CurrencyContextValue = {
-  currency: SupportedCurrency;
+  currency: DisplayCurrencyCode;
   /** SEK -> currency multiplier. 1 when displaying SEK. */
   rate: number;
   /** How the currency was decided. Diagnostics only — nothing renders it. */
@@ -44,21 +48,21 @@ export function CurrencyProvider({
   source,
   children,
 }: {
-  currency: SupportedCurrency;
+  currency: DisplayCurrencyCode;
   rate: number;
   source: CurrencyContextValue["source"];
   children: React.ReactNode;
 }) {
-  const { locale } = useLanguage();
-
   const convert = useCallback(
     (amountSek: number) => convertFromSek(amountSek, currency, rate),
     [currency, rate],
   );
 
+  // No language input: a price is written the way its currency is written,
+  // so the same amount renders identically in the Swedish and English views.
   const price = useCallback(
-    (amountSek: number) => formatAmount(convert(amountSek), currency, locale),
-    [convert, currency, locale],
+    (amountSek: number) => formatAmount(convert(amountSek), currency),
+    [convert, currency],
   );
 
   const value = useMemo<CurrencyContextValue>(

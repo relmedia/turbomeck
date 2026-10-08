@@ -421,6 +421,7 @@
     "coreReturnInvoiceNote": "If you choose to send the core but do not return it within 14 days, you may be invoiced {{amount}} SEK afterwards according to our terms.",
     "coreKeepFeeLine": "Core charge (retained core)",
     "vat": "VAT (25%)",
+    "chargeCurrencyNotice": "Prices on the site are shown in {display} as an approximate conversion. Your payment is taken in {charge} — the amount above is what will be charged. Your bank may add a currency fee.",
     "yourDetails": "Your details",
     "paymentMethod": "Payment method",
     "completePrevious": "Complete the previous step first.",

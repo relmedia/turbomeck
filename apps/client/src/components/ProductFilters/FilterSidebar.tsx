@@ -10,7 +10,7 @@ import { useTranslation } from "@/i18n/context";
 import { categorySlug, cn } from "@/lib/utils";
 import { useProductFilters } from "./useProductFilters";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
-import { currencySuffix } from "@repo/currency";
+import { formatAmount } from "@repo/currency";
 import { CategoryFilter } from "./CategoryFilter";
 import { PriceRangeFilter } from "./PriceRangeFilter";
 import { StockFilter, ExchangeTurboFilter } from "./ToggleFilters";
@@ -53,13 +53,12 @@ export function FilterSidebar({
   })();
 
   const priceSummary = (() => {
-    const suffix = currencySuffix(currency);
-    const fmt = (sek: number) => convert(sek).toLocaleString("sv-SE");
+    const fmt = (sek: number) => formatAmount(convert(sek), currency);
     if (state.minPrice != null && state.maxPrice != null) {
-      return `${fmt(state.minPrice)}–${fmt(state.maxPrice)} ${suffix}`;
+      return `${fmt(state.minPrice)}–${fmt(state.maxPrice)}`;
     }
-    if (state.minPrice != null) return `> ${fmt(state.minPrice)} ${suffix}`;
-    if (state.maxPrice != null) return `< ${fmt(state.maxPrice)} ${suffix}`;
+    if (state.minPrice != null) return `> ${fmt(state.minPrice)}`;
+    if (state.maxPrice != null) return `< ${fmt(state.maxPrice)}`;
     return null;
   })();
 

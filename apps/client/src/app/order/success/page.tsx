@@ -333,13 +333,7 @@ function OrderSuccessContent() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("orderSuccess.amountPaid")}</span>
               <span className="font-medium">
-                {isValidTotal
-                  ? formatAmount(
-                      Number(totalDisplay),
-                      orderCurrency,
-                      locale as "sv" | "en",
-                    )
-                  : "—"}
+                {isValidTotal ? formatAmount(Number(totalDisplay), orderCurrency) : "—"}
               </span>
             </div>
             <div className="flex justify-between">

@@ -421,6 +421,7 @@
     "coreReturnInvoiceNote": "Väljer du att skicka in kärnan men inte gör det inom 14 dagar kan du debiteras {{amount}} kr i efterhand (faktura) enligt köpvillkoren.",
     "coreKeepFeeLine": "Kärnavgift (bevarad kärna)",
     "vat": "Moms (25%)",
+    "chargeCurrencyNotice": "Priserna på sajten visas i {display} som en ungefärlig omräkning. Din betalning genomförs i {charge} — det är beloppet ovan, och det är det belopp som dras. Din bank kan ta ut en valutaavgift.",
     "yourDetails": "Dina uppgifter",
     "paymentMethod": "Betalningssätt",
     "completePrevious": "Slutför föregående steg först.",

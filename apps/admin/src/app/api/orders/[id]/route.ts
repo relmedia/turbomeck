@@ -1,6 +1,7 @@
 import { db } from "@repo/database";
 import { orders, orderItems } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
+import { normalizeCurrency } from "@repo/currency";
 import { NextResponse } from "next/server";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
 import { requireAdmin } from "@/lib/require-admin";
@@ -215,6 +216,11 @@ export async function GET(
       shipping: Number(order.shippingCost),
       discount: Number(order.discount),
       total: Number(order.total),
+      // The currency the order was charged in. Staff reconcile these figures
+      // against Stripe, so an EUR order must not be shown as kronor.
+      currency: normalizeCurrency(
+        (order as { currency?: string | null }).currency,
+      ),
       depositAmount:
         order.depositAmount != null ? Number(order.depositAmount) : undefined,
       balanceDue: order.balanceDue != null ? Number(order.balanceDue) : undefined,

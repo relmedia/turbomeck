@@ -118,11 +118,7 @@ export default function PayBalancePage() {
           <div className="rounded-lg border bg-muted/50 p-4">
             <p className="text-sm text-muted-foreground">Att betala</p>
             <p className="text-2xl font-semibold">
-              {formatAmount(
-                balance.balanceDue,
-                normalizeCurrency(balance.currency),
-                locale as "sv" | "en",
-              )}
+              {formatAmount(balance.balanceDue, normalizeCurrency(balance.currency))}
             </p>
           </div>
           <PaymentForm

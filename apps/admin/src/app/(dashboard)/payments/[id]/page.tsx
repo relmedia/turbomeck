@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { formatAmount, normalizeCurrency } from "@repo/currency";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
 import {
@@ -64,6 +65,8 @@ type OrderDetail = {
   shipping: number;
   discount?: number;
   total: number;
+  /** Currency the order was charged in; absent on pre-multi-currency orders. */
+  currency?: string;
   depositAmount?: number;
   balanceDue?: number;
   commitsCoreReturnWithin14?: boolean | null;
@@ -432,8 +435,16 @@ export default function OrderDetailPage() {
     }
   };
 
+  /**
+   * Shows the order in the currency it was actually charged in — not SEK,
+   * which this used to hardcode. An EUR order displayed as "1 234,00 kr" makes
+   * Stripe reconciliation impossible and the figure is simply wrong.
+   *
+   * Orders predating multi-currency carry no value and normalise to SEK.
+   */
+  const orderCurrency = normalizeCurrency(order?.currency);
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", minimumFractionDigits: 2 }).format(amount);
+    formatAmount(amount, orderCurrency);
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
 

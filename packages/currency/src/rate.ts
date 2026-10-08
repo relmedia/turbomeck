@@ -4,7 +4,7 @@
 // webpack cannot resolve ".js" to a ".ts" file and fails the build. A
 // type-only import is erased before webpack ever sees it, so both are happy —
 // and the one runtime value needed is declared locally below.
-import type { SupportedCurrency } from "./index.js";
+import type { DisplayCurrencyCode } from "./index.js";
 
 /** Kept local rather than imported: see the note above. Must match ./index.ts. */
 const BASE_CURRENCY = "SEK";
@@ -22,6 +22,11 @@ const BASE_CURRENCY = "SEK";
  * IP-geolocation service, this call carries no personal data, so it needs no
  * consent handling.
  *
+ * Together with the country lookup in the storefront this is the two-service
+ * split worth keeping: one service answers "where is this visitor", a separate
+ * one answers "what is the rate today". Only the first ever sees personal data,
+ * and only the second is allowed to influence an amount.
+ *
  * Failure policy: never block a checkout on an FX lookup. A failed fetch falls
  * back to the last good value, then to `FX_RATE_SEK_<CUR>` from the
  * environment, then to a conservative built-in default. A stale rate charges
@@ -35,31 +40,42 @@ const FETCH_TIMEOUT_MS = 4000;
  * Built-in last resort, kept close to the real rate rather than padded.
  *
  * A padded rate would over-charge the customer, which is worse than the shop
- * absorbing a fraction of a percent. Checked 2026-10-07: NOK 0.954, DKK 0.666,
- * EUR 0.089. Set `FX_RATE_SEK_<CUR>` to pin an exact value without editing
+ * absorbing a fraction of a percent. Checked against the ECB rates on
+ * 2026-10-07. Set `FX_RATE_SEK_<CUR>` to pin an exact value without editing
  * this.
+ *
+ * Only the first three can ever reach a charge; the rest exist so a display
+ * price still renders if the FX lookup is down on a cold process.
  */
 const FALLBACK_RATES: Record<string, number> = {
-  NOK: 0.96,
-  DKK: 0.67,
-  EUR: 0.09,
+  NOK: 0.954,
+  DKK: 0.666,
+  EUR: 0.089,
+  GBP: 0.075,
+  USD: 0.0996,
+  CHF: 0.083,
+  PLN: 0.39,
+  CZK: 2.176,
+  HUF: 32.68,
+  RON: 0.477,
+  ISK: 12.21,
 };
 
 type CacheEntry = { rate: number; fetchedAt: number };
 const cache = new Map<string, CacheEntry>();
 
-function envRate(currency: SupportedCurrency): number | null {
+function envRate(currency: DisplayCurrencyCode): number | null {
   const raw = process.env[`FX_RATE_SEK_${currency}`]?.trim();
   if (!raw) return null;
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function fallbackRate(currency: SupportedCurrency): number {
+function fallbackRate(currency: DisplayCurrencyCode): number {
   return envRate(currency) ?? FALLBACK_RATES[currency] ?? 1;
 }
 
-async function fetchRate(currency: SupportedCurrency): Promise<number | null> {
+async function fetchRate(currency: DisplayCurrencyCode): Promise<number | null> {
   try {
     // Canonical host: api.frankfurter.app 301s here, costing a round trip.
     const res = await fetch(
@@ -88,7 +104,7 @@ async function fetchRate(currency: SupportedCurrency): Promise<number | null> {
  *
  * @returns the multiplier to apply to a SEK amount (1 for SEK itself)
  */
-export async function getSekRate(currency: SupportedCurrency): Promise<number> {
+export async function getSekRate(currency: DisplayCurrencyCode): Promise<number> {
   if (currency === BASE_CURRENCY) return 1;
 
   const cached = cache.get(currency);

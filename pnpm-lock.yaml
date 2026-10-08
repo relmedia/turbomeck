@@ -101,6 +101,9 @@ importers:
       '@repo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@repo/currency':
+        specifier: workspace:*
+        version: link:../../packages/currency
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database

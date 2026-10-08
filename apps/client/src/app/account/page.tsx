@@ -371,9 +371,9 @@ export default function AccountPage() {
   const totalSpentText =
     Object.entries(spentByCurrency)
       .map(([c, amount]) =>
-        formatAmount(Math.round(amount ?? 0), c as SupportedCurrency, locale as "sv" | "en"),
+        formatAmount(Math.round(amount ?? 0), c as SupportedCurrency),
       )
-      .join(" + ") || formatAmount(0, "SEK", locale as "sv" | "en");
+      .join(" + ") || formatAmount(0, "SEK");
   const deliveredCount = orders.filter(
     (o) => o.status === "delivered" || o.status === "shipped"
   ).length;
@@ -684,7 +684,6 @@ export default function AccountPage() {
                                 normalizeCurrency(
                                   (order as { currency?: string }).currency,
                                 ),
-                                locale as "sv" | "en",
                               )}
                               <span className="text-border mx-1.5">·</span>
                               <span

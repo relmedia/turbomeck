@@ -116,8 +116,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
    * today's rate would misstate what the customer actually paid.
    */
   const orderCurrency = normalizeCurrency(order?.currency);
-  const money = (amount: number) =>
-    formatAmount(amount, orderCurrency, locale as "sv" | "en");
+  const money = (amount: number) => formatAmount(amount, orderCurrency);
   const displayRef = normalizeShopOrderNumber(order.orderNumber);
 
   const trackingUrl = order.postNordTrackingId

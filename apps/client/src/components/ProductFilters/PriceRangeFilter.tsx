@@ -7,7 +7,7 @@ import { useTranslation } from "@/i18n/context";
 import { cn } from "@/lib/utils";
 import { useProductFilters } from "./useProductFilters";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
-import { currencySuffix } from "@repo/currency";
+import { currencyParts, formatAmount } from "@repo/currency";
 
 /**
  * Dual-thumb price slider with numeric inputs and preset range chips.
@@ -31,11 +31,16 @@ export function PriceRangeFilter({
   const t = useTranslation();
   const { state, update } = useProductFilters();
   const { currency, rate, convert } = useCurrency();
-  const suffix = currencySuffix(currency);
+  /**
+   * The symbol and which side it belongs on. Sterling and dollars read
+   * "£7,490", not "7,490 £", and a filter that gets that backwards looks
+   * broken to the very visitors this feature is for.
+   */
+  const { symbol, prefix: symbolFirst } = currencyParts(0, currency);
   /** Display units -> SEK, for a number the customer typed. */
   const toSek = (shown: number) => Math.round(shown / rate);
-  /** SEK -> the number the customer reads (no suffix). */
-  const fmt = (sek: number) => convert(sek).toLocaleString("sv-SE");
+  /** SEK -> the number the customer reads, symbol included. */
+  const fmt = (sek: number) => formatAmount(convert(sek), currency);
 
   const minBound = Math.floor(bounds.min);
   const maxBound = Math.ceil(bounds.max);
@@ -75,7 +80,7 @@ export function PriceRangeFilter({
   // always fall inside the available range. Hidden when the data range
   // is too narrow to make distinct buckets meaningful (<3x).
   const presets = useMemo(
-    () => computePresets(minBound, maxBound, fmt, suffix),
+    () => computePresets(minBound, maxBound, fmt),
     // fmt closes over the rate, which is fixed for the life of the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [minBound, maxBound, currency, rate],
@@ -98,9 +103,9 @@ export function PriceRangeFilter({
     <div className="space-y-4">
       {/* Live value readout */}
       <div className="flex items-center justify-between gap-2 text-xs">
-        <ValuePill value={fmt(draft[0])} suffix={suffix} />
+        <ValuePill value={fmt(draft[0])} />
         <span className="text-muted-foreground/40 select-none">—</span>
-        <ValuePill value={fmt(draft[1])} suffix={suffix} />
+        <ValuePill value={fmt(draft[1])} />
       </div>
 
       {/* Slider — px-2.5 keeps the 20px thumb + hover ring inside the
@@ -121,7 +126,8 @@ export function PriceRangeFilter({
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
         <PriceInput
           label={t("products.filterPriceFrom")}
-          suffix={suffix}
+          symbol={symbol}
+          symbolFirst={symbolFirst}
           min={convert(minBound)}
           max={convert(draft[1])}
           value={convert(draft[0])}
@@ -136,7 +142,8 @@ export function PriceRangeFilter({
         <span className="pb-2.5 text-muted-foreground/50">–</span>
         <PriceInput
           label={t("products.filterPriceTo")}
-          suffix={suffix}
+          symbol={symbol}
+          symbolFirst={symbolFirst}
           min={convert(draft[0])}
           max={convert(maxBound)}
           value={convert(draft[1])}
@@ -171,20 +178,18 @@ export function PriceRangeFilter({
   );
 }
 
-function ValuePill({ value, suffix }: { value: string; suffix: string }) {
+function ValuePill({ value }: { value: string }) {
   return (
-    <span className="inline-flex flex-1 items-baseline justify-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 font-medium text-foreground">
-      <span className="tabular-nums">{value}</span>
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {suffix}
-      </span>
+    <span className="inline-flex flex-1 items-baseline justify-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 font-medium tabular-nums text-foreground">
+      {value}
     </span>
   );
 }
 
 function PriceInput({
   label,
-  suffix,
+  symbol,
+  symbolFirst,
   min,
   max,
   value,
@@ -192,7 +197,8 @@ function PriceInput({
   onCommit,
 }: {
   label: string;
-  suffix: string;
+  symbol: string;
+  symbolFirst: boolean;
   min: number;
   max: number;
   value: number;
@@ -218,10 +224,18 @@ function PriceInput({
               e.currentTarget.blur();
             }
           }}
-          className="h-9 pr-7 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className={cn(
+            "h-9 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+            symbolFirst ? "pl-6" : "pr-7",
+          )}
         />
-        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-          {suffix}
+        <span
+          className={cn(
+            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-xs text-muted-foreground",
+            symbolFirst ? "left-2.5" : "right-2.5",
+          )}
+        >
+          {symbol}
         </span>
       </div>
     </label>
@@ -250,9 +264,8 @@ type PricePreset = {
 function computePresets(
   min: number,
   max: number,
-  /** Formats a SEK threshold as the number the customer reads. */
+  /** Formats a SEK threshold as the price the customer reads. */
   fmt: (sek: number) => string,
-  suffix: string,
 ): PricePreset[] {
   const range = max - min;
   if (range < 200) return [];
@@ -268,9 +281,9 @@ function computePresets(
   const t3 = round(min + range * 0.75);
 
   return [
-    { id: "lt1", label: `< ${fmt(t1)} ${suffix}`, from: null, to: t1 },
-    { id: "1to2", label: `${fmt(t1)}–${fmt(t2)} ${suffix}`, from: t1, to: t2 },
-    { id: "2to3", label: `${fmt(t2)}–${fmt(t3)} ${suffix}`, from: t2, to: t3 },
-    { id: "gt3", label: `> ${fmt(t3)} ${suffix}`, from: t3, to: null },
+    { id: "lt1", label: `< ${fmt(t1)}`, from: null, to: t1 },
+    { id: "1to2", label: `${fmt(t1)}–${fmt(t2)}`, from: t1, to: t2 },
+    { id: "2to3", label: `${fmt(t2)}–${fmt(t3)}`, from: t2, to: t3 },
+    { id: "gt3", label: `> ${fmt(t3)}`, from: t3, to: null },
   ];
 }

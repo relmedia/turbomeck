@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { getShippingPrice } from "@/lib/postnord";
 import { formatAmount, normalizeCurrency } from "@repo/currency";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
@@ -199,8 +200,20 @@ const CartPage: React.FC = () => {
     coreReturnChoice,
   ]);
 
+  /**
+   * The cart speaks in the CHARGE currency, from the same server quote the
+   * PaymentIntent is built from. The rest of the storefront shows prices in the
+   * visitor's display currency, which can be one the shop cannot bill in (a
+   * London visitor browses in GBP and pays in SEK).
+   *
+   * Where the two differ the customer is told, next to the total, before they
+   * pay. Letting the number quietly change currency between the product page
+   * and the card form is how a shop earns chargebacks.
+   */
   const currency = normalizeCurrency(quote?.currency);
-  const money = (amount: number) => formatAmount(amount, currency, locale as "sv" | "en");
+  const money = (amount: number) => formatAmount(amount, currency);
+  const { currency: displayCurrency } = useCurrency();
+  const chargeCurrencyDiffers = quote != null && displayCurrency !== currency;
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
@@ -551,6 +564,13 @@ const CartPage: React.FC = () => {
                 <span>{t("cart.total")}</span>
                 <span>{money(quote?.total ?? amountToCharge)}</span>
               </div>
+              {chargeCurrencyDiffers && (
+                <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+                  {t("cart.chargeCurrencyNotice")
+                    .replace("{display}", displayCurrency)
+                    .replace("{charge}", currency)}
+                </p>
+              )}
             </div>
           </div>
 
