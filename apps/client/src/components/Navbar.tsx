@@ -3,12 +3,11 @@
 import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import SearchBar from "./SearchBar";
 import { MobileSearch } from "./MobileSearch";
 import { MobileMenu } from "./MobileMenu";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { User, LogOut, MapPin, Mail} from "lucide-react";
+import { User, LogOut, MapPin } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import { cn } from "@/lib/utils";
 import {
@@ -33,15 +32,10 @@ import { inlineItemStyle } from "./Categories";
 
 const Navbar = () => {
   const t = useTranslation();
-  const pathname = usePathname();
   const { data: session, status } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [contactOpen, setContactOpen] = useState(false);
-  // Categories nav is shown on the storefront pages (homepage + product list
-  // + product detail at /products/[slug]).
-  const showInlineCategories =
-    pathname === "/" || pathname.startsWith("/products");
 
   return (
     <nav className="sticky top-0 z-30 mb-5 flex w-full items-center justify-between gap-4 border-b border-gray-200 bg-background/90 py-2 backdrop-blur supports-backdrop-filter:bg-background/75 sm:py-3 sm:mb-6">
@@ -65,25 +59,32 @@ const Navbar = () => {
             MECK
           </p>
         </Link>
-        {showInlineCategories && (
-          <Suspense fallback={null}>
-            <NavCategoriesInline />
-          </Suspense>
-        )}
+        {/* Shown on every page. This used to be limited to `/` and
+            `/products*`, which left the cart and account pages with a header
+            containing nothing but the Kontakt link — it read as a bug rather
+            than as a deliberately stripped-back checkout. The component is
+            `hidden lg:flex`, so narrow screens are unaffected either way:
+            MobileMenu owns category navigation there. */}
+        <Suspense fallback={null}>
+          <NavCategoriesInline />
+        </Suspense>
         {/* Kontakt is a menu item like the categories beside it — same style,
             same row — but opens a modal rather than navigating, so a visitor
             mid-browse doesn't lose their place.
 
-            Below `lg` the category menu hides itself and MobileMenu takes over;
-            Kontakt stays as the mail icon so it is reachable at every width. */}
+            Desktop only. Below `lg` the category menu hands over to MobileMenu,
+            and Kontakt goes with it: a lone envelope icon in the header was a
+            second, competing entry point to the same drawer that already lists
+            it. One menu, one place to look. */}
         <button
           type="button"
           onClick={() => setContactOpen(true)}
-          className={cn(inlineItemStyle, "cursor-pointer whitespace-nowrap")}
-          aria-label={t("contact.navLabel")}
+          className={cn(
+            inlineItemStyle,
+            "hidden cursor-pointer whitespace-nowrap lg:inline-flex",
+          )}
         >
-          <Mail className="size-4 lg:hidden" aria-hidden />
-          <span className="hidden lg:inline">{t("contact.navLabel")}</span>
+          {t("contact.navLabel")}
         </button>
       </div>
       {/*RIGHT*/}

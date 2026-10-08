@@ -650,15 +650,15 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
                       <div data-slide-text className="mt-6 flex flex-wrap items-center gap-5 md:mt-8">
                         <span
                           data-slide-cta
-                          className="group/btn relative isolate inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-gray-900 px-7 py-3 text-sm font-semibold uppercase tracking-wider text-white ring-1 ring-white/0 transition-all duration-300 ring-offset-2 ring-offset-gray-100 hover:-translate-y-0.5 hover:ring-white/15 hover:shadow-lg hover:shadow-gray-900/25 active:translate-y-0 active:scale-[0.99] md:px-8 md:py-3.5"
+                          className="group/btn relative isolate inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-md bg-gray-900 px-7 py-3 text-sm font-semibold uppercase tracking-wider text-white ring-1 ring-white/0 transition-all duration-300 ring-offset-2 ring-offset-gray-100 hover:-translate-y-0.5 hover:ring-white/15 hover:shadow-lg hover:shadow-gray-900/25 active:translate-y-0 active:scale-[0.99] md:px-8 md:py-3.5"
                         >
                           {/* Brand tint */}
                           <span
-                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-[rgb(110,201,0)]/0 via-[rgb(110,201,0)]/12 to-[rgb(110,201,0)]/0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100"
+                            className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-br from-[rgb(110,201,0)]/0 via-[rgb(110,201,0)]/12 to-[rgb(110,201,0)]/0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100"
                             aria-hidden
                           />
                           {/* Shimmer sweep */}
-                          <span className="pointer-events-none absolute inset-0 z-[1] overflow-hidden rounded-full" aria-hidden>
+                          <span className="pointer-events-none absolute inset-0 z-[1] overflow-hidden rounded-md" aria-hidden>
                             <span className="absolute inset-y-0 -left-1/3 w-1/2 -translate-x-full skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-[320%]" />
                           </span>
                           <span className="relative z-[2]">{t("account.shopNow")}</span>

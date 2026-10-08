@@ -490,6 +490,14 @@
     "navLabel": "Contact"
   },
   "footer": {
+    "sectionLabel": "Footer",
+    "tagline": "Swedish web shop for turbochargers and exhaust parts — from compressor wheels and turbine shafts to downpipes, intercoolers and gauges.",
+    "shop": "Shop",
+    "cart": "Cart",
+    "myAccount": "My account",
+    "customerService": "Customer service",
+    "legal": "Terms",
+    "paymentNote": "Secure payment by card or Klarna — card details are handled by Stripe and never reach our servers.",
     "quickLinks": "Quick links",
     "products": "Products",
     "company": "Company",

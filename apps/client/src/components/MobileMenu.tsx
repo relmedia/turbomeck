@@ -343,6 +343,22 @@ function MobileMenuContent({ onAuthClick, onContactClick }: MobileMenuProps) {
                   </div>
                 );
               })}
+
+              {onContactClick && (
+                <div className="menu-item mt-2 border-t border-gray-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleLinkClick();
+                      onContactClick();
+                    }}
+                    className="mx-3 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 active:scale-[0.98]"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {t("contact.navLabel")}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -351,19 +367,6 @@ function MobileMenuContent({ onAuthClick, onContactClick }: MobileMenuProps) {
               className="border-t border-gray-100 p-4 space-y-1 bg-gray-50/50"
               style={{ opacity: 0 }}
             >
-              {onContactClick && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleLinkClick();
-                    onContactClick();
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-white transition-all active:scale-[0.98]"
-                >
-                  <Mail className="w-4 h-4" />
-                  {t("contact.navLabel")}
-                </button>
-              )}
               {session ? (
                 <>
                   <Link

@@ -490,6 +490,14 @@
     "navLabel": "Kontakt"
   },
   "footer": {
+    "sectionLabel": "Sidfot",
+    "tagline": "Svensk webshop för turboaggregat och avgasdelar — från kompressorhjul och turbinaxlar till downpipes, intercoolers och mätare.",
+    "shop": "Butik",
+    "cart": "Varukorg",
+    "myAccount": "Mitt konto",
+    "customerService": "Kundservice",
+    "legal": "Villkor",
+    "paymentNote": "Säker betalning med kort eller Klarna — kortuppgifter hanteras av Stripe och når aldrig våra servrar.",
     "quickLinks": "Snabb länkar",
     "products": "Produkter",
     "company": "Företaget",
