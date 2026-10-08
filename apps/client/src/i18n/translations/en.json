@@ -14,7 +14,8 @@
     "reviews": "reviews",
     "review": "review",
     "kr": "kr",
-    "yes": "Yes"
+    "yes": "Yes",
+    "no": "No"
   },
   "nav": {
     "myAccount": "My account",
@@ -105,8 +106,35 @@
     "addToWishlist": "Add to wishlist",
     "removeFromWishlist": "Remove from wishlist"
   },
+  "compare": {
+    "add": "Compare",
+    "remove": "Remove from comparison",
+    "removeNamed": "Remove {{name}} from the comparison",
+    "limitReached": "You can compare at most {{max}} products at a time. Remove one first.",
+    "trayLabel": "Products selected for comparison",
+    "addOneMore": "Pick one more",
+    "openWithCount": "Compare {{count}} products",
+    "clearAll": "Clear",
+    "close": "Close",
+    "dialogTitle": "Compare products",
+    "dialogSubtitle": "{{count}} products — {{differences}} rows differ.",
+    "dialogEmpty": "No products selected yet.",
+    "onlyDifferences": "Only differences",
+    "loading": "Loading product data…",
+    "loadFailed": "Could not load the products right now. Please try again shortly.",
+    "tableCaption": "Technical comparison of the selected products",
+    "columnLabels": "Property",
+    "rowPrice": "Price",
+    "rowAvailability": "Availability",
+    "rowWeight": "Weight",
+    "inStock": "In stock",
+    "outOfStock": "Out of stock",
+    "lowestPrice": "Lowest price",
+    "viewProduct": "View product"
+  },
   "product": {
     "addedToCart": "Product has been added to your cart!",
+    "inclVat": "Incl. VAT",
     "loginToSave": "Log in to save products",
     "loginToPurchase": "Log in to make a purchase",
     "addedToWishlist": "Added to wishlist",

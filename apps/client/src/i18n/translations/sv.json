@@ -14,7 +14,8 @@
     "reviews": "recensioner",
     "review": "recension",
     "kr": "Kr",
-    "yes": "Ja"
+    "yes": "Ja",
+    "no": "Nej"
   },
   "nav": {
     "myAccount": "Mitt konto",
@@ -105,8 +106,35 @@
     "addToWishlist": "Lägg till i önskelista",
     "removeFromWishlist": "Ta bort från önskelista"
   },
+  "compare": {
+    "add": "Jämför",
+    "remove": "Ta bort från jämförelse",
+    "removeNamed": "Ta bort {{name}} från jämförelsen",
+    "limitReached": "Du kan jämföra högst {{max}} produkter åt gången. Ta bort en först.",
+    "trayLabel": "Valda produkter för jämförelse",
+    "addOneMore": "Välj en till",
+    "openWithCount": "Jämför {{count}} produkter",
+    "clearAll": "Rensa",
+    "close": "Stäng",
+    "dialogTitle": "Jämför produkter",
+    "dialogSubtitle": "{{count}} produkter — {{differences}} rader skiljer sig åt.",
+    "dialogEmpty": "Inga produkter valda än.",
+    "onlyDifferences": "Visa bara skillnader",
+    "loading": "Hämtar produktdata…",
+    "loadFailed": "Kunde inte hämta produkterna just nu. Försök igen om en stund.",
+    "tableCaption": "Teknisk jämförelse av valda produkter",
+    "columnLabels": "Egenskap",
+    "rowPrice": "Pris",
+    "rowAvailability": "Lagerstatus",
+    "rowWeight": "Vikt",
+    "inStock": "I lager",
+    "outOfStock": "Slut i lager",
+    "lowestPrice": "Lägst pris",
+    "viewProduct": "Visa produkt"
+  },
   "product": {
     "addedToCart": "Produkten har lagts till i varukorgen!",
+    "inclVat": "Inkl. moms",
     "loginToSave": "Logga in för att spara produkter",
     "loginToPurchase": "Logga in för att göra ett köp",
     "addedToWishlist": "Tillagd i önskelista",

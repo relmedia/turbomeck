@@ -8,6 +8,7 @@ import { CurrencyProvider } from "@/components/providers/CurrencyProvider";
 import { resolveDisplayCurrency } from "@/lib/display-currency";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { CompareBar } from "@/components/compare/CompareBar";
 import {
   CookieConsentProvider,
   CookieBanner,
@@ -70,6 +71,11 @@ export default async function RootLayout({
               <Navbar />
               {children}
               <Footer />
+              {/* Docked here rather than per page so a comparison survives
+                  navigation: pick one product on the homepage, another from a
+                  category, and both are still queued. Renders nothing when the
+                  list is empty. */}
+              <CompareBar />
             </div>
             <CookieBanner />
             <CookieSettings />
