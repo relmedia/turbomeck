@@ -417,9 +417,19 @@ const CartPage: React.FC = () => {
               if (!userId && order.viewToken) params.set("token", order.viewToken);
               router.push(`/order/success?${params.toString()}`);
             } catch (err) {
+              // The payment itself SUCCEEDED here — we hold `result.stripePaymentId`
+              // — only writing the order failed. The Stripe webhook finalises it
+              // from the server-side snapshot, so the customer has paid and will
+              // get their order; clearing the cart is correct (keeping it invites
+              // a double purchase).
+              //
+              // `total` is passed so the confirmation page knows a payment
+              // happened. Without it the bare URL now renders "no payment to
+              // show", which would be the wrong answer for someone who just paid.
               console.error("Failed to create order:", err);
               clearCart();
-              router.push("/order/success");
+              const paid = new URLSearchParams({ total: String(total) });
+              router.push(`/order/success?${paid.toString()}`);
             }
           }}
         />

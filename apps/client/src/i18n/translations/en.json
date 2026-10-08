@@ -344,7 +344,19 @@
     "trackAtPostNord": "Track at PostNord",
     "completingOrder": "Completing your order...",
     "createOrderFailed": "Could not complete the order",
-    "backToCart": "Back to cart"
+    "backToCart": "Back to cart",
+    "verifyingPayment": "Checking the payment…",
+    "failedTitle": "The payment was not completed",
+    "failedBody": "You cancelled the payment, or it did not go through. No money has been taken and no order was placed.",
+    "failedCartIntact": "Your cart is exactly as you left it, so you can try again right away.",
+    "tryAgain": "Try again",
+    "continueShopping": "Continue shopping",
+    "processingTitle": "Payment is being processed",
+    "processingBody": "Your payment is still completing. We will email an order confirmation as soon as it is done — there is nothing more for you to do.",
+    "unconfirmedTitle": "No payment to show",
+    "unconfirmedBody": "This page shows the receipt after a completed purchase. If you have just ordered, you will find it under your account.",
+    "unverifiedTitle": "We could not confirm the payment",
+    "unverifiedBody": "We cannot reach the payment service right now, so we cannot show the status here. If the amount was charged you will receive an order confirmation by email shortly — contact us if you are unsure."
   },
   "orderDetail": {
     "orderTitle": "Order",

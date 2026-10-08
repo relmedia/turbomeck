@@ -344,7 +344,19 @@
     "trackAtPostNord": "Spåra hos PostNord",
     "completingOrder": "Slutför beställningen...",
     "createOrderFailed": "Kunde inte slutföra beställningen",
-    "backToCart": "Tillbaka till varukorgen"
+    "backToCart": "Tillbaka till varukorgen",
+    "verifyingPayment": "Kontrollerar betalningen…",
+    "failedTitle": "Betalningen genomfördes inte",
+    "failedBody": "Du avbröt betalningen eller så gick den inte igenom. Inget belopp har dragits och ingen order har lagts.",
+    "failedCartIntact": "Din varukorg är kvar som den var, så du kan försöka igen direkt.",
+    "tryAgain": "Försök igen",
+    "continueShopping": "Fortsätt handla",
+    "processingTitle": "Betalningen behandlas",
+    "processingBody": "Din betalning håller på att slutföras. Vi skickar en orderbekräftelse så snart den är klar — du behöver inte göra något mer.",
+    "unconfirmedTitle": "Ingen betalning att visa",
+    "unconfirmedBody": "Den här sidan visar kvittot efter ett slutfört köp. Har du precis handlat hittar du din order under Mina sidor.",
+    "unverifiedTitle": "Vi kunde inte bekräfta betalningen",
+    "unverifiedBody": "Vi når inte betaltjänsten just nu, så vi kan inte visa status här. Har beloppet dragits får du en orderbekräftelse via e-post inom kort — hör av dig till oss om du är osäker."
   },
   "orderDetail": {
     "orderTitle": "Beställning",

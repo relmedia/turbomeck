@@ -5,7 +5,8 @@
     "dev": "tsx --env-file=.env --watch src/index.ts",
     "build": "tsc",
     "start": "node --env-file=.env dist/index.js",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "check-payment-methods": "tsx --env-file=.env scripts/check-payment-methods.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",

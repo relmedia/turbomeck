@@ -8,14 +8,19 @@ import {
   ArrowRight,
   Box,
   CheckCircle,
+  Clock,
   ExternalLink,
+  HelpCircle,
   Home,
   Loader2,
   Mail,
   MapPin,
   Package,
+  ShoppingBag,
   Truck,
+  XCircle,
 } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@repo/ui/components/button";
 import { Confetti } from "@repo/ui/components/confetti";
 import { createOrder, fetchOrder } from "@/lib/api";
@@ -32,6 +37,55 @@ import {
 const POSTNORD_TRACKING_BASE =
   "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
+/**
+ * What actually happened to the payment.
+ *
+ * This page is the single `return_url` for every Stripe payment method, so it
+ * receives the customer back whether they paid, cancelled, or were declined.
+ * It used to read only `redirect_status` from the URL and use it to decide
+ * whether to CREATE the order — never what to RENDER — so a cancelled Klarna
+ * payment fell through to the success markup: confetti, "Betalning genomförd",
+ * and a claim that a confirmation email had been sent. Nothing had been paid.
+ *
+ * Two rules follow from that, and both matter:
+ *
+ *   1. The status comes from Stripe, not from the URL. `redirect_status` is a
+ *      query parameter — anyone can type `?redirect_status=succeeded`. We ask
+ *      Stripe what the PaymentIntent's real status is instead.
+ *   2. "checking" is the default, so success is never the fall-through. Any
+ *      path that fails to prove a payment lands on a neutral screen, not on a
+ *      receipt.
+ */
+type PaymentOutcome =
+  | "checking"
+  | "succeeded"
+  | "processing"
+  /** Declined, cancelled at the provider, or authentication abandoned. */
+  | "failed"
+  /** No payment to show: a bare URL or a stale bookmark. */
+  | "unknown"
+  /**
+   * A payment was in flight but we could not reach Stripe to ask about it.
+   *
+   * Distinct from "unknown" on purpose. Telling someone who just paid that
+   * there is "no payment to show" would be alarming and wrong; the honest
+   * message is that we cannot confirm it from here. Ad blockers routinely
+   * block js.stripe.com, so this is a real state, not a theoretical one.
+   */
+  | "unverified";
+
+/** Nothing on this page may wait forever; see LOOKUP_TIMEOUT_MS usage. */
+const LOOKUP_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), ms),
+    ),
+  ]);
+}
+
 function OrderSuccessContent() {
   const router = useRouter();
   const { locale } = useLanguage();
@@ -43,6 +97,12 @@ function OrderSuccessContent() {
   const totalParam = searchParams.get("total");
   const trackingParam = searchParams.get("tracking");
   const [paymentIntent, setPaymentIntent] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<PaymentOutcome>("checking");
+  /**
+   * `redirect_pm_type`, which Stripe appends for redirect-based methods. Lets
+   * the receipt say "Klarna" instead of calling every order a card payment.
+   */
+  const [redirectMethod, setRedirectMethod] = useState<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [orderDetails, setOrderDetails] = useState<{
@@ -86,19 +146,96 @@ function OrderSuccessContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let pi = searchParams.get("payment_intent");
-    let status = searchParams.get("redirect_status");
-    if (!pi && window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.slice(1));
-      pi = hashParams.get("payment_intent");
-      status = hashParams.get("redirect_status");
-    }
+    let cancelled = false;
+
+    // Stripe puts these in the query string, but some methods return them in
+    // the fragment instead, so both are checked.
+    const param = (key: string): string | null => {
+      const fromQuery = searchParams.get(key);
+      if (fromQuery) return fromQuery;
+      if (!window.location.hash) return null;
+      return new URLSearchParams(window.location.hash.slice(1)).get(key);
+    };
+
+    const pi = param("payment_intent");
+    const clientSecret = param("payment_intent_client_secret");
     if (pi) setPaymentIntent(pi);
-    const hasPending = !!sessionStorage.getItem("pendingStripeOrder");
-    if (pi && status === "succeeded" && hasPending) {
-      setPendingCreate(true);
+    setRedirectMethod(param("redirect_pm_type"));
+
+    // Not a Stripe return. The inline card flow routes here with ?orderId once
+    // the order already exists, and that is proof enough; anything else (a
+    // bookmark, a typed URL) has no payment behind it and must not claim one.
+    if (!clientSecret) {
+      setOutcome(orderIdParam || totalParam ? "succeeded" : "unknown");
+      return;
     }
-  }, [searchParams]);
+
+    (async () => {
+      try {
+        // The whole lookup is time-boxed. `loadStripe` never settles when
+        // js.stripe.com is blocked — by an ad blocker, a corporate proxy, or an
+        // outage — and an un-timed await there leaves the customer staring at a
+        // spinner forever, which is a worse outcome than the bug this fixes.
+        const intent = await withTimeout(
+          (async () => {
+            const res = await fetch("/api/stripe/config", {
+              signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+            });
+            const data = (await res.json()) as {
+              publishableKey?: string;
+              error?: string;
+            };
+            if (!data.publishableKey) {
+              throw new Error(data.error ?? "no Stripe key");
+            }
+            const stripe = await loadStripe(data.publishableKey);
+            if (!stripe) throw new Error("Stripe.js failed to load");
+            const result = await stripe.retrievePaymentIntent(clientSecret);
+            if (result.error) throw new Error(result.error.message ?? "lookup failed");
+            return result.paymentIntent;
+          })(),
+          LOOKUP_TIMEOUT_MS,
+        );
+        if (cancelled) return;
+
+        // Statuses per docs.stripe.com/payments/payment-intents/verifying-status.
+        // A cancelled or declined attempt returns the intent to
+        // `requires_payment_method`; an abandoned authentication leaves it at
+        // `requires_action`. Neither is a sale.
+        switch (intent?.status) {
+          case "succeeded":
+            setOutcome("succeeded");
+            if (sessionStorage.getItem("pendingStripeOrder")) {
+              setPendingCreate(true);
+            }
+            break;
+          case "processing":
+            setOutcome("processing");
+            break;
+          default:
+            setOutcome("failed");
+            // The snapshot describes a checkout that never happened. Leaving it
+            // behind would let a later visit to this page try to create an
+            // order for an unpaid intent.
+            try {
+              sessionStorage.removeItem("pendingStripeOrder");
+            } catch {
+              /* non-blocking */
+            }
+            break;
+        }
+      } catch {
+        // Timed out, blocked, or the client secret was not real. We cannot
+        // claim success, and we must not claim failure either — the money may
+        // well have been taken.
+        if (!cancelled) setOutcome("unverified");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, orderIdParam, totalParam]);
 
   useEffect(() => {
     if (!pendingCreate || !paymentIntent) return;
@@ -215,11 +352,153 @@ function OrderSuccessContent() {
     });
   }, [orderDetails?.createdAt, dateLocale]);
 
+  // Order matters below: every non-success outcome returns before the receipt
+  // markup, so no path can reach it by falling through.
+
+  if (outcome === "checking") {
+    return (
+      <div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+        <p className="mt-4 text-muted-foreground">
+          {t("orderSuccess.verifyingPayment")}
+        </p>
+      </div>
+    );
+  }
+
   if (pendingCreate) {
     return (
       <div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
         <p className="mt-4 text-muted-foreground">{t("orderSuccess.completingOrder")}</p>
+      </div>
+    );
+  }
+
+  if (outcome === "failed") {
+    return (
+      <div className="w-full max-w-lg mx-auto mt-12 mb-16">
+        <div className="bg-card border rounded-xl p-8 shadow-sm text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 mb-6">
+            <XCircle className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-semibold mb-2">
+            {t("orderSuccess.failedTitle")}
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            {t("orderSuccess.failedBody")}
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+            {t("orderSuccess.failedCartIntact")}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link href="/cart">
+              <Button className="w-full sm:w-auto">
+                <ArrowRight className="w-4 h-4" />
+                {t("orderSuccess.tryAgain")}
+              </Button>
+            </Link>
+            <Link href="/products">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <ShoppingBag className="w-4 h-4" />
+                {t("orderSuccess.continueShopping")}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (outcome === "processing") {
+    return (
+      <div className="w-full max-w-lg mx-auto mt-12 mb-16">
+        <div className="bg-card border rounded-xl p-8 shadow-sm text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-6">
+            <Clock className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-semibold mb-2">
+            {t("orderSuccess.processingTitle")}
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            {t("orderSuccess.processingBody")}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link href="/account">
+              <Button className="w-full sm:w-auto">
+                {t("orderSuccess.viewOrderHistory")}
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Home className="w-4 h-4" />
+                {t("orderSuccess.backToHome")}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (outcome === "unverified") {
+    return (
+      <div className="w-full max-w-lg mx-auto mt-12 mb-16">
+        <div className="bg-card border rounded-xl p-8 shadow-sm text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted text-muted-foreground mb-6">
+            <HelpCircle className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-semibold mb-2">
+            {t("orderSuccess.unverifiedTitle")}
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            {t("orderSuccess.unverifiedBody")}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link href="/account">
+              <Button className="w-full sm:w-auto">
+                {t("orderSuccess.viewOrderHistory")}
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Home className="w-4 h-4" />
+                {t("orderSuccess.backToHome")}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (outcome === "unknown") {
+    return (
+      <div className="w-full max-w-lg mx-auto mt-12 mb-16">
+        <div className="bg-card border rounded-xl p-8 shadow-sm text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted text-muted-foreground mb-6">
+            <Package className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-semibold mb-2">
+            {t("orderSuccess.unconfirmedTitle")}
+          </h1>
+          <p className="text-muted-foreground leading-relaxed">
+            {t("orderSuccess.unconfirmedBody")}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link href="/account">
+              <Button className="w-full sm:w-auto">
+                {t("orderSuccess.viewOrderHistory")}
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Home className="w-4 h-4" />
+                {t("orderSuccess.backToHome")}
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -338,7 +617,9 @@ function OrderSuccessContent() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("orderSuccess.paymentMethod")}</span>
-              <span className="font-medium">{t("orderSuccess.paymentMethodCard")}</span>
+              <span className="font-medium capitalize">
+                {redirectMethod ?? t("orderSuccess.paymentMethodCard")}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("orderSuccess.dateTime")}</span>

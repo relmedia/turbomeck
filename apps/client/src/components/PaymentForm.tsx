@@ -133,7 +133,10 @@ function CheckoutForm({
       const { error: submitError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/order/success?from_stripe=1`,
+          // No marker parameter needed: the confirmation page detects a
+          // Stripe return by the `payment_intent_client_secret` Stripe appends
+          // here, which it then uses to ask Stripe for the real status.
+          return_url: `${window.location.origin}/order/success`,
           payment_method_data: {
             billing_details: {
               name: `${payload.firstName} ${payload.lastName}`.trim() || undefined,
