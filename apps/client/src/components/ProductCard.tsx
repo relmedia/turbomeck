@@ -188,7 +188,9 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
             box, and is contained rather than cropped: a turbo photographed on
             white loses its housing to an object-cover crop. */}
         <div className="relative aspect-square overflow-hidden">
-          {!imageLoaded && <Skeleton className="absolute inset-0 z-10 rounded-none" />}
+          {!imageLoaded && (
+            <Skeleton className="pointer-events-none absolute inset-0 z-10 rounded-none" />
+          )}
           <div
             ref={trackRef}
             onScroll={handleScroll}
@@ -205,6 +207,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
                   fill
                   priority={priority && i === 0}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  draggable={false}
                   className="object-contain p-3 transition-transform duration-500 group-hover:scale-[1.03]"
                   onLoad={i === 0 ? () => setImageLoaded(true) : undefined}
                 />
@@ -257,7 +260,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
           {images.length > 1 && (
             <>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-between p-2 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-between p-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 <Button
                   variant="secondary"
                   size="icon"
@@ -277,24 +280,29 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
                   <ChevronRight className="h-4 w-4" aria-hidden />
                 </Button>
               </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex items-center justify-center gap-1.5">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center justify-center gap-0.5">
                 {images.map((_, index) => (
                   <button
                     key={index}
                     type="button"
-                    className={cn(
-                      "pointer-events-auto h-1.5 cursor-pointer rounded-full transition-all",
-                      index === currentImageIndex
-                        ? "w-4 bg-foreground/70"
-                        : "w-1.5 bg-foreground/25"
-                    )}
+                    className="pointer-events-auto flex cursor-pointer items-center justify-center px-1.5 py-2.5"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       scrollToIndex(index);
                     }}
                     aria-label={t("slider.goToSlide", { n: index + 1 })}
-                  />
+                    aria-current={index === currentImageIndex ? "true" : undefined}
+                  >
+                    <span
+                      className={cn(
+                        "block h-1.5 rounded-full transition-all",
+                        index === currentImageIndex
+                          ? "w-4 bg-foreground/70"
+                          : "w-1.5 bg-foreground/25"
+                      )}
+                    />
+                  </button>
                 ))}
               </div>
             </>
