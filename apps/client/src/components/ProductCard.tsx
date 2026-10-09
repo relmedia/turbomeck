@@ -71,9 +71,10 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
   // The gallery is a native horizontal scroll-snap track, so a finger drag
   // scrolls it with the platform's own momentum and rubber-banding. The
-  // chevrons (mouse only - they sit behind group-hover) and the dots drive the
-  // same track via scrollTo, and `currentImageIndex` is derived from the
-  // scroll position so every control stays in sync.
+  // chevrons (mouse only — `can-hover:` keeps them off touch devices, where
+  // they would otherwise intercept the swipe) and the dots drive the same
+  // track via scrollTo, and `currentImageIndex` is derived from the scroll
+  // position so every control stays in sync.
   const trackRef = useRef<HTMLDivElement>(null);
   const programmaticScrollUntil = useRef(0);
   const swipedUntil = useRef(0);
@@ -260,7 +261,17 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
           {images.length > 1 && (
             <>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-between p-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+              {/* `hidden can-hover:flex` — display:none, so on a phone these
+                  are not in the hit-test tree at all. They used to be rendered
+                  at full opacity below `sm` and at opacity-0 above it, and in
+                  both cases the two 32px buttons sat vertically centred on the
+                  left and right edges of the image: exactly where a horizontal
+                  swipe starts and ends. A drag beginning on one went to the
+                  button instead of the scroll track, so swiping between images
+                  did nothing. The track itself keeps touch-action:auto, which
+                  is what lets the browser route a horizontal drag to the
+                  gallery and a vertical one to the page. */}
+              <div className="pointer-events-none absolute inset-0 hidden items-center justify-between p-2 opacity-0 transition-opacity can-hover:flex group-hover:opacity-100">
                 <Button
                   variant="secondary"
                   size="icon"

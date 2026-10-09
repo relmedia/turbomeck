@@ -4,6 +4,10 @@
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
+/* Mouse-only affordances. Touch devices must not render these at all:
+   an invisible but still hit-testable control sitting over a swipe
+   surface silently eats the gesture. */
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
 /* Custom CSS rules */
 .lightGreen {
