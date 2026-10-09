@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useCartStore from "@/stores/cartStore";
@@ -57,8 +56,6 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
         )
       : [product.images?.default || "/logo.svg"];
 
-  const cardImageSrc = images[currentImageIndex] ?? images[0] ?? "/logo.svg";
-
   useEffect(() => {
     const pid = Number(product.id);
     if (!pid) {
@@ -72,18 +69,67 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
       .catch(() => setReviewStats("error"));
   }, [product.id]);
 
+  // The gallery is a native horizontal scroll-snap track, so a finger drag
+  // scrolls it with the platform's own momentum and rubber-banding. The
+  // chevrons (mouse only - they sit behind group-hover) and the dots drive the
+  // same track via scrollTo, and `currentImageIndex` is derived from the
+  // scroll position so every control stays in sync.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const programmaticScrollUntil = useRef(0);
+  const swipedUntil = useRef(0);
+
+  const scrollToIndex = useCallback(
+    (index: number) => {
+      const clamped = ((index % images.length) + images.length) % images.length;
+      setCurrentImageIndex(clamped);
+      const track = trackRef.current;
+      if (!track) return;
+      programmaticScrollUntil.current = performance.now() + 600;
+      track.scrollTo({ left: clamped * track.clientWidth, behavior: "smooth" });
+    },
+    [images.length],
+  );
+
+  const handleScroll = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    // Intermediate events from our own smooth scroll would drag the active
+    // index away from the target before the animation lands.
+    if (performance.now() < programmaticScrollUntil.current) return;
+    // A swipe ends in a click on the enclosing card link; swallow it so
+    // browsing images never navigates away from the listing.
+    swipedUntil.current = performance.now() + 350;
+    const width = track.clientWidth;
+    if (width === 0) return;
+    const index = Math.round(track.scrollLeft / width);
+    setCurrentImageIndex((prev) => (prev === index ? prev : index));
+  }, []);
+
+  // clientWidth is the snap unit, so a resize invalidates the scroll offset.
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const onResize = () => {
+      programmaticScrollUntil.current = performance.now() + 200;
+      track.scrollTo({
+        left: currentImageIndex * track.clientWidth,
+        behavior: "auto",
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [currentImageIndex]);
+
   const nextImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setImageLoaded(false);
-    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    scrollToIndex(currentImageIndex + 1);
   };
 
   const prevImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setImageLoaded(false);
-    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+    scrollToIndex(currentImageIndex - 1);
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {
@@ -123,11 +169,6 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   const hasColors =
     product.colors.length > 1 || product.colors[0] !== "default";
 
-  /** The two spec rows the card leads with — see the <dl> below. */
-  const specHighlights = (product.specifications ?? [])
-    .filter((spec) => spec?.label?.trim() && spec?.value?.trim())
-    .slice(0, 2);
-
   const cartLabel =
     attrs.length > 0 ? t("common.selectOptions") : t("common.addToCart");
 
@@ -135,35 +176,46 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
     typeof reviewStats === "object" ? reviewStats.totalCount : 0;
 
   return (
-    <Link href={productUrl(product)} className="group block h-full">
+    <Link
+      href={productUrl(product)}
+      className="group block h-full"
+      onClick={(e) => {
+        if (performance.now() < swipedUntil.current) e.preventDefault();
+      }}
+    >
       <Card className="flex h-full w-full max-w-sm flex-col gap-0 overflow-hidden rounded-none border-0 bg-muted/40 p-0 text-foreground shadow-none transition-colors duration-300 hover:bg-muted/70">
         {/* The image sits ON the card's own panel rather than in a separate
             box, and is contained rather than cropped: a turbo photographed on
             white loses its housing to an object-cover crop. */}
         <div className="relative aspect-square overflow-hidden">
           {!imageLoaded && <Skeleton className="absolute inset-0 z-10 rounded-none" />}
-          <motion.div
-            key={currentImageIndex}
-            className="absolute inset-0"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
+          <div
+            ref={trackRef}
+            onScroll={handleScroll}
+            className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
           >
-            <ImageWithFallback
-              src={cardImageSrc}
-              alt=""
-              fill
-              priority={priority}
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-contain p-3 transition-transform duration-500 group-hover:scale-[1.03]"
-              onLoad={() => setImageLoaded(true)}
-            />
-          </motion.div>
+            {images.map((src, i) => (
+              <div
+                key={`${src}-${i}`}
+                className="relative h-full w-full shrink-0 snap-center snap-always"
+              >
+                <ImageWithFallback
+                  src={src}
+                  alt=""
+                  fill
+                  priority={priority && i === 0}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-contain p-3 transition-transform duration-500 group-hover:scale-[1.03]"
+                  onLoad={i === 0 ? () => setImageLoaded(true) : undefined}
+                />
+              </div>
+            ))}
+          </div>
 
           {product.isExchangeTurbo === true && (
             <Badge
               variant="outline"
-              className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-5rem)] items-center gap-1 truncate rounded-none border-transparent bg-foreground px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-background shadow-none"
+              className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-5rem)] items-center gap-1 truncate rounded-none border-transparent bg-foreground px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-background shadow-none"
               title={t("product.exchangeTurboBadge")}
             >
               <ArrowLeftRight className="size-3 shrink-0" aria-hidden />
@@ -205,11 +257,11 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
           {images.length > 1 && (
             <>
-              <div className="absolute inset-0 flex items-center justify-between p-2 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-between p-2 opacity-0 transition-opacity group-hover:opacity-100">
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full bg-background/80 shadow-none backdrop-blur-sm"
+                  className="pointer-events-auto h-8 w-8 shrink-0 cursor-pointer rounded-full bg-background/80 shadow-none backdrop-blur-sm"
                   onClick={prevImage}
                   aria-label={t("product.previousProductImage", { name: product.name })}
                 >
@@ -218,20 +270,20 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full bg-background/80 shadow-none backdrop-blur-sm"
+                  className="pointer-events-auto h-8 w-8 shrink-0 cursor-pointer rounded-full bg-background/80 shadow-none backdrop-blur-sm"
                   onClick={nextImage}
                   aria-label={t("product.nextProductImage", { name: product.name })}
                 >
                   <ChevronRight className="h-4 w-4" aria-hidden />
                 </Button>
               </div>
-              <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5">
+              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex items-center justify-center gap-1.5">
                 {images.map((_, index) => (
                   <button
                     key={index}
                     type="button"
                     className={cn(
-                      "h-1.5 rounded-full transition-all",
+                      "pointer-events-auto h-1.5 cursor-pointer rounded-full transition-all",
                       index === currentImageIndex
                         ? "w-4 bg-foreground/70"
                         : "w-1.5 bg-foreground/25"
@@ -239,7 +291,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setCurrentImageIndex(index);
+                      scrollToIndex(index);
                     }}
                     aria-label={t("slider.goToSlide", { n: index + 1 })}
                   />
@@ -282,29 +334,13 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
             </div>
           )}
 
-          {/* The reference's defining trait: key specs as label-over-value
-              pairs, so a row of cards can be read down a column and compared at
-              a glance. Falls back to the summary for products with no spec
-              sheet, which keeps every card the same shape. */}
-          {specHighlights.length > 0 ? (
-            <dl className="space-y-1.5">
-              {specHighlights.map((spec) => (
-                <div key={`${spec.group ?? ""}-${spec.label}`}>
-                  <dt className="text-[11px] leading-tight text-muted-foreground">
-                    {spec.label}
-                  </dt>
-                  <dd className="text-sm leading-tight text-foreground">
-                    {spec.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            product.shortDescription && (
-              <p className="line-clamp-3 text-sm leading-snug text-muted-foreground">
-                {product.shortDescription}
-              </p>
-            )
+          {/* Prose only — the spec sheet belongs on the product page, not in
+              the grid. Clamped to three lines so cards in the same row keep
+              the same shape whatever the summary length. */}
+          {product.shortDescription && (
+            <p className="line-clamp-3 text-sm leading-snug text-muted-foreground">
+              {product.shortDescription}
+            </p>
           )}
 
           {hasSizes && (

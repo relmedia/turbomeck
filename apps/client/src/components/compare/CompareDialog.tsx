@@ -120,7 +120,7 @@ export function CompareDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[min(96vw,1200px)] max-h-[90vh] gap-0 overflow-hidden p-0">
-        <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b py-4 pl-5 pr-14">
           <div className="min-w-0">
             <DialogTitle className="text-lg font-semibold">
               {t("compare.dialogTitle")}
@@ -180,35 +180,33 @@ export function CompareDialog({
                       key={product.id}
                       scope="col"
                       className={cn(
-                        "sticky top-0 z-20 border-l bg-background p-3 text-left align-bottom",
+                        "sticky top-0 z-20 border-l bg-background p-3 text-left align-top",
                         columnWidth,
                       )}
                     >
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <Link
-                            href={productUrl(product)}
-                            onClick={() => onOpenChange(false)}
-                            className="relative block size-20 shrink-0 overflow-hidden border bg-white"
-                          >
-                            <ImageWithFallback
-                              src={product.images?.default || product.galleryImages?.[0] || "/logo.svg"}
-                              alt={product.name}
-                              fill
-                              sizes="80px"
-                              className="object-contain p-1"
-                            />
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 shrink-0 cursor-pointer text-muted-foreground"
-                            onClick={() => remove(Number(product.id))}
-                            aria-label={t("compare.removeNamed", { name: product.name })}
-                          >
-                            <X className="size-4" aria-hidden />
-                          </Button>
-                        </div>
+                      <div className="relative flex flex-col gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 z-10 size-7 shrink-0 cursor-pointer text-muted-foreground"
+                          onClick={() => remove(Number(product.id))}
+                          aria-label={t("compare.removeNamed", { name: product.name })}
+                        >
+                          <X className="size-4" aria-hidden />
+                        </Button>
+                        <Link
+                          href={productUrl(product)}
+                          onClick={() => onOpenChange(false)}
+                          className="relative block size-20 shrink-0 overflow-hidden border bg-white"
+                        >
+                          <ImageWithFallback
+                            src={product.images?.default || product.galleryImages?.[0] || "/logo.svg"}
+                            alt={product.name}
+                            fill
+                            sizes="80px"
+                            className="object-contain p-1"
+                          />
+                        </Link>
                         <Link
                           href={productUrl(product)}
                           onClick={() => onOpenChange(false)}
