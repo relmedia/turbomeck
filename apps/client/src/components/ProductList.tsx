@@ -38,6 +38,8 @@ const ProductList = async ({
     name: string;
     parentId?: number | null;
     parentName?: string | null;
+  /** "Root category" marks the catch-all container; see isContainerCategory. */
+  description?: string | null;
   }[] = [];
   let products: ProductType[] = initialProducts ?? [];
   const cookieStore = await cookies();

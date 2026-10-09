@@ -4,7 +4,6 @@ import useCartStore from "@/stores/cartStore";
 import { ProductType } from "@/types";
 import { Minus, Plus, ShoppingCart } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
-import { CompareToggle } from "@/components/compare/CompareToggle";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -196,7 +195,6 @@ const ProductInteraction = ({
         <ShoppingCart className="w-4 h-4" />
         {t("product.buyNow")}
       </button>
-      <CompareToggle productId={Number(product.id)} variant="full" className="w-full" />
     </div>
   );
 };

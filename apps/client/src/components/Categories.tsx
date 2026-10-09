@@ -13,7 +13,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "@repo/ui/components/navigation-menu";
-import { categorySlug, cn } from "@/lib/utils";
+import { categorySlug, isBrowsableTopLevelCategory, cn } from "@/lib/utils";
 
 // Segmented-control item style — pills that sit on a muted bar.
 // Default: transparent + muted text; hover: subtle lift to background/70;
@@ -47,6 +47,8 @@ type CategoryItem = {
   name: string;
   parentId?: number | null;
   parentName?: string | null;
+  /** "Root category" marks the catch-all container; see isContainerCategory. */
+  description?: string | null;
 };
 
 type CategoriesVariant = "bar" | "inline";
@@ -88,11 +90,7 @@ const Categories = ({
     (selectedCategory ?? "alla-produkter") === slug;
 
   const apiParentCategories = categories
-    .filter((c) => {
-      if (c.parentId) return false;
-      const slug = categorySlug(c);
-      return slug !== "alla-produkter" && slug !== "all-products";
-    })
+    .filter((c) => isBrowsableTopLevelCategory(c, categories))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const getChildren = (parentId: number) =>

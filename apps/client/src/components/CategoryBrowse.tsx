@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
-import { categorySlug } from "@/lib/utils";
+import { categorySlug, isBrowsableTopLevelCategory } from "@/lib/utils";
 import { BRAND, INK_GRADIENT } from "@/lib/brand";
 import { SectionHeading } from "./SectionHeading";
 
@@ -12,8 +12,11 @@ import { SectionHeading } from "./SectionHeading";
  *
  * Shape follows the data, not a template: this shop has exactly three real
  * top-level categories (two car makes and a parts tree), so the grid is 3-up on
- * desktop and fills the row instead of leaving a gap. The "Alla Produkter" root
- * is filtered out — it is a container, not something to browse into.
+ * desktop and fills the row instead of leaving a gap. The catch-all root row is
+ * filtered out by `isContainerCategory` — it is a container, not somewhere to
+ * browse into. That test is deliberately name-independent: it used to match the
+ * row's slug, so renaming it in admin turned the container into a card linking
+ * to an empty listing.
  *
  * Each card shows its subcategories as chips, because in a parts shop the
  * model ("Saab 9-5") is what people actually look for, and surfacing them turns
@@ -29,10 +32,9 @@ type CategoryItem = {
   name: string;
   parentId?: number | null;
   parentName?: string | null;
+  /** "Root category" marks the catch-all container; see isContainerCategory. */
+  description?: string | null;
 };
-
-/** Containers, not destinations. */
-const EXCLUDED_SLUGS = new Set(["alla-produkter", "all-products"]);
 
 const MAX_CHIPS = 5;
 
@@ -47,7 +49,7 @@ export function CategoryBrowse({
   const t = useTranslation();
 
   const parents = categories
-    .filter((c) => !c.parentId && !EXCLUDED_SLUGS.has(categorySlug(c)))
+    .filter((c) => isBrowsableTopLevelCategory(c, categories))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   if (parents.length === 0) return null;

@@ -47,6 +47,73 @@ export function categorySlug(
   return toSlug(name)
 }
 
+/**
+ * Slugs that have ever named the catch-all container row.
+ *
+ * Kept only as a fallback for environments whose row still carries one of
+ * these names. Identity must NOT depend on this: the name is editable in
+ * admin, and renaming the row ("Alla Produkter" -> "Shoppen") used to change
+ * its slug, drop it out of this set and make the container surface as a real
+ * category card linking to an empty listing.
+ */
+const LEGACY_CONTAINER_SLUGS = new Set(["alla-produkter", "all-products"]);
+
+/** `categories.description` value the catch-all row ships with. */
+const CONTAINER_DESCRIPTION = "root category";
+
+/**
+ * Is this category a container rather than somewhere to browse to?
+ *
+ * Name-independent by design. A container is a top-level row that groups
+ * nothing: no parent and no children. Every real top-level category in this
+ * shop is a make or a parts tree and therefore has subcategories, while the
+ * catch-all row has none — and the browse cards exist precisely to show those
+ * subcategories as chips, so a childless top-level row has nothing to put on
+ * one either way.
+ */
+export function isContainerCategory(
+  cat: {
+    id: number;
+    name: string;
+    description?: string | null;
+    parentId?: number | null;
+    parentName?: string | null;
+  },
+  categories: { id: number; parentId?: number | null }[],
+): boolean {
+  if (cat.parentId) return false;
+  // Marker the row has carried since it was created (description = "Root
+  // category"), so the container stays identifiable even if it is later given
+  // children.
+  if (cat.description?.trim().toLowerCase() === CONTAINER_DESCRIPTION) return true;
+  if (LEGACY_CONTAINER_SLUGS.has(categorySlug(cat))) return true;
+  return !categories.some((c) => c.parentId === cat.id);
+}
+
+/**
+ * Should this category be offered as a top-level destination — a browse card,
+ * a header menu entry, a filter chip?
+ *
+ * Use THIS at call sites, not `isContainerCategory`. The predicate callers
+ * actually want is "top-level AND not the container", and negating the
+ * container test alone silently lets every subcategory through: a child is not
+ * a container, so `!isContainerCategory(child)` is true. That regression put
+ * all 21 categories into the header menu and the card grid at once.
+ */
+export function isBrowsableTopLevelCategory(
+  cat: {
+    id: number;
+    name: string;
+    description?: string | null;
+    parentId?: number | null;
+    parentName?: string | null;
+  },
+  categories: { id: number; parentId?: number | null }[],
+): boolean {
+  if (cat.parentId) return false;
+  return !isContainerCategory(cat, categories);
+}
+
 /** Resolve category param (slug or legacy id) to category id */
 export function slugToCategoryId(
   param: string | null,

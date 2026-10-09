@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { LayoutGrid, Minus, Plus } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
-import { categorySlug, cn } from "@/lib/utils";
+import { categorySlug, isBrowsableTopLevelCategory, cn } from "@/lib/utils";
 import { useProductFilters } from "./useProductFilters";
 
 type CategoryItem = {
@@ -11,6 +11,8 @@ type CategoryItem = {
   name: string;
   parentId?: number | null;
   parentName?: string | null;
+  /** "Root category" marks the catch-all container; see isContainerCategory. */
+  description?: string | null;
 };
 
 /**
@@ -37,11 +39,7 @@ export function CategoryFilter({
 
   const tree = useMemo(() => {
     const parents = categories
-      .filter((c) => {
-        if (c.parentId) return false;
-        const slug = categorySlug(c);
-        return slug !== "alla-produkter" && slug !== "all-products";
-      })
+      .filter((c) => isBrowsableTopLevelCategory(c, categories))
       .sort((a, b) => a.name.localeCompare(b.name));
     return parents.map((parent) => ({
       ...parent,

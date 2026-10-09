@@ -378,6 +378,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Google({
             clientId: process.env.AUTH_GOOGLE_ID,
             clientSecret: process.env.AUTH_GOOGLE_SECRET,
+            /**
+             * Force Google's account chooser on every sign-in.
+             *
+             * Without `prompt`, Google uses its default: when exactly one
+             * account is signed in to the browser it skips the chooser and
+             * returns that account silently. Anyone with two Google accounts
+             * (a personal and a work one, say) could therefore never pick —
+             * they were signed in as whichever account Google happened to
+             * have, with no way to switch short of signing out of Google.
+             *
+             * `select_account` alone, NOT "consent select_account": consent
+             * re-prompts for scopes on every login, which is noise for a
+             * plain email/profile sign-in.
+             */
+            authorization: {
+              params: { prompt: "select_account" },
+            },
           }),
         ]
       : []),

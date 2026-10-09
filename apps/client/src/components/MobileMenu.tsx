@@ -8,7 +8,7 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/i18n/context";
 import { useLanguage } from "@/i18n/context";
-import { categorySlug, cn } from "@/lib/utils";
+import { categorySlug, isBrowsableTopLevelCategory, cn } from "@/lib/utils";
 import { useSession, signOut } from "next-auth/react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { fetchCategories } from "@/lib/api";
@@ -19,6 +19,8 @@ type CategoryItem = {
   name: string;
   parentId?: number | null;
   parentName?: string | null;
+  /** "Root category" marks the catch-all container; see isContainerCategory. */
+  description?: string | null;
 };
 
 function getCategoryIcon(name: string) {
@@ -183,11 +185,7 @@ function MobileMenuContent({ onAuthClick, onContactClick }: MobileMenuProps) {
     (selectedCategory ?? "alla-produkter") === slug;
 
   const parentCategories = categories
-    .filter((c) => {
-      if (c.parentId) return false;
-      const slug = categorySlug(c);
-      return slug !== "alla-produkter" && slug !== "all-products";
-    })
+    .filter((c) => isBrowsableTopLevelCategory(c, categories))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const getChildren = (parentId: number) =>
