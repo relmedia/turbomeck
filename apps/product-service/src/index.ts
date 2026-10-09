@@ -1,7 +1,7 @@
 import "./load-local-env.js";
 import express, { type Request } from "express";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
 import cors from "cors";
@@ -413,12 +413,14 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   // Trust the first hop (Next.js proxy / nginx). If you put this behind a
   // multi-hop proxy in prod, set NUMBER_OF_PROXIES and use req.ip.
+  // ipKeyGenerator() collapses IPv6 addresses to their /56 prefix so a client
+  // with a routed block can't rotate addresses for a fresh budget each time.
   keyGenerator: (req) => {
     const xff = req.headers["x-forwarded-for"];
     if (typeof xff === "string" && xff.length > 0) {
-      return xff.split(",")[0]!.trim();
+      return ipKeyGenerator(xff.split(",")[0]!.trim());
     }
-    return req.ip ?? "unknown";
+    return ipKeyGenerator(req.ip ?? "unknown");
   },
 });
 app.use("/api", apiLimiter);

@@ -44,6 +44,33 @@ function matchesSearch(p: ProductType, q: string): boolean {
 
 type SortOption = "newest" | "oldest" | "asc" | "desc";
 
+/**
+ * Small seeded PRNG (mulberry32). The startpage grid is shuffled from a seed
+ * drawn once per mount rather than from bare Math.random() so that re-renders
+ * (filter state, viewport changes) reproduce the same order instead of
+ * reshuffling the cards under the user's cursor.
+ */
+function mulberry32(seed: number): () => number {
+  let state = seed | 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Fisher-Yates, seeded. Returns a new array; input is left alone. */
+function shuffleProducts(products: ProductType[], seed: number): ProductType[] {
+  const rand = mulberry32(seed);
+  const out = [...products];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
 function sortProducts(products: ProductType[], sort: SortOption): ProductType[] {
   const sorted = [...products];
   const idNum = (p: ProductType) => Number(p.id) || 0;
@@ -100,6 +127,9 @@ export function ProductListClient({
   const [categoriesState, setCategoriesState] = useState<CategoryItem[]>(categories);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Drawn once per mount, i.e. once per page load / client-side nav here —
+  // that is what re-rolls the startpage's random selection on every refresh.
+  const [shuffleSeed] = useState(() => (Math.random() * 2 ** 32) >>> 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,9 +253,17 @@ export function ProductListClient({
     sortParam === "oldest" || sortParam === "asc" || sortParam === "desc"
       ? sortParam
       : "newest";
-  const sortedProducts = sortProducts(filteredProducts, sortOption);
 
   const isProductsPage = params === "products";
+  // Only the startpage proper gets the random pick. A category or search view
+  // still renders through params="homepage", and there the user is looking for
+  // something specific, so those keep the deterministic "newest first" order.
+  const isStartPageGrid =
+    !isProductsPage && !category && !searchParam?.trim();
+  const sortedProducts = isStartPageGrid
+    ? shuffleProducts(filteredProducts, shuffleSeed)
+    : sortProducts(filteredProducts, sortOption);
+
   const isLargeViewport = useIsLargeViewport();
   const pageSize = isProductsPage
     ? isLargeViewport
