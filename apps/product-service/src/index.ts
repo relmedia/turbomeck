@@ -591,6 +591,55 @@ app.get("/api/upload", async (req, res) => {
   }
 });
 
+/**
+ * Detach an image from every product that references it.
+ *
+ * Mirrors the repair in scripts/diagnose-r2.ts: a referenced thumbnail is
+ * dropped, and when the main image is the one going away the first surviving
+ * thumbnail is promoted into its place rather than leaving the product with a
+ * placeholder it does not need. `image` and `thumbnails` are disjoint in this
+ * schema, so a promoted thumbnail moves rather than being duplicated.
+ *
+ * Returns the ids it touched, for the response and the log.
+ */
+async function detachImageFromProducts(filename: string): Promise<number[]> {
+  // Stored values are absolute R2 URLs and may carry a ?v= cache-buster, so
+  // match on the bare object name rather than on string equality.
+  const path = filename.split("?")[0] ?? "";
+  const bare = path.slice(
+    Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1,
+  );
+  if (!bare) return [];
+  const matches = (url: string | null | undefined): boolean =>
+    !!url && (url.split("?")[0] ?? "").endsWith(`/${bare}`);
+
+  const rows = await db
+    .select({ id: products.id, image: products.image, thumbnails: products.thumbnails })
+    .from(products);
+
+  const touched: number[] = [];
+  for (const row of rows) {
+    // Cast as the rest of this file does: the @repo/database jsonb type does
+    // not resolve here, so thumbnails would otherwise be implicitly any.
+    const thumbs: string[] = Array.isArray(row.thumbnails)
+      ? (row.thumbnails as string[])
+      : [];
+    const mainHit = matches(row.image);
+    const keptThumbs = thumbs.filter((t) => !matches(t));
+    if (!mainHit && keptThumbs.length === thumbs.length) continue;
+
+    const update: { image?: string | null; thumbnails: string[] } = { thumbnails: keptThumbs };
+    if (mainHit) {
+      const promoted = keptThumbs[0] ?? null;
+      update.image = promoted;
+      update.thumbnails = promoted ? keptThumbs.slice(1) : keptThumbs;
+    }
+    await db.update(products).set(update).where(eq(products.id, row.id));
+    touched.push(row.id);
+  }
+  return touched;
+}
+
 // Delete image endpoint – R2 only
 app.delete("/api/upload/:filename", async (req, res) => {
   try {
@@ -598,8 +647,30 @@ app.delete("/api/upload/:filename", async (req, res) => {
     if (!USE_R2) {
       return res.status(503).json({ error: "R2 not configured" });
     }
+    /**
+     * Detach BEFORE deleting, deliberately.
+     *
+     * This endpoint used to delete the object and leave every products.image /
+     * thumbnails row still pointing at it, so the storefront kept requesting a
+     * key that no longer existed and next/image logged "upstream image
+     * response failed … 404" on every render. Doing the DB write first means
+     * the two possible failures are not symmetric: if the R2 delete fails we
+     * have detached an image whose file still exists, which is recoverable by
+     * re-attaching it in admin, whereas the old order produced a dangling
+     * reference that nothing short of a bulk audit would find.
+     */
+    const detached = await detachImageFromProducts(filename);
+    if (detached.length > 0) {
+      console.log(
+        `[upload] detached ${filename} from product(s) ${detached.join(", ")} before delete`,
+      );
+    }
     await deleteFromR2(filename);
-    res.json({ success: true, message: "File deleted successfully" });
+    res.json({
+      success: true,
+      message: "File deleted successfully",
+      detachedFromProducts: detached,
+    });
   } catch (error) {
     console.error("Error deleting file:", error);
     res.status(500).json({ error: "Failed to delete file" });
