@@ -25,6 +25,15 @@ export type ProductType = {
   images: Record<string, string>;
   /** All images for gallery (main + thumbnails) */
   galleryImages?: string[];
+  /** ISO timestamp from the API — drives <lastmod> in the sitemap. */
+  updatedAt?: string;
+  /**
+   * Review aggregates, supplied by the list endpoint. Used for the star row on
+   * a card and for AggregateRating in the product page's JSON-LD; null means
+   * "no reviews yet", which must NOT be emitted as a rating of 0.
+   */
+  averageRating?: number | null;
+  reviewCount?: number | null;
 };
 
 export type ProductsType = ProductType[];

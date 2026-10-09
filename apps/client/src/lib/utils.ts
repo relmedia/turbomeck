@@ -5,9 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** URL path for a product detail page. Uses translated slug from product.name (localized), falls back to slug or id. */
+/**
+ * Canonical URL path for a product detail page.
+ *
+ * `product.slug` comes from the API, which derives it from the raw Swedish
+ * `name` column and NOT from the localized name
+ * (product-service/src/index.ts:960) — so it is the one spelling of this
+ * product's URL that is identical in every locale. Preferring it is what
+ * stops the sv and en views of one product from being two indexable URLs.
+ *
+ * `toSlug(name)` stays only as a fallback for callers holding a product that
+ * predates the API field (cart lines, compare entries), and the numeric id as
+ * a last resort. Both still resolve server-side, and the product page 308s
+ * them to this canonical form.
+ */
 export function productUrl(product: { id: string | number; name?: string; slug?: string }): string {
-  const slug = (product.name ? toSlug(product.name) : null) ?? product.slug ?? null;
+  const slug = product.slug || (product.name ? toSlug(product.name) : null);
   return `/products/${slug || product.id}`;
 }
 

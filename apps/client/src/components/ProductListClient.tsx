@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductType } from "@/types";
 import { useLanguage, useTranslation } from "@/i18n/context";
 import { ProductsToolbar } from "./ProductsToolbar";
@@ -97,6 +97,20 @@ type CategoryItem = {
 
 type Props = {
   categories: CategoryItem[];
+  /**
+   * Server-fetched catalogue. Supplied so the grid is in the initial HTML:
+   * this component used to fetch in a useEffect, which meant crawlers (and
+   * the LCP measurement) saw only skeletons.
+   */
+  initialProducts?: ProductType[];
+  /**
+   * Seed for the startpage's random pick, generated per request on the server.
+   *
+   * It MUST come from the server. Drawing it here would shuffle differently on
+   * the server and on the client and React would report a hydration mismatch
+   * for the whole grid.
+   */
+  shuffleSeed?: number;
   category?: string;
   params: "homepage" | "products";
   page?: string;
@@ -111,6 +125,8 @@ type Props = {
 
 export function ProductListClient({
   categories,
+  initialProducts = [],
+  shuffleSeed = 0,
   category,
   params,
   page: pageParam,
@@ -123,50 +139,27 @@ export function ProductListClient({
 }: Props) {
   const { locale } = useLanguage();
   const t = useTranslation();
-  const [products, setProducts] = useState<ProductType[]>([]);
+  const [products, setProducts] = useState<ProductType[]>(initialProducts);
   const [categoriesState, setCategoriesState] = useState<CategoryItem[]>(categories);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialProducts.length === 0);
   const [loadFailed, setLoadFailed] = useState(false);
-  // Drawn once per mount, i.e. once per page load / client-side nav here —
-  // that is what re-rolls the startpage's random selection on every refresh.
-  const [shuffleSeed] = useState(() => (Math.random() * 2 ** 32) >>> 0);
+  // Same contract as HomepageSlider: when the server already supplied the
+  // catalogue, skip the hydration-time refetch and keep the server's markup.
+  const skipHydrationRefetchRef = useRef(initialProducts.length > 0);
 
   useEffect(() => {
     let cancelled = false;
+    if (skipHydrationRefetchRef.current) {
+      skipHydrationRefetchRef.current = false;
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     Promise.allSettled([fetchProducts(locale), fetchCategories(locale)]).then(
       (results) => {
         if (cancelled) return;
         const [pRes, cRes] = results;
-        // #region agent log
-        if (process.env.NODE_ENV === "development") {
-          fetch("/api/debug-log", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: "e93869",
-              hypothesisId: "H8",
-              location: "ProductListClient.tsx:useEffect",
-              message: "fetchProducts + fetchCategories settled",
-              data: {
-                locale,
-                productsStatus: pRes.status,
-                categoriesStatus: cRes.status,
-                productsCount:
-                  pRes.status === "fulfilled" ? pRes.value.length : null,
-                productsReason:
-                  pRes.status === "rejected"
-                    ? String((pRes.reason as Error)?.message ?? pRes.reason)
-                    : null,
-                categoriesReason:
-                  cRes.status === "rejected"
-                    ? String((cRes.reason as Error)?.message ?? cRes.reason)
-                    : null,
-              },
-            }),
-          }).catch(() => {});
-        }
-        // #endregion
         if (pRes.status === "fulfilled") setProducts(pRes.value);
         else {
           console.error("Failed to fetch products:", pRes.reason);

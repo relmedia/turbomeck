@@ -186,6 +186,10 @@ const nextConfig: NextConfig = {
     return config;
   },
   images: {
+    // Unset means Next serves WebP only. AVIF first typically saves a further
+    // 20-30% on product photos, which are the bulk of the bytes on a listing
+    // page and so the main lever on LCP here.
+    formats: ["image/avif", "image/webp"],
     // SECURITY (audit M11): only allow proxying local IPs in dev. The dev flow
     // loads images served by the admin/product process on localhost:3001/8000,
     // which production deployments never expose.
@@ -196,15 +200,6 @@ const nextConfig: NextConfig = {
         hostname: "localhost",
         port: "3001",
         pathname: "/uploads/**",
-      },
-      {
-        protocol: "https",
-        hostname: "images.pexels.com",
-      },
-      {
-        protocol: "https",
-        hostname: "img.clerk.com",
-        pathname: "/**",
       },
       // R2 S3 endpoint (fallback; set NEXT_PUBLIC_R2_PUBLIC_URL for public URLs to avoid 400)
       { protocol: "https", hostname: "10249571bfc72d7eb7816158e9d29a34.r2.cloudflarestorage.com", pathname: "/**" },

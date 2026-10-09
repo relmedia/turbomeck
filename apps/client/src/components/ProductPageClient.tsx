@@ -1,10 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useLanguage } from "@/i18n/context";
-import { fetchProduct, fetchCategories } from "@/lib/api";
-import { toSlug } from "@/lib/utils";
+import { useState } from "react";
 import { ProductDetailContent } from "@/components/ProductDetailContent";
 import { ProductImageGallery } from "@/components/ProductImageGallery";
 import {
@@ -13,9 +9,7 @@ import {
   type ProductTabId,
 } from "@/components/ProductInfoTabs";
 import { ProductReviewsProvider } from "@/components/ProductReviews";
-import { notFound } from "next/navigation";
 import type { ProductType } from "@/types";
-import { Skeleton } from "@/components/Skeleton";
 
 type Category = {
   id: number;
@@ -24,20 +18,33 @@ type Category = {
   parentName?: string | null;
 };
 
+/**
+ * Interactive shell for the product page.
+ *
+ * The product and category list are fetched by the Server Component in
+ * `app/products/[slug]/page.tsx` and handed down as props. This component used
+ * to fetch them itself in a `useEffect`, which meant the server HTML was a
+ * skeleton: the h1, price, description and specs only existed after hydration,
+ * so a crawler saw an empty page. Locale changes still work — `setLocale`
+ * calls `router.refresh()` (i18n/context.tsx), which re-runs the server
+ * component and sends down newly localized props.
+ *
+ * What stays client-side is genuinely interactive: tab selection, the gallery,
+ * and the reviews provider.
+ */
 type Props = {
-  slug: string;
+  product: ProductType;
+  categories: Category[];
   size?: string;
   color?: string;
 };
 
-export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: Props) {
-  const { locale } = useLanguage();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [product, setProduct] = useState<ProductType | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ProductPageClient({
+  product,
+  categories,
+  size: sizeParam,
+  color: colorParam,
+}: Props) {
   const [activeTab, setActiveTab] = useState<ProductTabId>("description");
 
   /** "Read more" under the clamped description: open the description tab and jump to it. */
@@ -47,61 +54,6 @@ export function ProductPageClient({ slug, size: sizeParam, color: colorParam }: 
       .getElementById(PRODUCT_TABS_SECTION_ID)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      fetchProduct(slug, locale),
-      fetchCategories(locale),
-    ])
-      .then(([p, cats]) => {
-        if (!cancelled) {
-          setProduct(p);
-          setCategories(cats);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          console.error("Failed to fetch product:", e);
-          setProduct(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [slug, locale]);
-
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-4 mt-6">
-        <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-4">
-          <Skeleton className="w-full lg:w-5/12 h-96 rounded-lg" />
-          <div className="w-full lg:w-7/12 flex flex-col gap-4">
-            <Skeleton className="h-6 w-3/4 rounded" />
-            <Skeleton className="h-4 w-full rounded" />
-            <Skeleton className="h-4 w-full rounded" />
-            <Skeleton className="h-8 w-1/4 rounded" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) notFound();
-
-  // Redirect to translated slug when URL doesn't match (ID-based or wrong language)
-  const targetSlug = (product.name ? toSlug(product.name) : null) ?? product.slug ?? null;
-  const isNumericSlug = /^\d+$/.test(slug);
-  const slugMismatch = targetSlug && slug !== targetSlug;
-  if (slugMismatch) {
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    if (sizeParam) params.set("size", sizeParam);
-    if (colorParam) params.set("color", colorParam);
-    const qs = params.toString();
-    router.replace(`/products/${targetSlug}${qs ? `?${qs}` : ""}`);
-  }
 
   const selectedSize = sizeParam || product.sizes[0];
   const selectedColor = colorParam || product.colors[0];

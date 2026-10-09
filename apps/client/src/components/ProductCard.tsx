@@ -7,7 +7,6 @@ import useCartStore from "@/stores/cartStore";
 import type { ProductType } from "@/types";
 import { productUrl } from "@/lib/utils";
 import { useWishlist } from "@/hooks/useWishlist";
-import { fetchReviews } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/Skeleton";
 import { Card, CardContent } from "@repo/ui/components/card";
@@ -44,10 +43,18 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
 
   const { toggle: toggleWishlist, isInWishlist, isSignedIn } = useWishlist();
   const { addToCart } = useCartStore();
-  const [reviewStats, setReviewStats] = useState<{
-    averageRating: number;
-    totalCount: number;
-  } | "loading" | "error">("loading");
+  /**
+   * Review aggregates come down with the product now — the list endpoint
+   * already computes them in one grouped query
+   * (product-service/src/index.ts:936-954). This component used to call
+   * /api/reviews per card from a useEffect, so a grid of 8 made 8 extra
+   * round trips for data that was already in the response it rendered from,
+   * and the stars popped in after a skeleton on every card.
+   */
+  const reviewStats = {
+    averageRating: product.averageRating ?? 0,
+    totalCount: product.reviewCount ?? 0,
+  };
 
   const images: string[] =
     product.galleryImages && product.galleryImages.length > 0
@@ -56,18 +63,6 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
         )
       : [product.images?.default || "/logo.svg"];
 
-  useEffect(() => {
-    const pid = Number(product.id);
-    if (!pid) {
-      setReviewStats({ averageRating: 0, totalCount: 0 });
-      return;
-    }
-    fetchReviews(pid)
-      .then(({ averageRating, totalCount }) =>
-        setReviewStats({ averageRating, totalCount })
-      )
-      .catch(() => setReviewStats("error"));
-  }, [product.id]);
 
   // The gallery is a native horizontal scroll-snap track, so a finger drag
   // scrolls it with the platform's own momentum and rubber-banding. The
@@ -173,8 +168,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   const cartLabel =
     attrs.length > 0 ? t("common.selectOptions") : t("common.addToCart");
 
-  const reviewCount =
-    typeof reviewStats === "object" ? reviewStats.totalCount : 0;
+  const reviewCount = reviewStats.totalCount;
 
   return (
     <Link
@@ -204,7 +198,13 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
               >
                 <ImageWithFallback
                   src={src}
-                  alt=""
+                  // Only the first slide is described: the rest are the same
+                  // product from other angles, and repeating the name on every
+                  // slide would make a screen reader announce it N times. The
+                  // card's h3 is not a substitute here the way the product
+                  // page's h1 is for the gallery — a crawler reading the grid
+                  // has no other text tying this image to the product.
+                  alt={i === 0 ? product.name : ""}
                   fill
                   priority={priority && i === 0}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -328,30 +328,25 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
           {/* Always rendered, even at zero reviews: a missing row made cards
               in the same grid row different shapes, and "0 recensioner" is
               itself information a shopper uses. */}
-          {reviewStats === "loading" ? (
-            <Skeleton className="h-3.5 w-28" />
-          ) : (
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star
-                  key={i}
-                  className={cn(
-                    "h-3.5 w-3.5",
-                    reviewStats !== "error" &&
-                      reviewStats.totalCount > 0 &&
-                      i <= Math.round(reviewStats.averageRating)
-                      ? "fill-amber-500 text-amber-500"
-                      : "text-gray-300"
-                  )}
-                  aria-hidden
-                />
-              ))}
-              <span className="ml-1 text-xs text-muted-foreground">
-                ({reviewCount}{" "}
-                {reviewCount === 1 ? t("common.review") : t("common.reviews")})
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Star
+                key={i}
+                className={cn(
+                  "h-3.5 w-3.5",
+                  reviewStats.totalCount > 0 &&
+                    i <= Math.round(reviewStats.averageRating)
+                    ? "fill-amber-500 text-amber-500"
+                    : "text-gray-300"
+                )}
+                aria-hidden
+              />
+            ))}
+            <span className="ml-1 text-xs text-muted-foreground">
+              ({reviewCount}{" "}
+              {reviewCount === 1 ? t("common.review") : t("common.reviews")})
+            </span>
+          </div>
 
           {/* Prose only — the spec sheet belongs on the product page, not in
               the grid. Clamped to three lines so cards in the same row keep

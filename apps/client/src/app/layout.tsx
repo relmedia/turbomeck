@@ -6,6 +6,8 @@ import { WishlistProvider } from "@/components/providers/WishlistProvider";
 import { LanguageProvider } from "@/i18n/context";
 import { CurrencyProvider } from "@/components/providers/CurrencyProvider";
 import { resolveDisplayCurrency } from "@/lib/display-currency";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CompareBar } from "@/components/compare/CompareBar";
@@ -27,10 +29,42 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_DESCRIPTION =
+  "Turbomeck är en svensk webshop som specialiserar sig på högpresterande turbodelar och avgassystem för bilar — allt från kompressorhjul och turbinaxlar till downpipes, intercoolers, dumpventiler och mätare.";
+
 export const metadata: Metadata = {
-  title: "Turbomeck - Allt från turbo till avgassystem",
-  description:
-    "Turbomeck är en svensk webshop som specialiserar sig på högpresterande turbodelar och avgassystem för bilar — allt från kompressorhjul och turbinaxlar till downpipes, intercoolers, dumpventiler och mätare.",
+  // Required for `alternates.canonical` and openGraph image paths to resolve
+  // to absolute URLs. Without it Next emits relative canonicals, which Google
+  // resolves against the request host — so a request to any other hostname
+  // would self-canonicalise instead of pointing at the apex.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    // `default` is used verbatim; `template` wraps every page-level title, so
+    // routes only declare their own subject and still get the brand suffix.
+    default: "Turbomeck – Allt från turbo till avgassystem",
+    template: "%s | Turbomeck",
+  },
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "sv_SE",
+    siteName: SITE_NAME,
+    url: "/",
+    title: "Turbomeck – Allt från turbo till avgassystem",
+    description: SITE_DESCRIPTION,
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Turbomeck – Allt från turbo till avgassystem",
+    description: SITE_DESCRIPTION,
+    images: ["/logo.png"],
+  },
+  // Swedish is the only indexable locale; the en translation is a cookie-based
+  // UI convenience with no URL of its own, so there is nothing to pair with
+  // hreflang and no alternate to declare.
+  robots: { index: true, follow: true },
 };
 
 export default async function RootLayout({
@@ -45,6 +79,10 @@ export default async function RootLayout({
   return (
     <html lang="sv" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {/* Site-wide entity markup. Emitted once here rather than per page so
+            there is a single Organization node for Google to attach the brand,
+            logo and contact details to. */}
+        <OrganizationJsonLd />
         <SessionProvider>
           <LanguageProvider>
           <CurrencyProvider

@@ -6,6 +6,24 @@ const UPLOADS_BASE =
 /** Public R2 base URL (e.g. https://pub-xxx.r2.dev) – used to rewrite S3 endpoint URLs which return 400 for unauthenticated requests */
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
+/**
+ * Catalogue reads are cached for 5 minutes instead of `no-store`.
+ *
+ * `no-store` made every page view a live DB round trip and, worse, made
+ * /sitemap.xml unbuildable: a route that opts into revalidation cannot contain
+ * an uncached fetch, so the sitemap's product and category lookups both threw
+ * `Dynamic server usage` at build time and the file shipped with only its
+ * static URLs.
+ *
+ * Five minutes is well inside what a shop needs — a price or stock edit in
+ * admin is visible within one window — and it lets Next serve the catalogue
+ * from its data cache instead of re-querying per request.
+ *
+ * Deliberately NOT applied to orders, account data or review mutations: those
+ * are per-user and must never be served from a shared cache.
+ */
+const CATALOG_REVALIDATE_SECONDS = 300;
+
 export type ApiCategory = {
   id: number;
   name: string;
@@ -32,6 +50,13 @@ export type ApiProduct = {
   isExchangeTurbo?: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Aggregates the list endpoint already computes in one grouped query
+   * (product-service/src/index.ts:936-954). They were being dropped by the
+   * mapper below, so every card re-fetched them one request at a time.
+   */
+  averageRating?: number | null;
+  reviewCount?: number | null;
 };
 
 /**
@@ -78,6 +103,9 @@ export function apiProductToProductType(api: ApiProduct): ProductType {
     colors: ["default"],
     images: { default: mainImg },
     galleryImages: galleryImages.length > 0 ? galleryImages : [mainImg],
+    updatedAt: api.updatedAt,
+    averageRating: api.averageRating ?? null,
+    reviewCount: api.reviewCount ?? 0,
   };
 }
 
@@ -120,13 +148,19 @@ async function readProductApiJson<T>(res: Response, url: string, label: string):
 
 export async function fetchCategories(locale?: "sv" | "en"): Promise<ApiCategory[]> {
   const url = locale ? `${PRODUCT_API}/categories?locale=${locale}` : `${PRODUCT_API}/categories`;
-  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
+  const res = await fetchWithRetry(
+    url,
+    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+  );
   return readProductApiJson<ApiCategory[]>(res, url, "Failed to fetch categories");
 }
 
 export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]> {
   const url = locale ? `${PRODUCT_API}/products?locale=${locale}` : `${PRODUCT_API}/products`;
-  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
+  const res = await fetchWithRetry(
+    url,
+    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+  );
   const data = await readProductApiJson<ApiProduct[]>(res, url, "Failed to fetch products");
   return data.map(apiProductToProductType);
 }
@@ -136,7 +170,10 @@ export async function fetchSliderProducts(locale?: "sv" | "en"): Promise<Product
   const params = new URLSearchParams({ featuredInSlider: "1" });
   if (locale) params.set("locale", locale);
   const url = `${PRODUCT_API}/products?${params}`;
-  const res = await fetchWithRetry(url, productApiRequestInit({ cache: "no-store" }));
+  const res = await fetchWithRetry(
+    url,
+    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+  );
   const text = await res.text();
   if (!res.ok) {
     console.error(
@@ -290,7 +327,10 @@ export async function fetchProduct(idOrSlug: string, locale?: "sv" | "en"): Prom
     ? `${PRODUCT_API}/products/${idOrSlug}`
     : `${PRODUCT_API}/products/slug/${idOrSlug}`;
   const url = locale ? `${base}?locale=${locale}` : base;
-  const res = await fetch(url, productApiRequestInit({ cache: "no-store" }));
+  const res = await fetch(
+    url,
+    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+  );
   if (!res.ok) return null;
   const data: ApiProduct = await res.json();
   return apiProductToProductType(data);

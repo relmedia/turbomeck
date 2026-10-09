@@ -887,6 +887,34 @@ async function getProductCategoryIds(productIds: number[]): Promise<Map<number, 
   return map;
 }
 
+// Helper: average rating + review count per product (products without reviews
+// are simply absent from the map — callers must emit null, not 0, so the
+// storefront's AggregateRating JSON-LD never claims a 0-star product.
+// Never throws: a reviews outage must not take the catalogue down with it.
+async function getProductRatings(
+  productIds: number[]
+): Promise<Map<number, { avg: number; count: number }>> {
+  const map = new Map<number, { avg: number; count: number }>();
+  if (productIds.length === 0) return map;
+  try {
+    const rows = await db
+      .select({
+        productId: reviews.productId,
+        avgRating: sql<number>`round(avg(${reviews.rating})::numeric, 1)`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(reviews)
+      .where(inArray(reviews.productId, productIds))
+      .groupBy(reviews.productId);
+    for (const r of rows) {
+      map.set(r.productId, { avg: Number(r.avgRating), count: r.count });
+    }
+  } catch (ratingErr) {
+    console.error("Error fetching review aggregates (continuing without ratings):", ratingErr);
+  }
+  return map;
+}
+
 // GET all products (optional ?ids=1,2,3 for filtering, ?featuredInSlider=1 for homepage slider, ?locale=sv|en for translated content)
 app.get("/api/products", async (req, res) => {
   try {
@@ -932,26 +960,7 @@ app.get("/api/products", async (req, res) => {
     const productIds = allProducts.map((p) => p.id);
     const categoryMap = await getProductCategoryIds(productIds);
 
-    // Average rating per product (products without reviews get null)
-    const ratingMap = new Map<number, { avg: number; count: number }>();
-    if (productIds.length > 0) {
-      try {
-        const ratingRows = await db
-          .select({
-            productId: reviews.productId,
-            avgRating: sql<number>`round(avg(${reviews.rating})::numeric, 1)`,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(reviews)
-          .where(inArray(reviews.productId, productIds))
-          .groupBy(reviews.productId);
-        for (const r of ratingRows) {
-          ratingMap.set(r.productId, { avg: Number(r.avgRating), count: r.count });
-        }
-      } catch (ratingErr) {
-        console.error("Error fetching review aggregates (continuing without ratings):", ratingErr);
-      }
-    }
+    const ratingMap = await getProductRatings(productIds);
 
     const formatted = allProducts.map((p) => {
       const loc = localizeProduct(p, locale);
@@ -1036,6 +1045,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
     const p = product;
     const loc = localizeProduct(p, locale);
     const categoryIds = (await getProductCategoryIds([p.id])).get(p.id) ?? [];
+    const rating = (await getProductRatings([p.id])).get(p.id);
     res.json({
       id: p.id,
       slug: productNameToSlug(p.name),
@@ -1053,6 +1063,8 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
+      averageRating: rating?.avg ?? null,
+      reviewCount: rating?.count ?? 0,
     });
   } catch (error) {
     console.error("Error fetching product by slug:", error);
@@ -1103,6 +1115,7 @@ app.get("/api/products/:id", async (req, res) => {
       .from(orderItems)
       .where(eq(orderItems.productId, id));
     const totalRevenue = parseFloat(totalRevenueResult[0]?.total ?? "0");
+    const rating = (await getProductRatings([p.id])).get(p.id);
     res.json({
       id: p.id,
       slug: productNameToSlug(p.name),
@@ -1125,6 +1138,8 @@ app.get("/api/products/:id", async (req, res) => {
       totalRevenue,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
+      averageRating: rating?.avg ?? null,
+      reviewCount: rating?.count ?? 0,
     });
   } catch (error) {
     console.error("Error fetching product:", error);

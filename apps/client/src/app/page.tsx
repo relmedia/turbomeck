@@ -8,6 +8,20 @@ import { fetchSliderProducts, fetchCategories, fetchProducts } from "@/lib/api";
 import { buildCategoryImageMap } from "@/lib/category-images";
 import { categorySlug } from "@/lib/utils";
 import { LOCALE_COOKIE_NAME, type Locale } from "@/i18n/context";
+import type { Metadata } from "next";
+
+/**
+ * The homepage previously inherited the root layout's metadata verbatim, which
+ * meant / and /products shipped identical titles — a duplicate-title signal on
+ * the two most valuable URLs on the site.
+ */
+export const metadata: Metadata = {
+  title: {
+    // Absolute: the homepage should not read "... | Turbomeck".
+    absolute: "Turbomeck – Turbodelar och avgassystem till Saab och Volvo",
+  },
+  alternates: { canonical: "/" },
+};
 
 const Homepage = async ({
   searchParams,
@@ -19,6 +33,9 @@ const Homepage = async ({
 
   let sliderProducts = [] as Awaited<ReturnType<typeof fetchSliderProducts>>;
   let categories = [] as Awaited<ReturnType<typeof fetchCategories>>;
+  // Reused for the product grid below, so the homepage fetches the catalogue
+  // once rather than once for the category images and again for the grid.
+  let products = [] as Awaited<ReturnType<typeof fetchProducts>>;
   let categoryImages: Awaited<ReturnType<typeof buildCategoryImageMap>> = {};
   if (isStartPage) {
     const cookieStore = await cookies();
@@ -37,6 +54,7 @@ const Homepage = async ({
     else console.error("Homepage categories SSR fetch failed:", cats.reason);
     // Card backgrounds come from the catalogue; without it the cards simply
     // fall back to the charcoal panel.
+    if (prods.status === "fulfilled") products = prods.value;
     if (cats.status === "fulfilled" && prods.status === "fulfilled") {
       categoryImages = buildCategoryImageMap(cats.value, prods.value, categorySlug);
     } else if (prods.status === "rejected") {
@@ -48,6 +66,13 @@ const Homepage = async ({
     <div className="">
       {isStartPage && (
         <>
+          {/* Visually hidden: the hero slider is the page's visual opening and
+              the brand is in the navbar, so there is nowhere to put a display
+              h1 without redesigning the hero. The document still needs exactly
+              one top-level heading, and this is it. */}
+          <h1 className="sr-only">
+            Turbomeck – turbodelar och avgassystem till Saab och Volvo
+          </h1>
           {/* Hero + reassurance strip share one frame: the strip is the hero's
               plinth, so the elevation and the bottom margin live out here. */}
           <div className="mt-4 mb-12 shadow-lg sm:mt-6">
@@ -61,7 +86,13 @@ const Homepage = async ({
           />
         </>
       )}
-      <ProductList category={category} params="homepage" page={page} search={search} />
+      <ProductList
+        category={category}
+        params="homepage"
+        page={page}
+        search={search}
+        initialProducts={isStartPage ? products : undefined}
+      />
     </div>
   );
 };
