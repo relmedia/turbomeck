@@ -395,6 +395,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             authorization: {
               params: { prompt: "select_account" },
             },
+            /**
+             * Sign in with Google onto an existing account that already has
+             * this email address, instead of failing with
+             * OAuthAccountNotLinked.
+             *
+             * Named "dangerous" because it treats the provider's email claim
+             * as proof of ownership: a provider that handed us an UNVERIFIED
+             * address could be used to reach someone else's account. Google
+             * verifies the addresses it asserts, so the claim is sound here —
+             * and the alternative is that a customer who registered by email
+             * link can never use this button, which is the common case for
+             * this shop rather than an edge one.
+             *
+             * Do not copy this onto a provider that does not verify email.
+             */
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
@@ -403,6 +419,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Facebook({
             clientId: process.env.AUTH_FACEBOOK_ID,
             clientSecret: process.env.AUTH_FACEBOOK_SECRET,
+            // Same reasoning as Google above: match an existing customer by
+            // email rather than dead-ending on OAuthAccountNotLinked. Requires
+            // the `email` permission on the Facebook app — without it Facebook
+            // returns no address, nothing can be matched, and a duplicate
+            // account is created instead.
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),

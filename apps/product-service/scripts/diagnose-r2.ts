@@ -8,7 +8,11 @@
  *   1) S3 ListObjects works with the configured creds (counts + first 10 keys)
  *   2) For each of the first few keys, fetches the public URL and prints status
  *   3) Verifies that DB image_url paths still match objects in the bucket
- *   4) Audits every product image reference; --clear-missing nulls dead ones
+ *   4) Audits every product image reference — main image AND thumbnails —
+ *      against the bucket. --clear-missing repairs the dead ones: a dead
+ *      thumbnail is dropped, and a dead main image is replaced by the first
+ *      surviving thumbnail rather than nulled, so a product only falls back
+ *      to the placeholder when it has no usable image left at all.
  */
 
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
@@ -118,7 +122,7 @@ async function main() {
 
   const { db } = await import("@repo/database");
   const { products } = await import("@repo/database/schema");
-  const { isNotNull, eq } = await import("drizzle-orm");
+  const { eq } = await import("drizzle-orm");
 
   const bucketKeys = new Set<string>();
   let token: string | undefined;
@@ -135,10 +139,16 @@ async function main() {
   } while (token);
   console.log(`    bucket holds ${bucketKeys.size} object(s) under ${PRODUCTS_PREFIX}`);
 
+  // Every product, not just those with a main image: a product can have a
+  // null image and still carry thumbnails that 404.
   const rows = await db
-    .select({ id: products.id, name: products.name, image: products.image })
-    .from(products)
-    .where(isNotNull(products.image));
+    .select({
+      id: products.id,
+      name: products.name,
+      image: products.image,
+      thumbnails: products.thumbnails,
+    })
+    .from(products);
 
   /** Strip the origin and any ?v= cache-buster to get the bucket key. */
   const keyOf = (url: string): string | null => {
@@ -148,34 +158,96 @@ async function main() {
     return withoutQuery.slice(idx + 1);
   };
 
-  const broken: Array<{ id: number; name: string; key: string }> = [];
+  /** A reference is dead when its key is absent from the bucket listing. */
+  const isDead = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const key = keyOf(url);
+    if (!key) return false; // not an R2 products/ URL — not ours to judge
+    return !bucketKeys.has(key);
+  };
+
+  type Repair = {
+    id: number;
+    name: string;
+    deadMain: string | null;
+    deadThumbs: string[];
+    /** Thumbnail promoted into `image`, when the main one is dead. */
+    promote: string | null;
+    survivingThumbs: string[];
+  };
+
+  const repairs: Repair[] = [];
+  let deadRefCount = 0;
+
   for (const row of rows) {
-    const key = keyOf(row.image ?? "");
-    if (!key) continue;
-    if (!bucketKeys.has(key)) {
-      broken.push({ id: row.id, name: row.name ?? "", key });
-    }
+    const thumbs = Array.isArray(row.thumbnails) ? row.thumbnails : [];
+    const deadThumbs = thumbs.filter((t) => isDead(t));
+    const deadMain = isDead(row.image) ? row.image : null;
+    if (!deadMain && deadThumbs.length === 0) continue;
+
+    const survivingThumbs = thumbs.filter((t) => !isDead(t));
+    deadRefCount += deadThumbs.length + (deadMain ? 1 : 0);
+    repairs.push({
+      id: row.id,
+      name: row.name ?? "",
+      deadMain,
+      deadThumbs,
+      // `image` and `thumbnails` are disjoint in this schema, so a promoted
+      // thumbnail moves rather than being duplicated into both.
+      promote: deadMain && survivingThumbs.length > 0 ? survivingThumbs[0]! : null,
+      survivingThumbs,
+    });
   }
 
-  if (broken.length === 0) {
-    console.log("    every product image resolves to an object in the bucket.");
+  if (repairs.length === 0) {
+    console.log("    every product image and thumbnail resolves to an object in the bucket.");
   } else {
-    console.log(`    ${broken.length} product(s) reference an object that is NOT in the bucket:`);
-    for (const b of broken) {
-      console.log(`      #${b.id}  ${b.name.slice(0, 40).padEnd(40)} ${b.key}`);
+    const unrecoverable = repairs.filter((r) => r.deadMain && !r.promote);
+    console.log(
+      `    ${deadRefCount} dead reference(s) across ${repairs.length} product(s):`,
+    );
+    for (const r of repairs) {
+      const bits: string[] = [];
+      if (r.deadMain) bits.push(`main=${keyOf(r.deadMain)}`);
+      if (r.deadThumbs.length) bits.push(`${r.deadThumbs.length} thumb(s)`);
+      const plan = r.promote
+        ? `promote ${keyOf(r.promote)}`
+        : r.deadMain
+          ? "NO IMAGE LEFT — re-upload in admin"
+          : "drop dead thumb(s)";
+      console.log(`      #${String(r.id).padEnd(5)} ${r.name.slice(0, 32).padEnd(34)} ${bits.join(", ").padEnd(46)} -> ${plan}`);
     }
     console.log();
-    console.log("    These render as a broken image and make next/image log an upstream 404.");
-    console.log("    The file itself is gone, so re-upload the image in admin — or run");
-    console.log("    this script with --clear-missing to null the dead references so the");
-    console.log("    storefront falls back to its placeholder instead.");
+    console.log("    Each one makes next/image log an upstream 404 and renders a gap.");
+    console.log("    Re-run with --clear-missing to apply the repairs above.");
+    if (unrecoverable.length > 0) {
+      console.log(
+        `    ${unrecoverable.length} product(s) have no surviving image — those files are`,
+      );
+      console.log("    gone from the bucket and only a re-upload in admin can restore them.");
+    }
 
     if (process.argv.includes("--clear-missing")) {
-      for (const b of broken) {
-        await db.update(products).set({ image: null }).where(eq(products.id, b.id));
-        console.log(`      cleared image on #${b.id}`);
+      console.log();
+      for (const r of repairs) {
+        const update: { image?: string | null; thumbnails?: string[] } = {};
+        if (r.deadMain) {
+          update.image = r.promote ?? null;
+          update.thumbnails = r.promote
+            ? r.survivingThumbs.filter((t) => t !== r.promote)
+            : r.survivingThumbs;
+        } else {
+          update.thumbnails = r.survivingThumbs;
+        }
+        await db.update(products).set(update).where(eq(products.id, r.id));
+        const what = r.deadMain
+          ? r.promote
+            ? `promoted ${keyOf(r.promote)} to main`
+            : "nulled main (no image left)"
+          : `dropped ${r.deadThumbs.length} thumb(s)`;
+        console.log(`      #${r.id}: ${what}`);
       }
-      console.log(`    cleared ${broken.length} dead reference(s).`);
+      console.log(`    repaired ${repairs.length} product(s).`);
     }
   }
 }
