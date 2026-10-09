@@ -1,0 +1,12 @@
+{
+  "$schema": "https://v2-11-7.turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // `tsc` emits to ./dist (see tsconfig outDir), not .next. The root task's
+    // Next-shaped outputs matched nothing here, so turbo cached no artifacts
+    // and warned "no output files found" on every run.
+    "build": {
+      "outputs": ["dist/**"]
+    }
+  }
+}
