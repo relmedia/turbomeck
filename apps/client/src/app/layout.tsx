@@ -14,6 +14,7 @@ import { CompareBar } from "@/components/compare/CompareBar";
 import {
   CookieConsentProvider,
   CookieBanner,
+  CookieBannerBackdrop,
   CookieSettings,
 } from "@/components/cookie-consent";
 import { VisitTracker } from "@/components/VisitTracker";
@@ -115,6 +116,12 @@ export default async function RootLayout({
                   list is empty. */}
               <CompareBar />
             </div>
+            {/* Dims and blurs the page behind the consent banner on a first
+                visit. Gated on the same `isBannerVisible` as the banner, which
+                is itself gated on `isInitialized`, so a returning visitor with
+                stored consent never sees a flash of it. Sits at z-40, under
+                the banner's z-50. */}
+            <CookieBannerBackdrop />
             <CookieBanner />
             <CookieSettings />
             {/* No close button, and the whole toast is the dismiss target.

@@ -93,6 +93,15 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     const initialCountry = value ? parsed.country : defaultCountry;
     const [country, setCountry] = React.useState(initialCountry);
     const [number, setNumber] = React.useState(parsed.number);
+    /**
+     * Set once the customer picks a dial code themselves.
+     *
+     * `emit` reports "" while the number box is empty, so a chosen country
+     * alone does not show up in `value` — without this flag the sync below
+     * would treat "+47, no digits yet" as untouched and snap it back to the
+     * detected country.
+     */
+    const countryPickedByUser = React.useRef(false);
 
     React.useEffect(() => {
       const p = parsePhoneValue(value);
@@ -100,9 +109,10 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       setNumber(p.number);
     }, [value]);
 
-    // Update country when defaultCountry changes (e.g. after browser language detection)
+    // Follow the detected country (browser locale on mount, then geo-IP when
+    // it resolves) for as long as the field is genuinely untouched.
     React.useEffect(() => {
-      if (!value) {
+      if (!value && !countryPickedByUser.current) {
         setCountry(defaultCountry);
       }
     }, [defaultCountry, value]);
@@ -118,6 +128,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     );
 
     const handleCountryChange = (code: string) => {
+      countryPickedByUser.current = true;
       setCountry(code);
       const v = number.replace(/\D/g, "").slice(0, 15);
       setNumber(v);

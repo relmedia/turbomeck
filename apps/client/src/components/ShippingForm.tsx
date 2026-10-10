@@ -3,6 +3,7 @@
 import type { FC } from "react";
 import { useLanguage, useTranslation } from "@/i18n/context";
 import {
+  EUROPEAN_COUNTRY_CODES,
   ShippingFormInputs,
   shippingFormSchema,
   type CartItemType,
@@ -13,6 +14,7 @@ import { ArrowRight, Package, MapPin, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn, getDefaultCountryFromBrowser } from "@/lib/utils";
+import { useGeoCountry } from "@/hooks/useGeoCountry";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
@@ -101,11 +103,34 @@ const ShippingForm: FC<ShippingFormProps> = ({
     useState<PostNordServicePoint | null>(null);
   const [postNordDeliveryOption, setPostNordDeliveryOption] =
     useState<PostNordDeliveryOptionsSelection | null>(null);
+  /**
+   * Which country to pre-select, for both the country field and the phone's
+   * dial code.
+   *
+   * Two signals, weakest first. The browser's locale lands on mount and is only
+   * a hint — a Swedish-language browser in Oslo reports SE. The geo-IP lookup
+   * is the real answer but arrives a fetch later, so it overwrites the guess
+   * once it does.
+   *
+   * Only European results are taken: the country field offers
+   * `EUROPEAN_COUNTRY_CODES` and the schema rejects anything else, so a visitor
+   * from outside the list keeps the locale guess rather than being handed a
+   * value the form cannot accept.
+   */
+  const { country: geoCountry } = useGeoCountry();
   const [detectedCountry, setDetectedCountry] = useState<string>("SE");
 
   useEffect(() => {
     setDetectedCountry(getDefaultCountryFromBrowser());
   }, []);
+
+  useEffect(() => {
+    if (!geoCountry) return;
+    const code = geoCountry.toUpperCase();
+    if ((EUROPEAN_COUNTRY_CODES as readonly string[]).includes(code)) {
+      setDetectedCountry(code);
+    }
+  }, [geoCountry]);
 
   const {
     register,
@@ -114,7 +139,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
     control,
     setValue,
     reset,
-    formState: { errors, isValid },
+    formState: { errors, isValid, dirtyFields },
   } = useForm<ShippingFormInputs>({
     resolver: zodResolver(shippingFormSchema as any),
     mode: "onChange",
@@ -133,10 +158,13 @@ const ShippingForm: FC<ShippingFormProps> = ({
   }, [defaultAddress, reset]);
 
   useEffect(() => {
-    if (!defaultAddress?.country) {
+    // `dirtyFields.country` is only set by the Select's own onChange, never by
+    // the `setValue` below — so once the customer has picked a country, a
+    // late-arriving geo lookup must not move it back under them.
+    if (!defaultAddress?.country && !dirtyFields.country) {
       setValue("country", detectedCountry);
     }
-  }, [detectedCountry, setValue, defaultAddress?.country]);
+  }, [detectedCountry, setValue, defaultAddress?.country, dirtyFields.country]);
 
   const postalCode = watch("postalCode");
   const city = watch("city");
