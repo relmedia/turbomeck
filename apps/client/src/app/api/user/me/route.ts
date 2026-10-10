@@ -9,6 +9,7 @@ import {
   PENDING_PROFILE_COOKIE,
   parsePendingProfile,
 } from "@/lib/pending-profile";
+import { claimGuestOrdersForRow } from "@/lib/claim-guest-orders";
 
 export async function GET() {
   const session = await auth();
@@ -23,6 +24,9 @@ export async function GET() {
       id: users.id,
       name: users.name,
       email: users.email,
+      // Needed by the guest-order claim below; a timestamp, so it does not
+      // widen what the audit comment above is protecting.
+      emailVerified: users.emailVerified,
       image: users.image,
       createdAt: users.createdAt,
       metadata: users.metadata,
@@ -58,6 +62,22 @@ export async function GET() {
       .where(eq(users.id, user.id));
     jar.delete(PENDING_PROFILE_COOKIE);
   }
+
+  /**
+   * Attach any orders placed as a guest with this (now verified) address.
+   *
+   * Runs after the pending-profile write, not inside it: it must happen for
+   * every verified user, including ones who registered long before guest
+   * checkout existed. Ordering matters — the claim merges its marker in SQL,
+   * so it cannot clobber the `termsAcceptedAt` written just above, but a
+   * whole-object write in the other order would.
+   */
+  await claimGuestOrdersForRow({
+    id: user.id,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    metadata: user.metadata,
+  });
 
   const savedAddress = user.metadata?.savedAddress;
   return NextResponse.json({

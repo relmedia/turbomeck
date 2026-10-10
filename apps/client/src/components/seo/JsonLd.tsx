@@ -2,6 +2,7 @@ import type { ProductType } from "@/types";
 import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 import { productUrl } from "@/lib/utils";
 import { htmlToText, truncateAtWord } from "@/lib/html-text";
+import { getShippingPrice } from "@/lib/postnord";
 
 /**
  * Structured data, rendered from Server Components only.
@@ -37,6 +38,77 @@ function JsonLdScript({ data }: { data: unknown }) {
 
 const CONTACT_PHONE = "+46709165006";
 const CONTACT_EMAIL = "shop@turbomeck.se";
+
+/**
+ * Shipping and returns, as stated in the Köpvillkor (`/terms`).
+ *
+ * Google's merchant-listing enrichment reads these off the Offer; every value
+ * below has to stay in step with the terms page, because the markup is a
+ * public promise about what a buyer is charged and what they can send back.
+ */
+
+/** Terms §4: PostNord, 2–5 business days within the Nordics. */
+const TRANSIT_DAYS_MIN = 2;
+const TRANSIT_DAYS_MAX = 5;
+
+/** Terms §5: 14-day right of withdrawal, return postage paid by the buyer. */
+const RETURN_WINDOW_DAYS = 14;
+
+/**
+ * The quoted rate is Sweden-only and per-product.
+ *
+ * Rates are weight- and country-banded (`getShippingPrice`), so a single
+ * figure can only be honest for one destination and one parcel. Sweden is the
+ * home market and the only destination PostNord bands cheaply enough to be
+ * worth advertising; the other countries resolve at checkout.
+ *
+ * `product.weight` is nullable in the catalogue, and 1 kg is the same
+ * assumption the cart already quotes against (`app/cart/page.tsx:91`), so a
+ * weightless product advertises exactly what it will later be charged.
+ */
+function shippingDetailsSE(product: ProductType) {
+  return {
+    "@type": "OfferShippingDetails",
+    shippingRate: {
+      "@type": "MonetaryAmount",
+      value: getShippingPrice(product.weight ?? 1, "SE", "servicepoint"),
+      currency: "SEK",
+    },
+    shippingDestination: {
+      "@type": "DefinedRegion",
+      addressCountry: "SE",
+    },
+    // `handlingTime` is deliberately absent: the terms commit to a delivery
+    // window but never to a dispatch time, and inventing one here would
+    // advertise a promise the shop has not made.
+    deliveryTime: {
+      "@type": "ShippingDeliveryTime",
+      transitTime: {
+        "@type": "QuantitativeValue",
+        minValue: TRANSIT_DAYS_MIN,
+        maxValue: TRANSIT_DAYS_MAX,
+        unitCode: "DAY",
+      },
+    },
+  };
+}
+
+/** Terms §5, as schema.org. Consumer withdrawal under Swedish law. */
+function merchantReturnPolicy() {
+  return {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: "SE",
+    returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+    merchantReturnDays: RETURN_WINDOW_DAYS,
+    returnMethod: "https://schema.org/ReturnByMail",
+    // The buyer pays return postage, and the amount is whatever the carrier
+    // charges them directly — so the category is stated without a figure
+    // rather than with a made-up one.
+    returnFees: "https://schema.org/ReturnShippingFees",
+    refundType: "https://schema.org/FullRefund",
+    merchantReturnLink: absoluteUrl("/terms"),
+  };
+}
 
 /** Organization + WebSite. Rendered once, from the root layout. */
 export function OrganizationJsonLd() {
@@ -161,6 +233,8 @@ export function ProductJsonLd({ product }: { product: ProductType }) {
               : "https://schema.org/OutOfStock",
           itemCondition: "https://schema.org/NewCondition",
           seller: { "@id": `${SITE_URL}/#organization` },
+          shippingDetails: shippingDetailsSE(product),
+          hasMerchantReturnPolicy: merchantReturnPolicy(),
         },
         ...rating,
       }}

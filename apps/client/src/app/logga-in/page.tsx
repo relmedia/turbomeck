@@ -42,6 +42,10 @@ function LoggaInContent() {
   const router = useRouter();
   const errorParam = searchParams.get("error");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
+  // Lets the guest-checkout nudge deep-link straight to the register form, so
+  // there is one sign-up implementation rather than a second copy elsewhere.
+  const defaultMode =
+    searchParams.get("mode") === "register" ? "register" : "login";
   const [authOpen, setAuthOpen] = useState(!errorParam);
 
   const handleAuthOpenChange = (open: boolean) => {
@@ -74,7 +78,7 @@ function LoggaInContent() {
         <AuthModal
           open={authOpen}
           onOpenChange={handleAuthOpenChange}
-          defaultMode="login"
+          defaultMode={defaultMode}
           callbackUrl={callbackUrl}
         />
       </div>

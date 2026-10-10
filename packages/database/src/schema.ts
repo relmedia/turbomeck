@@ -26,6 +26,12 @@ export const users = pgTable("user", {
     savedWishlist?: number[];
     /** ISO timestamp of the terms/privacy acceptance given at sign-up. */
     termsAcceptedAt?: string;
+    /**
+     * ISO timestamp of the one-time sweep that attached this user's pre-account
+     * guest orders (matched on verified email). Set even when nothing matched,
+     * so the sweep runs once rather than on every profile read.
+     */
+    ordersClaimedAt?: string;
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

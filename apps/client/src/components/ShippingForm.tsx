@@ -9,10 +9,10 @@ import {
   type PostNordServicePoint,
 } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Package, MapPin } from "lucide-react";
+import { ArrowRight, Package, MapPin, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getDefaultCountryFromBrowser } from "@/lib/utils";
+import { cn, getDefaultCountryFromBrowser } from "@/lib/utils";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
@@ -33,13 +33,15 @@ import type {
 } from "@/lib/postnord-delivery-options-types";
 import { EUROPEAN_COUNTRIES, CountryFlag } from "./PhoneInput";
 import { POSTNORD_SERVICE_POINT_COUNTRIES } from "@/lib/postnord";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { signIn } from "next-auth/react";
 
 type ShippingFormProps = {
   setShippingForm: (data: ShippingFormInputs) => void;
   onSuccess?: () => void;
   onDeliveryChange?: (
     deliveryOption: "home" | "servicepoint",
-    country: string
+    country: string,
   ) => void;
   /** Called when user picks a structured Delivery Options API alternative. */
   onDeliveryOptionsSelection?: (
@@ -54,6 +56,12 @@ type ShippingFormProps = {
   defaultAddress?: Partial<ShippingFormInputs>;
   /** If true, show "Spara adress till mitt konto" checkbox (user must be logged in) */
   showSaveAddressOption?: boolean;
+  /**
+   * If true, offer to create an account — the guest counterpart of
+   * `showSaveAddressOption`. The two are mutually exclusive in practice: a
+   * signed-in buyer saves an address, a guest is offered the account.
+   */
+  showAccountOffer?: boolean;
 };
 
 const ShippingForm: FC<ShippingFormProps> = ({
@@ -63,13 +71,32 @@ const ShippingForm: FC<ShippingFormProps> = ({
   onDeliveryOptionsSelection,
   defaultAddress,
   showSaveAddressOption = false,
+  showAccountOffer = false,
 }) => {
   const { locale } = useLanguage();
   const t = useTranslation();
   const [saveToAccount, setSaveToAccount] = useState(false);
-  const [deliveryOption, setDeliveryOption] = useState<
-    "home" | "servicepoint"
-  >("servicepoint");
+  /**
+   * The account offer, as local state rather than form fields: none of it is
+   * part of the order, and the order must go through whether or not it works.
+   */
+  const [createAccount, setCreateAccount] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  /**
+   * Remount counter for the challenge. Turnstile tokens expire in minutes and
+   * `TurnstileWidget` reports the expiry as an empty token without re-solving
+   * (its render effect returns early once a widget id exists), so the only way
+   * back to a usable token is a fresh mount. Filling in an address — picking a
+   * service point especially — easily outlasts one token.
+   *
+   * Keyed locally rather than fixed inside `TurnstileWidget`, which is shared
+   * with AuthModal and ContactModal.
+   */
+  const [turnstileEpoch, setTurnstileEpoch] = useState(0);
+  const [deliveryOption, setDeliveryOption] = useState<"home" | "servicepoint">(
+    "servicepoint",
+  );
   const [selectedServicePoint, setSelectedServicePoint] =
     useState<PostNordServicePoint | null>(null);
   const [postNordDeliveryOption, setPostNordDeliveryOption] =
@@ -115,7 +142,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
   const city = watch("city");
   const country = watch("country") ?? "SE";
   const isPostNordCountry = POSTNORD_SERVICE_POINT_COUNTRIES.includes(
-    country.toUpperCase() as "SE" | "NO" | "DK"
+    country.toUpperCase() as "SE" | "NO" | "DK",
   );
 
   const router = useRouter();
@@ -195,8 +222,7 @@ const ShippingForm: FC<ShippingFormProps> = ({
               : "",
             postalCode: selection.locationAddress?.postCode ?? "",
             city: selection.locationAddress?.city ?? "",
-            countryCode:
-              selection.locationAddress?.countryCode ?? country,
+            countryCode: selection.locationAddress?.countryCode ?? country,
           });
         } else {
           setSelectedServicePoint(null);
@@ -242,7 +268,9 @@ const ShippingForm: FC<ShippingFormProps> = ({
     selectedServicePoint,
   ]);
 
-  const handleShippingForm: SubmitHandler<ShippingFormInputs> = async (data) => {
+  const handleShippingForm: SubmitHandler<ShippingFormInputs> = async (
+    data,
+  ) => {
     if (!isDeliveryComplete) return;
     setShippingForm({
       ...data,
@@ -267,6 +295,51 @@ const ShippingForm: FC<ShippingFormProps> = ({
         });
       } catch {
         // Silently fail - address still used for this order
+      }
+    }
+    /**
+     * The account offer, sent here rather than after payment because the
+     * Turnstile token is single-use and expires in minutes — `TurnstileWidget`
+     * zeroes it on `expired-callback`, and `requireTurnstile` rejects an empty
+     * one. By the time payment clears it would usually be dead.
+     *
+     * Fire-and-forget, like the address above: nothing here writes a user row
+     * or touches the order, so a failure must never be allowed to interrupt a
+     * purchase. The buyer can always register later, and the order confirmation
+     * page offers again.
+     */
+    if (showAccountOffer && createAccount && acceptedTerms) {
+      const email = data.email.trim().toLowerCase();
+      try {
+        // Two steps, as in AuthModal: this one validates, records the consent
+        // and parks the display name in a cookie — it mails nothing and writes
+        // no user row. The `signIn` below is what actually sends the link, and
+        // verifying that link is what creates the account.
+        const res = await fetch("/api/auth/sign-up", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name: `${data.firstName} ${data.lastName}`.trim() || undefined,
+            acceptedTerms: true,
+            turnstileToken,
+          }),
+          // A slow Turnstile verify must not hold the buyer on the
+          // "Fortsätt" button; the account is optional, the order is not.
+          signal: AbortSignal.timeout(6000),
+        });
+        // Rejected for rate limit, challenge or validation. Deliberately shown
+        // as nothing at all: any per-outcome message here would turn the cart
+        // into an account-existence oracle. The success page offers again.
+        if (res.ok) {
+          await signIn("email", {
+            email,
+            callbackUrl: "/account",
+            redirect: false,
+          });
+        }
+      } catch {
+        // Silently fail - the order does not depend on the account.
       }
     }
     if (onSuccess) {
@@ -368,7 +441,9 @@ const ShippingForm: FC<ShippingFormProps> = ({
             className={errors.firstName ? "border-destructive" : ""}
           />
           {errors.firstName && (
-            <p className="text-xs text-destructive">{errors.firstName.message}</p>
+            <p className="text-xs text-destructive">
+              {errors.firstName.message}
+            </p>
           )}
         </div>
         <div className="space-y-2">
@@ -380,7 +455,9 @@ const ShippingForm: FC<ShippingFormProps> = ({
             className={errors.lastName ? "border-destructive" : ""}
           />
           {errors.lastName && (
-            <p className="text-xs text-destructive">{errors.lastName.message}</p>
+            <p className="text-xs text-destructive">
+              {errors.lastName.message}
+            </p>
           )}
         </div>
       </div>
@@ -480,12 +557,69 @@ const ShippingForm: FC<ShippingFormProps> = ({
           </label>
         ))}
 
+      {showAccountOffer && (
+        <div
+          className={cn(
+            "rounded-lg border p-4 transition-colors",
+            createAccount
+              ? "border-primary/40 bg-primary/10"
+              : "border-primary/20 bg-primary/5",
+          )}
+        >
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={createAccount}
+              onChange={(e) => setCreateAccount(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded accent-primary"
+            />
+            <span className="flex flex-col gap-1">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <UserPlus
+                  className="h-4 w-4 shrink-0 text-primary"
+                  aria-hidden
+                />
+                {t("cart.createAccountOffer")}
+              </span>
+              {/* Shown unticked too: the reason to opt in has to be readable
+                  before the decision, not after it. */}
+              <span className="text-xs text-muted-foreground">
+                {t("cart.createAccountOfferDesc")}
+              </span>
+            </span>
+          </label>
+          {createAccount && (
+            <div className="mt-3 flex flex-col gap-2 border-t border-primary/20 pt-3 pl-7">
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded accent-primary"
+                />
+                {t("cart.createAccountTerms")}
+              </label>
+              {/* Renders nothing until this deployment has Turnstile keys. */}
+              <TurnstileWidget
+                key={turnstileEpoch}
+                onToken={(token) => {
+                  setTurnstileToken(token);
+                  if (!token) setTurnstileEpoch((n) => n + 1);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 pt-4 border-t border-border">
         {isPostNordCountry ? (
           <PostNordDeliveryOptions
             recipient={recipient}
             language={locale === "en" ? "en" : "sv"}
-            selectedDeliveryOptionId={postNordDeliveryOption?.deliveryOptionId ?? null}
+            selectedDeliveryOptionId={
+              postNordDeliveryOption?.deliveryOptionId ?? null
+            }
             onSelectionChange={handleDeliveryOptionsSelect}
           />
         ) : deliveryOption === "servicepoint" ? (

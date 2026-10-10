@@ -123,6 +123,16 @@ function OrderSuccessContent() {
 
   const dateLocale = locale === "en" ? "en-GB" : "sv-SE";
 
+  /**
+   * A guest's only route back to their order: the view token is what authorises
+   * the read, so the link has to carry it. Relative on purpose — the page is
+   * server-rendered first, and reading `window.location` here would break that.
+   */
+  const guestOrderPath =
+    !session && orderIdParam && orderTokenParam
+      ? `/order/success?orderId=${encodeURIComponent(orderIdParam)}&token=${encodeURIComponent(orderTokenParam)}`
+      : null;
+
   // Capture total from URL (direct flow) or sessionStorage (Stripe redirect)
   useEffect(() => {
     if (pendingCreate || createError) return;
@@ -131,8 +141,14 @@ function OrderSuccessContent() {
     try {
       const s = sessionStorage.getItem("orderSuccessTotal");
       if (s) fromStorage = parseFloat(s);
-    } catch { /* ignore */ }
-    const total = !isNaN(fromUrl) ? fromUrl : !isNaN(fromStorage) ? fromStorage : NaN;
+    } catch {
+      /* ignore */
+    }
+    const total = !isNaN(fromUrl)
+      ? fromUrl
+      : !isNaN(fromStorage)
+        ? fromStorage
+        : NaN;
     if (!isNaN(total)) {
       setOrderDetails({ total, createdAt: new Date() });
     }
@@ -191,7 +207,8 @@ function OrderSuccessContent() {
             const stripe = await loadStripe(data.publishableKey);
             if (!stripe) throw new Error("Stripe.js failed to load");
             const result = await stripe.retrievePaymentIntent(clientSecret);
-            if (result.error) throw new Error(result.error.message ?? "lookup failed");
+            if (result.error)
+              throw new Error(result.error.message ?? "lookup failed");
             return result.paymentIntent;
           })(),
           LOOKUP_TIMEOUT_MS,
@@ -260,7 +277,9 @@ function OrderSuccessContent() {
     try {
       sessionStorage.setItem("orderSuccessTotal", String(totalNum));
       sessionStorage.setItem("orderSuccessCurrency", currency);
-    } catch { /* non-blocking */ }
+    } catch {
+      /* non-blocking */
+    }
 
     (async () => {
       let postNordTrackingId = payload.postNordTrackingId ?? null;
@@ -290,7 +309,8 @@ function OrderSuccessContent() {
         clearCart();
         const params = new URLSearchParams();
         params.set("orderId", String(order.id));
-        if (order.postNordTrackingId) params.set("tracking", order.postNordTrackingId);
+        if (order.postNordTrackingId)
+          params.set("tracking", order.postNordTrackingId);
         params.set("total", String(totalNum));
         if (order.viewToken) params.set("token", order.viewToken);
         router.replace(`/order/success?${params.toString()}`);
@@ -308,7 +328,10 @@ function OrderSuccessContent() {
     const id = orderIdParam ? parseInt(orderIdParam, 10) : NaN;
     if (isNaN(id)) return;
     const userId = session?.user?.id ?? "";
-    fetchOrder(id, userId)
+    // A guest has no userId, so the view token is the only thing that
+    // authorises this read — without it the receipt renders with no order
+    // number, no confirmation address and no pickup point.
+    fetchOrder(id, userId, orderTokenParam)
       .then((order) => {
         if (order) {
           setOrderDetails({
@@ -320,8 +343,16 @@ function OrderSuccessContent() {
           });
         }
       })
-      .catch(() => { /* ignore - use fallbacks */ });
-  }, [orderIdParam, orderTokenParam, session?.user?.id, pendingCreate, createError]);
+      .catch(() => {
+        /* ignore - use fallbacks */
+      });
+  }, [
+    orderIdParam,
+    orderTokenParam,
+    session?.user?.id,
+    pendingCreate,
+    createError,
+  ]);
 
   // Read total from window/sessionStorage on client (runs after hydration)
   useEffect(() => {
@@ -341,7 +372,9 @@ function OrderSuccessContent() {
         const n = parseFloat(s);
         if (!isNaN(n)) setClientTotal(n);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [clientTotal]);
 
   const formattedDate = useMemo(() => {
@@ -370,7 +403,9 @@ function OrderSuccessContent() {
     return (
       <div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-        <p className="mt-4 text-muted-foreground">{t("orderSuccess.completingOrder")}</p>
+        <p className="mt-4 text-muted-foreground">
+          {t("orderSuccess.completingOrder")}
+        </p>
       </div>
     );
   }
@@ -424,11 +459,13 @@ function OrderSuccessContent() {
             {t("orderSuccess.processingBody")}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/account">
-              <Button className="w-full sm:w-auto">
-                {t("orderSuccess.viewOrderHistory")}
-              </Button>
-            </Link>
+            {session && (
+              <Link href="/account">
+                <Button className="w-full sm:w-auto">
+                  {t("orderSuccess.viewOrderHistory")}
+                </Button>
+              </Link>
+            )}
             <Link href="/">
               <Button variant="outline" className="w-full sm:w-auto">
                 <Home className="w-4 h-4" />
@@ -455,11 +492,13 @@ function OrderSuccessContent() {
             {t("orderSuccess.unverifiedBody")}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/account">
-              <Button className="w-full sm:w-auto">
-                {t("orderSuccess.viewOrderHistory")}
-              </Button>
-            </Link>
+            {session && (
+              <Link href="/account">
+                <Button className="w-full sm:w-auto">
+                  {t("orderSuccess.viewOrderHistory")}
+                </Button>
+              </Link>
+            )}
             <Link href="/">
               <Button variant="outline" className="w-full sm:w-auto">
                 <Home className="w-4 h-4" />
@@ -483,14 +522,20 @@ function OrderSuccessContent() {
             {t("orderSuccess.unconfirmedTitle")}
           </h1>
           <p className="text-muted-foreground leading-relaxed">
-            {t("orderSuccess.unconfirmedBody")}
+            {t(
+              session
+                ? "orderSuccess.unconfirmedBody"
+                : "orderSuccess.unconfirmedBodyGuest",
+            )}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/account">
-              <Button className="w-full sm:w-auto">
-                {t("orderSuccess.viewOrderHistory")}
-              </Button>
-            </Link>
+            {session && (
+              <Link href="/account">
+                <Button className="w-full sm:w-auto">
+                  {t("orderSuccess.viewOrderHistory")}
+                </Button>
+              </Link>
+            )}
             <Link href="/">
               <Button variant="outline" className="w-full sm:w-auto">
                 <Home className="w-4 h-4" />
@@ -542,7 +587,9 @@ function OrderSuccessContent() {
   const totalDisplay =
     orderDetails?.total ??
     clientTotal ??
-    (totalFromUrl ?? totalFromWindow ?? totalFromStorage);
+    totalFromUrl ??
+    totalFromWindow ??
+    totalFromStorage;
   const isValidTotal = totalDisplay !== null && !isNaN(totalDisplay);
   const trackingId = trackingParam?.trim() ?? "";
   const postNordTrackingUrl = trackingId
@@ -581,21 +628,22 @@ function OrderSuccessContent() {
 
   return (
     <>
-      <Confetti
-        className="fixed inset-0 z-50 size-full pointer-events-none"
-      />
+      <Confetti className="fixed inset-0 z-50 size-full pointer-events-none" />
       <div className="w-full max-w-lg mx-auto mt-12 mb-16">
         <div className="bg-card border rounded-xl p-8 shadow-sm">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 mb-6">
               <CheckCircle className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-semibold mb-2">{t("orderSuccess.title")}</h1>
-            <p className="text-muted-foreground">
-              {t("orderSuccess.message")}
-            </p>
+            <h1 className="text-2xl font-semibold mb-2">
+              {t("orderSuccess.title")}
+            </h1>
+            <p className="text-muted-foreground">{t("orderSuccess.message")}</p>
             <p className="mt-3 inline-flex items-start gap-2 text-sm text-muted-foreground">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 opacity-80" aria-hidden />
+              <Mail
+                className="mt-0.5 h-4 w-4 shrink-0 opacity-80"
+                aria-hidden
+              />
               <span className="text-left">{emailConfirmationText}</span>
             </p>
           </div>
@@ -605,31 +653,46 @@ function OrderSuccessContent() {
           <div className="space-y-3 text-sm">
             {displayOrderNumber && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("orderSuccess.orderNumberLabel")}</span>
-                <span className="font-mono font-medium">#{displayOrderNumber}</span>
+                <span className="text-muted-foreground">
+                  {t("orderSuccess.orderNumberLabel")}
+                </span>
+                <span className="font-mono font-medium">
+                  #{displayOrderNumber}
+                </span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t("orderSuccess.amountPaid")}</span>
+              <span className="text-muted-foreground">
+                {t("orderSuccess.amountPaid")}
+              </span>
               <span className="font-medium">
-                {isValidTotal ? formatAmount(Number(totalDisplay), orderCurrency) : "—"}
+                {isValidTotal
+                  ? formatAmount(Number(totalDisplay), orderCurrency)
+                  : "—"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t("orderSuccess.paymentMethod")}</span>
+              <span className="text-muted-foreground">
+                {t("orderSuccess.paymentMethod")}
+              </span>
               <span className="font-medium capitalize">
                 {redirectMethod ?? t("orderSuccess.paymentMethodCard")}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t("orderSuccess.dateTime")}</span>
+              <span className="text-muted-foreground">
+                {t("orderSuccess.dateTime")}
+              </span>
               <span className="font-medium">{formattedDate}</span>
             </div>
           </div>
 
           {displayServicePoint && (
             <div className="mt-6 flex items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <MapPin
+                className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {t("orderSuccess.servicePointLabel")}
@@ -653,7 +716,10 @@ function OrderSuccessContent() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                      <Icon
+                        className="h-3.5 w-3.5 text-muted-foreground"
+                        aria-hidden
+                      />
                       {title}
                     </p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
@@ -680,7 +746,11 @@ function OrderSuccessContent() {
                 rel="noopener noreferrer"
                 className="mb-3 inline-flex"
               >
-                <Button variant="outline" size="sm" className="border-sky-300/80 bg-white/80 hover:bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-sky-300/80 bg-white/80 hover:bg-sky-100/80 dark:border-sky-800 dark:bg-sky-950/50"
+                >
                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
                   {t("orderSuccess.trackAtPostNord")}
                 </Button>
@@ -691,9 +761,28 @@ function OrderSuccessContent() {
             </div>
           )}
 
+          {!session && (
+            <div className="mt-6 rounded-lg border bg-muted/30 px-4 py-4 text-sm">
+              <p className="font-medium">
+                {t("orderSuccess.createAccountNudge")}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("orderSuccess.createAccountNudgeDesc")}
+              </p>
+              <Link href="/logga-in?mode=register" className="mt-3 inline-flex">
+                <Button variant="outline" size="sm">
+                  {t("auth.createAccount")}
+                </Button>
+              </Link>
+            </div>
+          )}
+
           <div className="mt-6 flex flex-row gap-3">
             <Link href="/" className="flex-1">
-              <Button variant="outline" className="w-full justify-between group">
+              <Button
+                variant="outline"
+                className="w-full justify-between group"
+              >
                 <span className="flex items-center gap-2">
                   <Home className="w-4 h-4" />
                   {t("orderSuccess.backToHome")}
@@ -701,9 +790,19 @@ function OrderSuccessContent() {
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Link href="/account" className="flex-1">
-              <Button className="w-full">{t("orderSuccess.viewOrderHistory")}</Button>
-            </Link>
+            {session ? (
+              <Link href="/account" className="flex-1">
+                <Button className="w-full">
+                  {t("orderSuccess.viewOrderHistory")}
+                </Button>
+              </Link>
+            ) : guestOrderPath ? (
+              <Link href={guestOrderPath} className="flex-1">
+                <Button className="w-full">
+                  {t("orderSuccess.viewOrderAsGuest")}
+                </Button>
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
@@ -714,7 +813,13 @@ function OrderSuccessContent() {
 export default function OrderSuccessPage() {
   const t = useTranslation();
   return (
-    <Suspense fallback={<div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center text-muted-foreground">{t("common.loading")}</div>}>
+    <Suspense
+      fallback={
+        <div className="w-full max-w-lg mx-auto mt-12 mb-16 text-center text-muted-foreground">
+          {t("common.loading")}
+        </div>
+      }
+    >
       <OrderSuccessContent />
     </Suspense>
   );

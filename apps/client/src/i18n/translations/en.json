@@ -369,6 +369,9 @@
     "nextStep3Body": "PostNord delivers in 2–4 business days. You'll receive an email with the tracking number when your parcel ships.",
     "backToHome": "Back to homepage",
     "viewOrderHistory": "View order history",
+    "viewOrderAsGuest": "View your order",
+    "createAccountNudge": "Create an account",
+    "createAccountNudgeDesc": "Save your address, track your orders and review what you bought.",
     "trackAtPostNord": "Track at PostNord",
     "completingOrder": "Completing your order...",
     "createOrderFailed": "Could not complete the order",
@@ -383,6 +386,7 @@
     "processingBody": "Your payment is still completing. We will email an order confirmation as soon as it is done — there is nothing more for you to do.",
     "unconfirmedTitle": "No payment to show",
     "unconfirmedBody": "This page shows the receipt after a completed purchase. If you have just ordered, you will find it under your account.",
+    "unconfirmedBodyGuest": "This page shows the receipt after a completed purchase. If you have just ordered, the link to your order is in your confirmation email.",
     "unverifiedTitle": "We could not confirm the payment",
     "unverifiedBody": "We cannot reach the payment service right now, so we cannot show the status here. If the amount was charged you will receive an order confirmation by email shortly — contact us if you are unsure."
   },
@@ -477,8 +481,9 @@
     "removeItem": "Remove item",
     "colorLabel": "Color",
     "sizeLabel": "Size",
-    "loginToComplete": "Log in to complete your purchase",
-    "loginToCompleteDesc": "You need to be logged in to proceed to checkout."
+    "createAccountOffer": "Create an account for me",
+    "createAccountOfferDesc": "We'll email you a login link. It saves your address and your orders.",
+    "createAccountTerms": "I accept the terms and the privacy policy"
   },
   "slider": {
     "regionLabel": "Featured products",

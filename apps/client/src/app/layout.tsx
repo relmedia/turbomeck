@@ -117,7 +117,15 @@ export default async function RootLayout({
             </div>
             <CookieBanner />
             <CookieSettings />
-            <ToastContainer position="top-right" />
+            {/* No close button, and the whole toast is the dismiss target.
+                `closeOnClick` defaults to false in react-toastify v11, so it
+                has to be set explicitly. Both are container-level defaults and
+                no `toast.*()` call overrides them. */}
+            <ToastContainer
+              position="top-right"
+              closeButton={false}
+              closeOnClick
+            />
           </CookieConsentProvider>
           </WishlistProvider>
           </CurrencyProvider>

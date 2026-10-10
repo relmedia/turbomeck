@@ -16,20 +16,21 @@ import {
 } from "@repo/ui/components/select";
 import { ChevronDown, ChevronUp, ShoppingBag, Trash2 } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { getShippingPrice } from "@/lib/postnord";
-import { formatAmount, normalizeCurrency } from "@repo/currency";
+import {
+  convertFromSek,
+  formatAmount,
+  normalizeCurrency,
+} from "@repo/currency";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { createOrder } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import type { SavedAddress } from "@/types";
 import { CORE_KEEP_FEE_SEK } from "@/lib/core-exchange";
 import { useGeoCountry } from "@/hooks/useGeoCountry";
-import { cn } from "@/lib/utils";
 import type { PostNordDeliveryOptionsSelection } from "@/lib/postnord-delivery-options-types";
-
 
 const CartPage: React.FC = () => {
   const router = useRouter();
@@ -52,7 +53,9 @@ const CartPage: React.FC = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [savedAddress, setSavedAddress] = useState<SavedAddress | undefined>();
-  const [coreReturnChoice, setCoreReturnChoice] = useState<"return" | "keep" | null>(null);
+  const [coreReturnChoice, setCoreReturnChoice] = useState<
+    "return" | "keep" | null
+  >(null);
 
   useEffect(() => {
     if (userId) {
@@ -67,7 +70,9 @@ const CartPage: React.FC = () => {
   const { isSweden: geoIsSweden, loading: geoCountryLoading } = useGeoCountry();
 
   const deliveryOption =
-    shippingForm?.deliveryOption ?? shippingPreview?.deliveryOption ?? "servicepoint";
+    shippingForm?.deliveryOption ??
+    shippingPreview?.deliveryOption ??
+    "servicepoint";
   const shippingCountry =
     shippingForm?.country ?? shippingPreview?.country ?? "SE";
 
@@ -84,12 +89,11 @@ const CartPage: React.FC = () => {
 
   const subtotal = cart.reduce(
     (acc, item) => acc + item.price * item.quantity,
-    0
+    0,
   );
   const totalWeightKg = cart.reduce(
-    (acc, item) =>
-      acc + (item.weight ?? 1) * item.quantity,
-    0
+    (acc, item) => acc + (item.weight ?? 1) * item.quantity,
+    0,
   );
   const [couponDiscount, setCouponDiscount] = useState(0);
   /** Percentage the applied code works out to, for the "(90%)" labels. */
@@ -107,7 +111,11 @@ const CartPage: React.FC = () => {
     });
     fetch(`/api/postnord/postpaket-price?${params}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => (d?.price != null ? setShippingFromApi(d.price) : setShippingFromApi(null)))
+      .then((d) =>
+        d?.price != null
+          ? setShippingFromApi(d.price)
+          : setShippingFromApi(null),
+      )
       .catch(() => setShippingFromApi(null));
   }, [totalWeightKg, deliveryOption, shippingCountry]);
 
@@ -153,6 +161,12 @@ const CartPage: React.FC = () => {
    */
   const [quote, setQuote] = useState<{
     currency: string;
+    /**
+     * SEK -> `currency` multiplier the server priced with. Needed to show the
+     * line items in the same currency as the totals below them, from the same
+     * rate, so the two cannot disagree.
+     */
+    fxRate: number;
     subtotal: number;
     shipping: number;
     discount: number;
@@ -176,7 +190,8 @@ const CartPage: React.FC = () => {
         country: shippingCountry,
         deliveryOption,
         commitsCoreReturnWithin14:
-          (shippingCountry ?? "SE").toUpperCase() === "SE" && cartNeedsCoreReturn
+          (shippingCountry ?? "SE").toUpperCase() === "SE" &&
+          cartNeedsCoreReturn
             ? coreReturnChoice === "return"
             : undefined,
       }),
@@ -212,12 +227,34 @@ const CartPage: React.FC = () => {
    */
   const currency = normalizeCurrency(quote?.currency);
   const money = (amount: number) => formatAmount(amount, currency);
+  /**
+   * One line, in the charge currency.
+   *
+   * The catalogue stores SEK and the cart keeps that raw figure, so the line has
+   * to be converted here — with the rate the server quoted, never a separately
+   * fetched one.
+   *
+   * Converts the UNIT price and then multiplies, which is what
+   * `resolveCheckoutOrder` does ("convert each component, not just the total,
+   * so the order reconciles from its own rounded parts"). Converting the line
+   * total instead would round differently and leave the items visibly failing
+   * to add up to the subtotal printed beneath them, by up to a couple of minor
+   * units per line.
+   *
+   * Before the quote lands `currency` is SEK at rate 1, so the amount renders
+   * as the SEK it already is rather than flickering.
+   */
+  const lineMoney = (unitPriceSek: number, quantity: number) =>
+    formatAmount(
+      convertFromSek(unitPriceSek, currency, quote?.fxRate ?? 1) * quantity,
+      currency,
+    );
   const { currency: displayCurrency } = useCurrency();
   const chargeCurrencyDiffers = quote != null && displayCurrency !== currency;
 
   const cartNeedsCoreReturn = useMemo(
     () => cart.some((item) => item.isExchangeTurbo === true),
-    [cart]
+    [cart],
   );
 
   useEffect(() => {
@@ -263,7 +300,9 @@ const CartPage: React.FC = () => {
         appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
       country: shippingForm.country ?? "SE",
       deliveryOption,
-      commitsCoreReturnWithin14: seNeedsCoreChoice ? coreReturnChoice === "return" : undefined,
+      commitsCoreReturnWithin14: seNeedsCoreChoice
+        ? coreReturnChoice === "return"
+        : undefined,
     };
   }, [
     shippingForm,
@@ -310,10 +349,10 @@ const CartPage: React.FC = () => {
       setShippingPreview((prev) =>
         prev.deliveryOption === opt && prev.country === country
           ? prev
-          : { deliveryOption: opt, country }
+          : { deliveryOption: opt, country },
       );
     },
-    []
+    [],
   );
 
   const sections = [
@@ -327,6 +366,7 @@ const CartPage: React.FC = () => {
           onDeliveryChange={handleDeliveryChange}
           defaultAddress={savedAddress}
           showSaveAddressOption={!!userId}
+          showAccountOffer={!session}
           onDeliveryOptionsSelection={setPostNordDeliveryOption}
         />
       ),
@@ -355,7 +395,9 @@ const CartPage: React.FC = () => {
             // Must be here: without it the post-redirect re-price loses the
             // discount and the payment no longer matches the order total.
             couponCode:
-              appliedCoupon && lastValidatedCode ? lastValidatedCode : undefined,
+              appliedCoupon && lastValidatedCode
+                ? lastValidatedCode
+                : undefined,
             subtotal,
             shippingCost: shipping,
             discount,
@@ -411,10 +453,12 @@ const CartPage: React.FC = () => {
               });
               clearCart();
               const params = new URLSearchParams();
-              if (order.postNordTrackingId) params.set("tracking", order.postNordTrackingId);
+              if (order.postNordTrackingId)
+                params.set("tracking", order.postNordTrackingId);
               params.set("orderId", String(order.id));
               params.set("total", String(total));
-              if (!userId && order.viewToken) params.set("token", order.viewToken);
+              if (!userId && order.viewToken)
+                params.set("token", order.viewToken);
               router.push(`/order/success?${params.toString()}`);
             } catch (err) {
               // The payment itself SUCCEEDED here — we hold `result.stripePaymentId`
@@ -445,8 +489,13 @@ const CartPage: React.FC = () => {
     return (
       <div className="w-full mt-8 lg:mt-12">
         <div className="bg-card border rounded-lg p-12 text-center flex flex-col items-center gap-4">
-          <ShoppingBag className="h-16 w-16 text-muted-foreground" strokeWidth={1.5} />
-          <h2 className="text-xl font-bold text-foreground">{t("cart.empty")}</h2>
+          <ShoppingBag
+            className="h-16 w-16 text-muted-foreground"
+            strokeWidth={1.5}
+          />
+          <h2 className="text-xl font-bold text-foreground">
+            {t("cart.empty")}
+          </h2>
           <p className="text-sm text-muted-foreground whitespace-nowrap">
             {t("cart.emptyDescription")}
           </p>
@@ -465,12 +514,8 @@ const CartPage: React.FC = () => {
   return (
     <div className="w-full mt-8 lg:mt-12">
       <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-        {/* LEFT COLUMN - Shopping Cart (combined) + Coupon; guests: below login on mobile */}
-        <div
-          className={`lg:w-2/5 space-y-6 ${
-            !session ? "order-2 lg:order-1" : ""
-          }`}
-        >
+        {/* LEFT COLUMN - Shopping Cart (combined) + Coupon */}
+        <div className="lg:w-2/5 space-y-6">
           {/* Shopping Cart – items + order summary + place order */}
           <div className="bg-card border rounded-lg p-6">
             <h2 className="text-lg font-bold mb-1">{t("cart.title")}</h2>
@@ -486,6 +531,7 @@ const CartPage: React.FC = () => {
                 <CartItemRow
                   key={`${item.id}-${item.selectedSize}-${item.selectedColor}-${item.selectedVariant ?? ""}`}
                   item={item}
+                  formatPrice={lineMoney}
                   onRemove={() => removeFromCart(item)}
                   onQuantityChange={(q) => updateQuantity(item, q)}
                 />
@@ -493,13 +539,17 @@ const CartPage: React.FC = () => {
             </div>
             <div className="mt-6 pt-6 border-t border-border space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("cart.subtotal")}</span>
+                <span className="text-muted-foreground">
+                  {t("cart.subtotal")}
+                </span>
                 <span className="font-medium">
                   {money(quote?.subtotal ?? subtotal)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("cart.shipping")}</span>
+                <span className="text-muted-foreground">
+                  {t("cart.shipping")}
+                </span>
                 <span className="font-medium">
                   {money(quote?.shipping ?? shipping)}
                 </span>
@@ -509,7 +559,9 @@ const CartPage: React.FC = () => {
                   <span>
                     {t("cart.discount")}
                     {discountPercent > 0 && (
-                      <span className="ml-1 font-medium">({discountPercent}%)</span>
+                      <span className="ml-1 font-medium">
+                        ({discountPercent}%)
+                      </span>
                     )}
                   </span>
                   <span className="font-medium">
@@ -594,7 +646,9 @@ const CartPage: React.FC = () => {
               <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 px-4 py-3">
                 <span className="text-sm font-medium text-green-800 dark:text-green-200">
                   {discountPercent > 0 && `${discountPercent}% – `}
-                  {t("cart.couponApplied", { amount: discount.toLocaleString("sv-SE") })}
+                  {t("cart.couponApplied", {
+                    amount: discount.toLocaleString("sv-SE"),
+                  })}
                 </span>
                 <Button
                   type="button"
@@ -643,50 +697,40 @@ const CartPage: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Checkout Forms or Login Prompt; guests: first on mobile */}
-        <div
-          className={cn("lg:w-3/5 space-y-4", !session && "order-1 lg:order-2")}
-        >
-          {!session ? (
-            <div className="bg-card border rounded-lg p-8 flex flex-col items-center justify-center text-center gap-4">
-              <h3 className="text-lg font-semibold">{t("cart.loginToComplete")}</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {t("cart.loginToCompleteDesc")}
-              </p>
-              <Button asChild>
-                <Link href="/logga-in?callbackUrl=%2Fcart">{t("nav.login")}</Link>
-              </Button>
-            </div>
-          ) : (
-            sections.map((section) => (
-              <div
-                key={section.id}
-                className="bg-card border rounded-lg overflow-hidden"
+        {/* RIGHT COLUMN - Checkout Forms. Guests check out here too; the
+            account is offered inside the details form, never required. */}
+        <div className="lg:w-3/5 space-y-4">
+          {sections.map((section) => (
+            <div
+              key={section.id}
+              className="bg-card border rounded-lg overflow-hidden"
+            >
+              <button
+                type="button"
+                disabled={section.id === 3 && !shippingForm}
+                title={
+                  section.id === 3 && !shippingForm
+                    ? t("cart.completeShippingBeforePayment")
+                    : undefined
+                }
+                onClick={() => {
+                  if (section.id === 3 && !shippingForm) return;
+                  setExpandedSection(
+                    expandedSection === section.id
+                      ? expandedSection
+                      : section.id,
+                  );
+                }}
+                className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
               >
-                <button
-                  type="button"
-                  disabled={section.id === 3 && !shippingForm}
-                  title={
-                    section.id === 3 && !shippingForm
-                      ? t("cart.completeShippingBeforePayment")
-                      : undefined
-                  }
-                  onClick={() => {
-                    if (section.id === 3 && !shippingForm) return;
-                    setExpandedSection(
-                      expandedSection === section.id ? expandedSection : section.id
-                    );
-                  }}
-                  className="w-full flex items-center justify-between p-4 text-left font-medium hover:bg-muted/50 transition-colors disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
-                >
-                  {section.title}
-                  {expandedSection === section.id ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
-                {/*
+                {section.title}
+                {expandedSection === section.id ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+              {/*
                   Always render section.content so React state inside
                   (ShippingForm address fields, selected PostNord delivery
                   option, service point, etc.) is preserved when the user
@@ -694,18 +738,17 @@ const CartPage: React.FC = () => {
                   accordions. Hiding via CSS instead of unmounting avoids
                   losing the customer's chosen shipping details.
                 */}
-                <div
-                  className={
-                    expandedSection === section.id
-                      ? "px-4 pb-4 border-t border-border pt-4"
-                      : "hidden"
-                  }
-                >
-                  {section.content}
-                </div>
+              <div
+                className={
+                  expandedSection === section.id
+                    ? "px-4 pb-4 border-t border-border pt-4"
+                    : "hidden"
+                }
+              >
+                {section.content}
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -714,10 +757,13 @@ const CartPage: React.FC = () => {
 
 function CartItemRow({
   item,
+  formatPrice,
   onRemove,
   onQuantityChange,
 }: {
   item: CartItemType;
+  /** Renders a line in the charge currency, from the stored SEK unit price. */
+  formatPrice: (unitPriceSek: number, quantity: number) => string;
   onRemove: () => void;
   onQuantityChange: (q: number) => void;
 }) {
@@ -780,11 +826,7 @@ function CartItemRow({
         </div>
       </div>
       <p className="text-sm font-semibold shrink-0 self-start">
-        {(item.price * item.quantity).toLocaleString("sv-SE", {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        })}{" "}
-        kr
+        {formatPrice(item.price, item.quantity)}
       </p>
     </div>
   );

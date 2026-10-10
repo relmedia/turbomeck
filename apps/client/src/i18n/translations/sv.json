@@ -369,6 +369,9 @@
     "nextStep3Body": "PostNord levererar normalt på 2–4 arbetsdagar. Du får ett mejl med spårningsnummer när paketet skickas.",
     "backToHome": "Till startsidan",
     "viewOrderHistory": "Visa orderhistorik",
+    "viewOrderAsGuest": "Visa din order",
+    "createAccountNudge": "Skapa ett konto",
+    "createAccountNudgeDesc": "Spara din adress, följ dina ordrar och recensera det du köpt.",
     "trackAtPostNord": "Spåra hos PostNord",
     "completingOrder": "Slutför beställningen...",
     "createOrderFailed": "Kunde inte slutföra beställningen",
@@ -383,6 +386,7 @@
     "processingBody": "Din betalning håller på att slutföras. Vi skickar en orderbekräftelse så snart den är klar — du behöver inte göra något mer.",
     "unconfirmedTitle": "Ingen betalning att visa",
     "unconfirmedBody": "Den här sidan visar kvittot efter ett slutfört köp. Har du precis handlat hittar du din order under Mina sidor.",
+    "unconfirmedBodyGuest": "Den här sidan visar kvittot efter ett slutfört köp. Har du precis handlat hittar du länken till din order i orderbekräftelsen via e-post.",
     "unverifiedTitle": "Vi kunde inte bekräfta betalningen",
     "unverifiedBody": "Vi når inte betaltjänsten just nu, så vi kan inte visa status här. Har beloppet dragits får du en orderbekräftelse via e-post inom kort — hör av dig till oss om du är osäker."
   },
@@ -477,8 +481,9 @@
     "removeItem": "Ta bort",
     "colorLabel": "Färg",
     "sizeLabel": "Storlek",
-    "loginToComplete": "Logga in för att slutföra köpet",
-    "loginToCompleteDesc": "Du måste vara inloggad för att kunna slutföra köpet"
+    "createAccountOffer": "Skapa ett konto åt mig",
+    "createAccountOfferDesc": "Vi mailar en inloggningslänk. Då sparas din adress och dina ordrar.",
+    "createAccountTerms": "Jag godkänner köpvillkoren och integritetspolicyn"
   },
   "slider": {
     "regionLabel": "Utvalda produkter",
