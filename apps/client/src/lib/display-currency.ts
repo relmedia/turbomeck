@@ -59,6 +59,19 @@ export type DisplayCurrency = {
   rate: number;
   /** Where the decision came from, for debugging and for the UI's wording. */
   source: "cookie" | "header" | "geoip" | "language" | "default";
+  /**
+   * The visitor's ISO 3166-1 alpha-2 country, when a signal gave one.
+   *
+   * Returned alongside the currency because it comes from the same two
+   * signals, so the checkout form can pre-select a shipping country on the
+   * server — first paint already correct — instead of fetching it again from
+   * the browser and visibly switching the field afterwards.
+   *
+   * Reported even when it implies no currency we can bill in: a US visitor is
+   * charged in SEK but is still a US visitor. Consumers decide what is usable;
+   * the shipping form, for instance, only accepts European codes.
+   */
+  country: string | null;
 };
 
 /**
@@ -103,33 +116,55 @@ async function geoipCountry(ip: string): Promise<string | null> {
   }
 }
 
+/** Whatever country the edge already told us, if any. Free, no lookup. */
+function countryFromHeaders(headerList: Headers): string | null {
+  for (const name of COUNTRY_HEADERS) {
+    const value = headerList.get(name)?.trim().toUpperCase();
+    if (value && value.length === 2 && value !== "XX") return value;
+  }
+  return null;
+}
+
 export async function resolveDisplayCurrency(): Promise<DisplayCurrency> {
   const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
+
+  const headerCountry = countryFromHeaders(headerList);
 
   const chosen = cookieStore.get(CURRENCY_COOKIE)?.value;
   if (chosen) {
     const currency = normalizeDisplayCurrency(chosen);
-    return { currency, rate: await getSekRate(currency), source: "cookie" };
+    return {
+      currency,
+      rate: await getSekRate(currency),
+      source: "cookie",
+      // Header only: the override is a devtools preview path and is not worth
+      // an IP lookup it would otherwise have skipped.
+      country: headerCountry,
+    };
   }
 
-  for (const name of COUNTRY_HEADERS) {
-    const fromHeader = currencyForDetectedCountry(headerList.get(name));
-    if (fromHeader) {
-      return {
-        currency: fromHeader,
-        rate: await getSekRate(fromHeader),
-        source: "header",
-      };
-    }
+  const fromHeader = currencyForDetectedCountry(headerCountry);
+  if (fromHeader) {
+    return {
+      currency: fromHeader,
+      rate: await getSekRate(fromHeader),
+      source: "header",
+      country: headerCountry,
+    };
   }
 
+  // Only reached when the edge gave no country, or gave one we have no
+  // currency opinion about — the lookup is cached per IP for 12h either way.
   const ip = clientIpFromHeaders(headerList);
-  const fromGeoip = currencyForDetectedCountry(await geoipCountry(ip));
+  const geoipResult = headerCountry ?? (await geoipCountry(ip));
+  const country = headerCountry ?? geoipResult;
+  const fromGeoip = currencyForDetectedCountry(geoipResult);
   if (fromGeoip) {
     return {
       currency: fromGeoip,
       rate: await getSekRate(fromGeoip),
       source: "geoip",
+      country,
     };
   }
 
@@ -139,8 +174,9 @@ export async function resolveDisplayCurrency(): Promise<DisplayCurrency> {
       currency: fromLanguage,
       rate: await getSekRate(fromLanguage),
       source: "language",
+      country,
     };
   }
 
-  return { currency: "SEK", rate: 1, source: "default" };
+  return { currency: "SEK", rate: 1, source: "default", country };
 }

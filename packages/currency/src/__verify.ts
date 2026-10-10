@@ -145,7 +145,7 @@ async function main() {
   const NNB = " ";
   const APO = "’";
 
-  check("SEK", formatAmount(7490, "SEK"), `7${NB}490 kr`);
+  check("SEK is spelled out", formatAmount(7490, "SEK"), `7${NB}490 SEK`);
   check("NOK", formatAmount(7148, "NOK"), `7${NB}148 NOK`);
   // Not "4 988 kr": Danish, Norwegian and Icelandic kroner all share that
   // symbol with SEK, so a Dane could not tell what they were charged.

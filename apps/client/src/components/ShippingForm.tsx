@@ -14,7 +14,7 @@ import { ArrowRight, Package, MapPin, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn, getDefaultCountryFromBrowser } from "@/lib/utils";
-import { useGeoCountry } from "@/hooks/useGeoCountry";
+import { useGeoCountryValue } from "@/components/providers/GeoCountryProvider";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
@@ -107,30 +107,36 @@ const ShippingForm: FC<ShippingFormProps> = ({
    * Which country to pre-select, for both the country field and the phone's
    * dial code.
    *
-   * Two signals, weakest first. The browser's locale lands on mount and is only
-   * a hint — a Swedish-language browser in Oslo reports SE. The geo-IP lookup
-   * is the real answer but arrives a fetch later, so it overwrites the guess
-   * once it does.
+   * Resolved on the SERVER and handed down by `GeoCountryProvider`, so the
+   * field renders correct and then stays put. The browser-side alternative —
+   * render SE, fetch the real country, swap the field — shows the customer
+   * their shipping country changing by itself while they are filling the form.
    *
-   * Only European results are taken: the country field offers
-   * `EUROPEAN_COUNTRY_CODES` and the schema rejects anything else, so a visitor
-   * from outside the list keeps the locale guess rather than being handed a
-   * value the form cannot accept.
+   * Only European results are taken: the field offers `EUROPEAN_COUNTRY_CODES`
+   * and the schema rejects anything else, so a visitor from outside that list
+   * falls through to the locale guess rather than being handed a value the form
+   * cannot accept.
    */
-  const { country: geoCountry } = useGeoCountry();
-  const [detectedCountry, setDetectedCountry] = useState<string>("SE");
+  const serverCountry = useGeoCountryValue();
+  const detectedFromServer = useMemo(() => {
+    const code = serverCountry?.toUpperCase();
+    return code && (EUROPEAN_COUNTRY_CODES as readonly string[]).includes(code)
+      ? code
+      : null;
+  }, [serverCountry]);
+
+  const [detectedCountry, setDetectedCountry] = useState<string>(
+    detectedFromServer ?? "SE",
+  );
 
   useEffect(() => {
+    // Only when the server had no usable answer — no country header and a
+    // failed or skipped IP lookup, which is every request on localhost. Runs
+    // after paint and can therefore still change the field, but it is the
+    // fallback path, not the common one.
+    if (detectedFromServer) return;
     setDetectedCountry(getDefaultCountryFromBrowser());
-  }, []);
-
-  useEffect(() => {
-    if (!geoCountry) return;
-    const code = geoCountry.toUpperCase();
-    if ((EUROPEAN_COUNTRY_CODES as readonly string[]).includes(code)) {
-      setDetectedCountry(code);
-    }
-  }, [geoCountry]);
+  }, [detectedFromServer]);
 
   const {
     register,
@@ -144,7 +150,10 @@ const ShippingForm: FC<ShippingFormProps> = ({
     resolver: zodResolver(shippingFormSchema as any),
     mode: "onChange",
     defaultValues: {
-      country: "SE",
+      // Not "SE": this is what the field renders before any effect runs, and
+      // the server already knows the answer. Identical on both sides of
+      // hydration, so there is no mismatch and no visible correction.
+      country: detectedFromServer ?? "SE",
       phone: "",
       ...defaultAddress,
     },

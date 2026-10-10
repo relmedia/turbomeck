@@ -96,10 +96,12 @@ type CurrencyStyle = {
  * "kr" in a Danish locale — the exact ambiguity the spelled-out codes here
  * exist to remove. Danish, Norwegian and Icelandic kroner all share "kr" with
  * the Swedish krona, and a customer must never have to guess which krona they
- * are being charged.
+ * are being charged. SEK is spelled out for that same reason: it used to be
+ * the one krona rendered as a bare "kr", which is precisely the ambiguity the
+ * other three avoid.
  */
 const CURRENCY_STYLE: Record<DisplayCurrencyCode, CurrencyStyle> = {
-  SEK: { decimals: 0, symbol: "kr", numberLocale: "sv-SE" },
+  SEK: { decimals: 0, symbol: "SEK", numberLocale: "sv-SE" },
   NOK: { decimals: 0, symbol: "NOK", numberLocale: "nb-NO" },
   DKK: { decimals: 0, symbol: "DKK", numberLocale: "da-DK" },
   EUR: { decimals: 2, symbol: "€", numberLocale: "fr-FR" },

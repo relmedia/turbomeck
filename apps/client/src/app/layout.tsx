@@ -18,6 +18,7 @@ import {
   CookieSettings,
 } from "@/components/cookie-consent";
 import { VisitTracker } from "@/components/VisitTracker";
+import { GeoCountryProvider } from "@/components/providers/GeoCountryProvider";
 import { ToastContainer } from "react-toastify";
 
 const geistSans = Geist({
@@ -91,6 +92,10 @@ export default async function RootLayout({
             rate={display.rate}
             source={display.source}
           >
+          {/* Same request-time resolution as the currency above, so the
+              checkout form's country and phone code are right on first paint
+              instead of switching once a browser-side lookup returns. */}
+          <GeoCountryProvider country={display.country}>
           <WishlistProvider>
           <CookieConsentProvider
             config={{
@@ -135,6 +140,7 @@ export default async function RootLayout({
             />
           </CookieConsentProvider>
           </WishlistProvider>
+          </GeoCountryProvider>
           </CurrencyProvider>
           </LanguageProvider>
         </SessionProvider>
