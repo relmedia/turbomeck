@@ -1,6 +1,14 @@
 -- Find orders that share a Stripe payment: one payment, several order rows.
 --
--- Run on the server (read-only, safe any time):
+-- Read-only; safe to run any time, against a live site.
+--
+-- On the server (standalone Postgres) — uses the same DATABASE_URL the services
+-- do, so it cannot connect to the wrong database:
+--   cd ~/apps/turbomeck
+--   psql "$(sed -n 's/^DATABASE_URL=//p' apps/product-service/.env | head -1 | tr -d '\042\047')" \
+--     -f scripts/debug/duplicate-orders.sql
+--
+-- Local dev, where Postgres runs in the docker-compose container:
 --   docker exec -i turbodb psql -U postgres -d turbodb -f - < scripts/debug/duplicate-orders.sql
 --
 -- Migration 0019 adds a unique index that makes this impossible going forward,
