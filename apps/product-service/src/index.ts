@@ -11,6 +11,7 @@ import fs from "fs";
 import os from "os";
 import { fileURLToPath } from "url";
 import { db, products, categories, productCategories, orders, orderItems, reviews, users, checkoutIntents } from "@repo/database";
+import { ORDER_NUMBER_SEQUENCE } from "@repo/database/schema";
 import { eq, inArray, desc, asc, sql, or, and, isNull } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
 import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
@@ -1391,15 +1392,59 @@ app.put("/api/products/:id", async (req, res) => {
 
 // ============ ORDERS ============
 
-const ORDER_NUMBER_START = 257;
+/** The transaction handle `db.transaction` hands its callback. */
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function generateOrderNumber(): Promise<string> {
-  const result = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(orders);
-  const num = ORDER_NUMBER_START + (result[0]?.count ?? 0);
-  return `#${num}`;
+/**
+ * Next order number, drawn from a Postgres sequence.
+ *
+ * Was `ORDER_NUMBER_START + count(*)`, read in application code before the
+ * insert. Two concurrent checkouts both read the same count and were issued the
+ * SAME order number, and deleting any order made the next one collide with a
+ * number already in use. `nextval` is atomic and never reissues a value.
+ *
+ * The sequence is created and seeded above the highest existing number by
+ * migration 0019, so no number already in the table can come back.
+ *
+ * Takes the transaction so the number is drawn on the connection that does the
+ * insert. Numbers can skip: a sequence is not rolled back, so a lost insert
+ * race or a failed transaction leaves a gap. A gap is cosmetic; two orders
+ * sharing a number is not.
+ */
+async function nextOrderNumber(tx: DbTransaction): Promise<string> {
+  const result = await tx.execute(
+    sql`select nextval(${ORDER_NUMBER_SEQUENCE}::regclass)::bigint as value`,
+  );
+  const rows = (
+    Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])
+  ) as Array<{ value: string | number | bigint }>;
+  const value = rows[0]?.value;
+  if (value === undefined || value === null) {
+    throw new Error(`nextval('${ORDER_NUMBER_SEQUENCE}') returned no value`);
+  }
+  return `#${value}`;
 }
+
+/** What both order-creating paths need back, whether or not this call made it. */
+type PersistedOrder = {
+  id: number;
+  orderNumber: string;
+  postNordTrackingId: string | null;
+  viewToken: string | null;
+  /**
+   * False when this payment already had an order and the existing one was
+   * returned instead. Callers use it to avoid reporting a duplicate as new.
+   */
+  created: boolean;
+};
+
+/** Columns `persistOrder` returns, selected the same way on every path. */
+const persistedOrderColumns = {
+  id: orders.id,
+  orderNumber: orders.orderNumber,
+  postNordTrackingId: orders.postNordTrackingId,
+  viewToken: orders.viewToken,
+};
 
 /** Server-side checkout quote — amount matches POST /api/orders; never trust client-displayed totals. */
 app.post("/api/checkout-quote", async (req, res) => {
@@ -1482,12 +1527,7 @@ async function persistOrder({
   priced: Extract<Awaited<ReturnType<typeof resolveCheckoutOrder>>, { ok: true }>;
   stripePaymentId: string;
   paymentMethodLabel: string | null;
-}): Promise<{
-  id: number;
-  orderNumber: string;
-  postNordTrackingId: string | null;
-  viewToken: string | null;
-}> {
+}): Promise<PersistedOrder> {
   const locale: "sv" | "en" = body.locale === "en" ? "en" : "sv";
   const paymentMethodDisplay =
     priced.stripeChargeSek <= 0
@@ -1496,8 +1536,6 @@ async function persistOrder({
         : "Ingen betalning krävs"
       : paymentMethodLabel ??
         (locale === "en" ? "Paid (card or other method)" : "Betalt (kort eller annan metod)");
-
-  const orderNumber = await generateOrderNumber();
 
   const hasTrackingId = !!(
     body.postNordTrackingId &&
@@ -1511,56 +1549,125 @@ async function persistOrder({
       ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
       : null;
 
+  /**
+   * The payment this order belongs to, and the key both creation paths
+   * deduplicate on. Empty for a zero-total order: those store NULL, and
+   * Postgres treats NULLs as distinct, so they are never deduplicated against
+   * one another.
+   */
+  const paymentKey = stripePaymentId.trim();
   const viewToken = generateOrderViewToken();
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber,
-      userId: body.userId ?? null,
-      viewToken,
-      email: body.email,
-      firstName: body.firstName,
-      lastName: body.lastName,
-      phone: body.phone ?? null,
-      address: body.address,
-      city: body.city,
-      postalCode: body.postalCode,
-      country: body.country ?? "SE",
-      servicePointName: body.servicePointName ?? null,
-      servicePointId: body.servicePointId ?? null,
-      deliveryOption: body.deliveryOption ?? "servicepoint",
-      currency: priced.currency,
-      fxRateFromSek: String(priced.fxRate),
-      subtotal: String(priced.subtotal),
-      shippingCost: String(priced.shipping),
-      discount: String(priced.discount),
-      total: String(priced.total),
-      depositAmount: null,
-      balanceDue: null,
-      commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
-      coreKeepFeeSek: priced.coreKeepFeeSek,
-      coreReturnDeadline: coreDeadline,
-      stripePaymentId: stripePaymentId || null,
-      postNordTrackingId: body.postNordTrackingId ?? null,
-      status: initialStatus,
-    })
-    .returning();
 
-  if (!order) {
-    throw new Error("Order insert returned no row");
+  const outcome = await db.transaction(async (tx) => {
+    /**
+     * Fast path: this payment already has an order — a webhook retry, a browser
+     * retry, or the other creation path having already finished. Returning that
+     * order beats drawing an order number we would only discard.
+     */
+    if (paymentKey) {
+      const [existing] = await tx
+        .select(persistedOrderColumns)
+        .from(orders)
+        .where(eq(orders.stripePaymentId, paymentKey))
+        .limit(1);
+      if (existing) return { order: existing, created: false as const };
+    }
+
+    const orderNumber = await nextOrderNumber(tx);
+
+    /**
+     * `ON CONFLICT DO NOTHING` is the actual guard, not the SELECT above.
+     *
+     * Two writers create orders: the browser's POST /api/orders once
+     * `confirmPayment` resolves, and the webhook's checkout-intent finalize for
+     * a payment the browser never finished. Both can pass any
+     * check-then-insert, because the webhook routinely arrives while the
+     * browser's POST is still waiting on its own `paymentIntents.retrieve`.
+     * `orders_stripe_payment_id_unique` (migration 0019) makes the loser insert
+     * nothing and return no row.
+     */
+    const [inserted] = await tx
+      .insert(orders)
+      .values({
+        orderNumber,
+        userId: body.userId ?? null,
+        viewToken,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        phone: body.phone ?? null,
+        address: body.address,
+        city: body.city,
+        postalCode: body.postalCode,
+        country: body.country ?? "SE",
+        servicePointName: body.servicePointName ?? null,
+        servicePointId: body.servicePointId ?? null,
+        deliveryOption: body.deliveryOption ?? "servicepoint",
+        currency: priced.currency,
+        fxRateFromSek: String(priced.fxRate),
+        subtotal: String(priced.subtotal),
+        shippingCost: String(priced.shipping),
+        discount: String(priced.discount),
+        total: String(priced.total),
+        depositAmount: null,
+        balanceDue: null,
+        commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
+        coreKeepFeeSek: priced.coreKeepFeeSek,
+        coreReturnDeadline: coreDeadline,
+        stripePaymentId: paymentKey || null,
+        postNordTrackingId: body.postNordTrackingId ?? null,
+        status: initialStatus,
+      })
+      .onConflictDoNothing({ target: orders.stripePaymentId })
+      .returning(persistedOrderColumns);
+
+    if (!inserted) {
+      /**
+       * Lost the race. `ON CONFLICT DO NOTHING` waits on the other transaction
+       * before yielding no row, so by the time we get here that transaction has
+       * committed — and under READ COMMITTED this statement takes a fresh
+       * snapshot, so it sees the winner.
+       */
+      const [winner] = await tx
+        .select(persistedOrderColumns)
+        .from(orders)
+        .where(eq(orders.stripePaymentId, paymentKey))
+        .limit(1);
+      if (!winner) {
+        // Unreachable in theory: the insert conflicted, so a row must exist.
+        // Throwing means a 500, which makes the Stripe webhook retry.
+        throw new Error(
+          `Order insert for ${paymentKey} conflicted but no order was found`,
+        );
+      }
+      return { order: winner, created: false as const };
+    }
+
+    await tx.insert(orderItems).values(
+      priced.lines.map((item) => ({
+        orderId: inserted.id,
+        productId: item.productId,
+        productName: item.productName,
+        productImage: item.productImage ?? null,
+        variant: item.variant ?? null,
+        price: String(item.unitPrice),
+        quantity: item.quantity,
+      })),
+    );
+
+    return { order: inserted, created: true as const };
+  });
+
+  if (!outcome.created) {
+    console.log("[order] payment already has an order — returning it", {
+      stripePaymentId: paymentKey,
+      orderId: outcome.order.id,
+      orderNumber: outcome.order.orderNumber,
+    });
+    return { ...outcome.order, created: false };
   }
 
-  await db.insert(orderItems).values(
-    priced.lines.map((item) => ({
-      orderId: order.id,
-      productId: item.productId,
-      productName: item.productName,
-      productImage: item.productImage ?? null,
-      variant: item.variant ?? null,
-      price: String(item.unitPrice),
-      quantity: item.quantity,
-    })),
-  );
+  const order = outcome.order;
 
   const emailItems = priced.lines.map((item) => ({
     productName: item.productName,
@@ -1570,6 +1677,13 @@ async function persistOrder({
     quantity: item.quantity,
   }));
 
+  /**
+   * Emails go out only for an order this call actually created, and only after
+   * the transaction committed. Inside it, a rollback would leave a customer
+   * holding a confirmation for an order that does not exist; without the
+   * `created` check, a duplicate POST sent the customer and the shop a second
+   * copy of everything.
+   */
   sendOrderConfirmationEmail({
     orderNumber: order.orderNumber,
     currency: priced.currency,
@@ -1621,12 +1735,7 @@ async function persistOrder({
     console.error("[order] Failed to send admin new-order email:", err),
   );
 
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    postNordTrackingId: order.postNordTrackingId,
-    viewToken: order.viewToken,
-  };
+  return { ...order, created: true };
 }
 
 /**
@@ -1778,38 +1887,48 @@ app.post("/api/checkout-intents/:paymentIntentId/finalize", async (req, res) => 
       );
     }
 
-    const created = await persistOrder({
+    // Idempotency 2 (the real one): `persistOrder` inserts under
+    // `ON CONFLICT (stripe_payment_id) DO NOTHING`, so if the browser's
+    // POST /api/orders won the race — or an earlier webhook delivery did — this
+    // returns that order with `created: false` instead of inserting a second.
+    const order = await persistOrder({
       body: { ...payload, stripePaymentId: paymentIntentId },
       priced,
       stripePaymentId: paymentIntentId,
       paymentMethodLabel: verified.paymentMethodLabel,
     });
 
-    // Idempotency 2: only the first finalize claims the snapshot. A second
-    // concurrent webhook delivery finds consumedAt set and does nothing.
-    const claimed = await db
+    // Bookkeeping, not a guard: record which order this snapshot produced.
+    // `isNull(consumedAt)` keeps the first claim's timestamp rather than
+    // overwriting it on a later delivery. This used to run after the insert and
+    // pretend to prevent duplicates, which it never could — by the time it runs
+    // the second order already exists. The unique index does that job now.
+    await db
       .update(checkoutIntents)
-      .set({ consumedAt: new Date(), orderId: created.id })
+      .set({ consumedAt: new Date(), orderId: order.id })
       .where(
         and(
           eq(checkoutIntents.paymentIntentId, paymentIntentId),
           isNull(checkoutIntents.consumedAt),
         ),
-      )
-      .returning({ paymentIntentId: checkoutIntents.paymentIntentId });
-    if (claimed.length === 0) {
-      console.warn(
-        "[checkout-intent] snapshot was claimed concurrently; order created twice?",
-        { paymentIntentId, orderId: created.id },
       );
-    }
 
-    console.log("[checkout-intent] finalized from webhook", {
-      paymentIntentId,
-      orderId: created.id,
-      orderNumber: created.orderNumber,
+    console.log(
+      order.created
+        ? "[checkout-intent] finalized from webhook"
+        : "[checkout-intent] order already existed for this payment",
+      {
+        paymentIntentId,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      },
+    );
+    // 200, not 201, when nothing was created — the webhook logs the difference.
+    res.status(order.created ? 201 : 200).json({
+      created: order.created,
+      reason: order.created ? undefined : "order-exists",
+      order,
     });
-    res.status(201).json({ created: true, order: created });
   } catch (error) {
     console.error("checkout-intent finalize:", paymentIntentId, error);
     res.status(500).json({ error: "Failed to finalize checkout" });
@@ -1850,6 +1969,57 @@ app.post("/api/orders", async (req, res) => {
       return res.status(400).json({ error: "Missing required shipping fields" });
     }
 
+    const stripePaymentId = body.stripePaymentId?.trim() ?? "";
+
+    /**
+     * This payment already has an order — hand back that order instead of
+     * creating a second one.
+     *
+     * The storefront can POST the same PaymentIntent more than once: a retry
+     * after a timeout, a double submit, a re-fired effect on the confirmation
+     * page (which only clears its `pendingStripeOrder` snapshot once the POST
+     * resolves), or the Stripe webhook's finalize having already created the
+     * order. Nothing here used to look, so each POST minted another order.
+     *
+     * Returning early also skips a pointless re-price and Stripe round-trip.
+     * It is safe without verifying the payment again: an order only exists for
+     * this PaymentIntent because it was verified when that order was created.
+     * `persistOrder` still guards the real race via the unique index.
+     */
+    if (stripePaymentId) {
+      const [existing] = await db
+        .select({ ...persistedOrderColumns, email: orders.email })
+        .from(orders)
+        .where(eq(orders.stripePaymentId, stripePaymentId))
+        .limit(1);
+      if (existing) {
+        /**
+         * The response carries `viewToken` — a guest's only credential for
+         * their order — so a PaymentIntent id must not be enough on its own to
+         * fetch it: those ids travel in Stripe's `return_url`. Require the
+         * buyer's email as well. A genuine retry re-POSTs the same payload and
+         * always has it; someone holding only a scraped id does not.
+         */
+        if (existing.email.trim().toLowerCase() !== body.email.trim().toLowerCase()) {
+          console.warn("[order] payment already belongs to a different customer", {
+            stripePaymentId,
+            orderId: existing.id,
+          });
+          return res
+            .status(409)
+            .json({ error: "This payment already belongs to another order" });
+        }
+        console.log("[order] duplicate POST /api/orders for payment", {
+          stripePaymentId,
+          orderId: existing.id,
+          orderNumber: existing.orderNumber,
+        });
+        const { email: _existingEmail, ...order } = existing;
+        void _existingEmail;
+        return res.status(200).json({ ...order, created: false });
+      }
+    }
+
     const priced = await resolveCheckoutOrder({
       items: body.items,
       couponCode: body.couponCode,
@@ -1861,7 +2031,6 @@ app.post("/api/orders", async (req, res) => {
       return res.status(priced.status).json({ error: priced.error });
     }
 
-    const stripePaymentId = body.stripePaymentId?.trim() ?? "";
     let payVerify: PaymentVerification = { ok: true, paymentMethodLabel: null };
     if (priced.stripeChargeSek > 0) {
       payVerify = await verifyCheckoutPaymentIntent(
@@ -1886,14 +2055,16 @@ app.post("/api/orders", async (req, res) => {
         .json({ error: payVerify.error, retryable: payVerify.retryable });
     }
 
-    const created = await persistOrder({
+    const order = await persistOrder({
       body,
       priced,
       stripePaymentId,
       paymentMethodLabel: payVerify.paymentMethodLabel,
     });
 
-    res.status(201).json(created);
+    // 200 when `persistOrder` lost the insert race and returned the order the
+    // other writer created; 201 only for an order this request actually made.
+    res.status(order.created ? 201 : 200).json(order);
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).json({ error: "Failed to create order" });

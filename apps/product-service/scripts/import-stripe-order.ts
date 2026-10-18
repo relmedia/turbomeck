@@ -39,9 +39,9 @@ import "../src/load-local-env.js";
 import Stripe from "stripe";
 import { randomBytes } from "node:crypto";
 import { db, orders, orderItems, checkoutIntents } from "@repo/database";
+import { ORDER_NUMBER_SEQUENCE } from "@repo/database/schema";
 import { eq, sql, desc } from "drizzle-orm";
 
-const ORDER_NUMBER_START = 257;
 const PLACEHOLDER_ITEM_SV =
   "Importerad betalning från Stripe – okänt innehåll, korrigera manuellt";
 
@@ -119,9 +119,23 @@ function isMissingTableError(err: unknown): boolean {
   return false;
 }
 
+/**
+ * Same sequence the live order paths use (see `nextOrderNumber` in
+ * product-service). Was `ORDER_NUMBER_START + count(*)`, which would hand a
+ * recovered order a number another order already had.
+ */
 async function nextOrderNumber(): Promise<string> {
-  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(orders);
-  return `#${ORDER_NUMBER_START + (row?.count ?? 0)}`;
+  const result = await db.execute(
+    sql`select nextval(${ORDER_NUMBER_SEQUENCE}::regclass)::bigint as value`,
+  );
+  const rows = (
+    Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])
+  ) as Array<{ value: string | number | bigint }>;
+  const value = rows[0]?.value;
+  if (value === undefined || value === null) {
+    throw new Error(`nextval('${ORDER_NUMBER_SEQUENCE}') returned no value`);
+  }
+  return `#${value}`;
 }
 
 type Resolved = {

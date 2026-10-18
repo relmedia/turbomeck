@@ -9,6 +9,7 @@ import {
   jsonb,
   foreignKey,
   primaryKey,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -215,7 +216,11 @@ export const orders = pgTable("orders", {
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   /** Balance due after deposit; paid when customer sends old part and receives new turbo */
   balanceDue: decimal("balance_due", { precision: 12, scale: 2 }),
-  /** Stripe payment ID for deposit */
+  /**
+   * Stripe payment ID for deposit. Unique (see the table's `uniqueIndex`
+   * below): one order per PaymentIntent. NULL for zero-total orders, and
+   * Postgres treats NULLs as distinct, so any number of those coexist.
+   */
   stripePaymentId: text("stripe_payment_id"),
   /** Stripe payment ID for balance (when customer pays remainder) */
   stripeBalancePaymentId: text("stripe_balance_payment_id"),
@@ -234,7 +239,34 @@ export const orders = pgTable("orders", {
    */
   postNordLabelSnapshot: jsonb("post_nord_label_snapshot").$type<Record<string, unknown> | null>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  /**
+   * One order per Stripe PaymentIntent.
+   *
+   * Two code paths create orders — the browser's POST /api/orders after
+   * `confirmPayment` resolves, and the Stripe webhook's checkout-intent
+   * finalize for a payment the browser never finished. Both used to guard with
+   * a SELECT before inserting, which two concurrent writers both pass: the
+   * webhook routinely arrives while the browser's POST is still waiting on its
+   * own `paymentIntents.retrieve`, so one payment produced two orders, two
+   * order numbers and two confirmation emails.
+   *
+   * This index is what actually prevents that. The application code uses it via
+   * `ON CONFLICT (stripe_payment_id) DO NOTHING` and returns the existing order
+   * instead of a second one.
+   */
+  uniqueIndex("orders_stripe_payment_id_unique").on(table.stripePaymentId),
+]);
+
+/**
+ * Atomic source of order numbers, replacing `ORDER_NUMBER_START + count(*)`.
+ *
+ * `count(*)` was read in application code before the insert, so two concurrent
+ * checkouts were issued the same number, and deleting an order made the next
+ * one collide with a number already in use. Created and seeded in migration
+ * 0019; read with `nextval` (see `nextOrderNumber` in product-service).
+ */
+export const ORDER_NUMBER_SEQUENCE = "orders_order_number_seq";
 
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
