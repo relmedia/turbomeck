@@ -9,6 +9,12 @@ import { Label } from "@repo/ui/components/label";
 import { Checkbox } from "@repo/ui/components/checkbox";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
+import {
+  ShipmentSection,
+  shipmentTypeForWeight,
+  type ShipmentType,
+  type ShipmentValue,
+} from "@/components/ShipmentSection";
 import { Save, RefreshCw, Trash2, Plus, Languages, Loader2, Sparkles } from "lucide-react";
 import {
   Breadcrumb,
@@ -74,6 +80,10 @@ type Product = {
   thumbnails: string[];
   stock: number;
   weight: number | null;
+  shipmentType: ShipmentType | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
   categoryIds: number[];
   isExchangeTurbo?: boolean;
   createdAt: string;
@@ -139,6 +149,10 @@ export default function ProductDetailPage() {
     price: string;
     stock: string;
     weight: string;
+    shipmentType: ShipmentType;
+    lengthCm: string;
+    widthCm: string;
+    heightCm: string;
     categoryIds: number[];
     attributes: { name: string; options: string[] }[];
     specifications: SpecRow[];
@@ -155,6 +169,10 @@ export default function ProductDetailPage() {
     price: "",
     stock: "",
     weight: "",
+    shipmentType: "heavy",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
     categoryIds: [],
     attributes: [],
     specifications: [],
@@ -188,6 +206,12 @@ export default function ProductDetailPage() {
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
         weight: data.weight != null ? data.weight.toString() : "",
+        // Products created before this section existed have no shipment type;
+        // derive one from the weight rather than show three empty cards.
+        shipmentType: data.shipmentType ?? shipmentTypeForWeight(data.weight),
+        lengthCm: data.lengthCm != null ? String(data.lengthCm) : "",
+        widthCm: data.widthCm != null ? String(data.widthCm) : "",
+        heightCm: data.heightCm != null ? String(data.heightCm) : "",
         categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
         attributes: Array.isArray(data.attributes)
           ? data.attributes.filter((a: { name?: string; options?: string[] }) => a?.name && Array.isArray(a?.options))
@@ -451,6 +475,10 @@ export default function ProductDetailPage() {
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
           weight: formData.weight ? Number(formData.weight) : null,
+          shipmentType: formData.shipmentType,
+          lengthCm: formData.lengthCm ? Number(formData.lengthCm) : null,
+          widthCm: formData.widthCm ? Number(formData.widthCm) : null,
+          heightCm: formData.heightCm ? Number(formData.heightCm) : null,
           categoryIds: Array.isArray(formData.categoryIds) ? formData.categoryIds : [],
           attributes: Array.isArray(formData.attributes) ? formData.attributes : [],
           specifications: formData.specifications.filter(
@@ -781,6 +809,19 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
+          <ShipmentSection
+            value={{
+              shipmentType: formData.shipmentType,
+              weight: formData.weight,
+              lengthCm: formData.lengthCm,
+              widthCm: formData.widthCm,
+              heightCm: formData.heightCm,
+            }}
+            onChange={(patch: Partial<ShipmentValue>) =>
+              setFormData((prev) => ({ ...prev, ...patch }))
+            }
+          />
+
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -969,19 +1010,6 @@ export default function ProductDetailPage() {
                     value={formData.stock ?? ""}
                     onChange={handleInputChange}
                     placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight">Vikt (kg) – för PostNord frakt</Label>
-                  <Input
-                    id="weight"
-                    name="weight"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.weight ?? ""}
-                    onChange={handleInputChange}
-                    placeholder="t.ex. 2.5"
                   />
                 </div>
                 <div className="space-y-4 col-span-2">

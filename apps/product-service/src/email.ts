@@ -912,12 +912,9 @@ export type AdminNewOrderEmailData = {
 function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
   const adminMoney = (amount: number) =>
     formatMoney(amount, data.currency);
-  const adminBase = (
-    process.env.NEXT_PUBLIC_ADMIN_URL ||
-    process.env.ADMIN_URL ||
-    ""
-  ).replace(/\/$/u, "");
-  const orderUrl = adminBase ? `${adminBase}/payments/${data.orderId}` : "";
+  // Was a second, drifting copy of getAdminBaseUrl()'s body; the shared helper
+  // is the one place the studio host is resolved.
+  const orderUrl = `${getAdminBaseUrl()}/payments/${data.orderId}`;
   const logoUrl = getOrderEmailLogoUrl();
 
   const fullName = `${data.firstName} ${data.lastName}`.trim();
@@ -1044,15 +1041,11 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
               <p style="margin:0 0 16px 0;font-size:14px;color:#111827;line-height:1.55;">${addressBlock || "—"}</p>
             </td>
           </tr>
-          ${
-            orderUrl
-              ? `<tr>
-                  <td style="padding:0 32px 28px 32px;">
-                    <a href="${escapeHtmlAttr(orderUrl)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Öppna ordern i Turbomeck Studio →</a>
-                  </td>
-                </tr>`
-              : ""
-          }
+          <tr>
+            <td style="padding:0 32px 28px 32px;">
+              <a href="${escapeHtmlAttr(orderUrl)}" style="display:inline-block;background:#111827;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Öppna ordern i Turbomeck Studio →</a>
+            </td>
+          </tr>
           <tr>
             <td style="background:#f9fafb;padding:18px 32px;text-align:center;border-top:1px solid #e5e7eb;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">Detta är ett internt admin-meddelande från Turbomeck. © ${new Date().getFullYear()}</p>
@@ -1130,17 +1123,31 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
 // ——— Shared admin-mail helpers ———
 
 /**
- * Resolves the absolute base URL the admin app is reachable on, used to
- * build "open in admin" deep links inside admin-side emails. Falls back
- * to an empty string when no admin URL is configured; callers should
- * omit the CTA in that case.
+ * Resolves the absolute base URL the admin app is reachable on, used to build
+ * the "open in Turbomeck Studio" deep links inside admin-side emails.
+ *
+ * Falls back to the studio host rather than to an empty string. Neither
+ * `NEXT_PUBLIC_ADMIN_URL` nor `ADMIN_URL` is set on the server, and the old
+ * empty-string fallback made every admin email ship with its CTA silently
+ * dropped — a link that is merely wrong is obvious and gets fixed, one that is
+ * absent just looks like the email never had one.
+ *
+ * `ADMIN_STUDIO_HOSTNAME` with a `studio.turbomeck.se` default is the same pair
+ * `ecosystem.config.js` and `apps/admin/next.config.ts` use, so these links
+ * land on the host those already canonicalise admin traffic to. Set either URL
+ * var to override (a staging host, say).
  */
 function getAdminBaseUrl(): string {
-  return (
+  const configured = (
     process.env.NEXT_PUBLIC_ADMIN_URL ||
     process.env.ADMIN_URL ||
     ""
-  ).replace(/\/$/u, "");
+  ).trim();
+  if (configured) return configured.replace(/\/$/u, "");
+
+  const host = process.env.ADMIN_STUDIO_HOSTNAME?.trim() || "studio.turbomeck.se";
+  // Tolerate a hostname that was given with a scheme or a trailing slash.
+  return `https://${host.replace(/^https?:\/\//u, "").replace(/\/$/u, "")}`;
 }
 
 type AdminEmailLayoutOptions = {
@@ -1275,8 +1282,7 @@ function ratingStars(rating: number): string {
 }
 
 function renderAdminNewReviewEmail(data: AdminNewReviewEmailData): string {
-  const adminBase = getAdminBaseUrl();
-  const reviewUrl = adminBase ? `${adminBase}/reviews` : "";
+  const reviewUrl = `${getAdminBaseUrl()}/reviews`;
 
   const reviewerHtml = data.reviewerEmail
     ? `${escapeHtml(data.reviewerName)} · <a href="mailto:${escapeHtmlAttr(data.reviewerEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.reviewerEmail)}</a>`
@@ -1319,7 +1325,7 @@ function renderAdminNewReviewEmail(data: AdminNewReviewEmailData): string {
     eyebrow: "Ny review",
     heading: `Ny recension för ${data.productName}`,
     sections,
-    ...(reviewUrl ? { cta: { label: "Hantera recensioner i Turbomeck Studio", url: reviewUrl } } : {}),
+    cta: { label: "Hantera recensioner i Turbomeck Studio", url: reviewUrl },
   });
 }
 
@@ -1365,8 +1371,7 @@ export type AdminUserDeletedEmailData = {
 };
 
 function renderAdminUserDeletedEmail(data: AdminUserDeletedEmailData): string {
-  const adminBase = getAdminBaseUrl();
-  const usersUrl = adminBase ? `${adminBase}/users` : "";
+  const usersUrl = `${getAdminBaseUrl()}/users`;
 
   const initiatorLabel =
     data.initiator === "self"
@@ -1405,7 +1410,7 @@ function renderAdminUserDeletedEmail(data: AdminUserDeletedEmailData): string {
         ? "En användare har raderat sitt konto"
         : "Ett användarkonto har tagits bort",
     sections,
-    ...(usersUrl ? { cta: { label: "Öppna användarlistan i Turbomeck Studio", url: usersUrl } } : {}),
+    cta: { label: "Öppna användarlistan i Turbomeck Studio", url: usersUrl },
   });
 }
 
@@ -1457,8 +1462,7 @@ export type AdminShipmentBookedEmailData = {
 };
 
 function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): string {
-  const adminBase = getAdminBaseUrl();
-  const orderUrl = adminBase ? `${adminBase}/payments/${data.orderId}` : "";
+  const orderUrl = `${getAdminBaseUrl()}/payments/${data.orderId}`;
   const trackingUrl = `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`;
   const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
 
@@ -1496,7 +1500,7 @@ function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): str
         "Etiketten finns tillgänglig i admin under ordern. Kunden får automatiskt ett mejl med spårningslänken.",
       ),
     ],
-    ...(orderUrl ? { cta: { label: "Öppna ordern i Turbomeck Studio", url: orderUrl } } : {}),
+    cta: { label: "Öppna ordern i Turbomeck Studio", url: orderUrl },
   });
 }
 

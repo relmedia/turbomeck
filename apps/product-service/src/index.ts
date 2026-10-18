@@ -1009,6 +1009,10 @@ app.get("/api/products", async (req, res) => {
       thumbnails: products.thumbnails,
       stock: products.stock,
       weight: products.weight,
+      shipmentType: products.shipmentType,
+      lengthCm: products.lengthCm,
+      widthCm: products.widthCm,
+      heightCm: products.heightCm,
       attributes: products.attributes,
       specifications: products.specifications,
       featuredInSlider: products.featuredInSlider,
@@ -1047,6 +1051,10 @@ app.get("/api/products", async (req, res) => {
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
+      shipmentType: (p as { shipmentType?: string | null }).shipmentType ?? null,
+      lengthCm: (p as { lengthCm?: number | null }).lengthCm ?? null,
+      widthCm: (p as { widthCm?: number | null }).widthCm ?? null,
+      heightCm: (p as { heightCm?: number | null }).heightCm ?? null,
       categoryIds: categoryMap.get(p.id) ?? [],
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
@@ -1099,6 +1107,10 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         thumbnails: products.thumbnails,
         stock: products.stock,
         weight: products.weight,
+        shipmentType: products.shipmentType,
+        lengthCm: products.lengthCm,
+        widthCm: products.widthCm,
+        heightCm: products.heightCm,
         attributes: products.attributes,
         specifications: products.specifications,
         isExchangeTurbo: products.isExchangeTurbo,
@@ -1129,6 +1141,10 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
+      shipmentType: (p as { shipmentType?: string | null }).shipmentType ?? null,
+      lengthCm: (p as { lengthCm?: number | null }).lengthCm ?? null,
+      widthCm: (p as { widthCm?: number | null }).widthCm ?? null,
+      heightCm: (p as { heightCm?: number | null }).heightCm ?? null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
@@ -1163,6 +1179,10 @@ app.get("/api/products/:id", async (req, res) => {
         thumbnails: products.thumbnails,
         stock: products.stock,
         weight: products.weight,
+        shipmentType: products.shipmentType,
+        lengthCm: products.lengthCm,
+        widthCm: products.widthCm,
+        heightCm: products.heightCm,
         attributes: products.attributes,
         specifications: products.specifications,
         isExchangeTurbo: products.isExchangeTurbo,
@@ -1202,6 +1222,10 @@ app.get("/api/products/:id", async (req, res) => {
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
+      shipmentType: (p as { shipmentType?: string | null }).shipmentType ?? null,
+      lengthCm: (p as { lengthCm?: number | null }).lengthCm ?? null,
+      widthCm: (p as { widthCm?: number | null }).widthCm ?? null,
+      heightCm: (p as { heightCm?: number | null }).heightCm ?? null,
       categoryIds,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
@@ -1236,10 +1260,35 @@ function sanitizeSpecifications(input: unknown): { group?: string; label: string
     .slice(0, 60);
 }
 
+/** PostNord shipment classes the admin's "Forsandelse" section offers. */
+const SHIPMENT_TYPES = new Set(["light", "heavy", "pallet"]);
+
+/**
+ * Accept only a known shipment class; anything else (including "" from a form
+ * that never set it) stores NULL rather than a value the admin cannot render.
+ */
+function normalizeShipmentType(value: unknown): string | null {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return SHIPMENT_TYPES.has(v) ? v : null;
+}
+
+/**
+ * Parcel dimensions are optional whole centimetres. Blank, zero, negative and
+ * unparseable all mean "not specified" - PostNord prices on weight alone until
+ * dimensions are known, so a junk value must not look like data. Capped at
+ * 1000 cm, comfortably past the 175 cm the form offers.
+ */
+function normalizeDimensionCm(value: unknown): number | null {
+  if (value == null || String(value).trim() === "") return null;
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(n, 1000);
+}
+
 // POST create product
 app.post("/api/products", async (req, res) => {
   try {
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, specifications, nameEn, shortDescriptionEn, descriptionEn, isExchangeTurbo } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, shipmentType, lengthCm, widthCm, heightCm, categoryIds, specifications, nameEn, shortDescriptionEn, descriptionEn, isExchangeTurbo } = req.body;
 
     const catIds = Array.isArray(categoryIds)
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
@@ -1254,6 +1303,10 @@ app.post("/api/products", async (req, res) => {
       thumbnails: thumbnails && Array.isArray(thumbnails) ? thumbnails : [],
       stock: stock || 0,
       weight: weight != null ? weight.toString() : null,
+      shipmentType: normalizeShipmentType(shipmentType),
+      lengthCm: normalizeDimensionCm(lengthCm),
+      widthCm: normalizeDimensionCm(widthCm),
+      heightCm: normalizeDimensionCm(heightCm),
       specifications: sanitizeSpecifications(specifications),
       nameEn: nameEn != null && String(nameEn).trim() !== "" ? String(nameEn) : null,
       shortDescriptionEn: shortDescriptionEn != null && String(shortDescriptionEn).trim() !== "" ? String(shortDescriptionEn) : null,
@@ -1283,6 +1336,10 @@ app.post("/api/products", async (req, res) => {
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
+      shipmentType: (p as { shipmentType?: string | null }).shipmentType ?? null,
+      lengthCm: (p as { lengthCm?: number | null }).lengthCm ?? null,
+      widthCm: (p as { widthCm?: number | null }).widthCm ?? null,
+      heightCm: (p as { heightCm?: number | null }).heightCm ?? null,
       categoryIds: categoryIdsRes,
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
@@ -1300,7 +1357,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, categoryIds, attributes, specifications, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, shipmentType, lengthCm, widthCm, heightCm, categoryIds, attributes, specifications, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -1323,6 +1380,10 @@ app.put("/api/products/:id", async (req, res) => {
       const w = weight != null && String(weight).trim() !== "" ? Number(weight) : NaN;
       updateData.weight = !Number.isNaN(w) ? String(w) : null;
     }
+    if (shipmentType !== undefined) updateData.shipmentType = normalizeShipmentType(shipmentType);
+    if (lengthCm !== undefined) updateData.lengthCm = normalizeDimensionCm(lengthCm);
+    if (widthCm !== undefined) updateData.widthCm = normalizeDimensionCm(widthCm);
+    if (heightCm !== undefined) updateData.heightCm = normalizeDimensionCm(heightCm);
     if (attributes !== undefined) {
       updateData.attributes = Array.isArray(attributes)
         ? attributes.filter((a: unknown) => a && typeof a === "object" && "name" in a && "options" in a && Array.isArray((a as { options: unknown }).options))
@@ -1376,6 +1437,10 @@ app.put("/api/products/:id", async (req, res) => {
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],
       stock: p.stock,
       weight: p.weight != null ? parseFloat(p.weight) : null,
+      shipmentType: (p as { shipmentType?: string | null }).shipmentType ?? null,
+      lengthCm: (p as { lengthCm?: number | null }).lengthCm ?? null,
+      widthCm: (p as { widthCm?: number | null }).widthCm ?? null,
+      heightCm: (p as { heightCm?: number | null }).heightCm ?? null,
       categoryIds: categoryIdsRes,
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,

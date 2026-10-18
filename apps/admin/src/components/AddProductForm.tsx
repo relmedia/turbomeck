@@ -16,6 +16,7 @@ import { Input } from "@repo/ui/components/input";
 import { Button } from "@repo/ui/components/button";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { useState, useEffect, useCallback } from "react";
+import { ShipmentSection } from "@/components/ShipmentSection";
 import { Loader2, Plus, Languages, Sparkles } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { ThumbnailsUpload } from "./ThumbnailsUpload";
@@ -66,6 +67,10 @@ const formSchema = z.object({
   }),
   stock: z.coerce.number().min(0).default(0),
   weight: z.coerce.number().min(0).optional().nullable(),
+  shipmentType: z.enum(["light", "heavy", "pallet"]).default("heavy"),
+  lengthCm: z.coerce.number().int().min(0).optional().nullable(),
+  widthCm: z.coerce.number().int().min(0).optional().nullable(),
+  heightCm: z.coerce.number().int().min(0).optional().nullable(),
   image: z.string().nullable().optional(),
   thumbnails: z.array(z.string()).optional().default([]),
   categoryIds: z.array(z.number()).optional().default([]),
@@ -116,6 +121,10 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       price: 0,
       stock: 0,
       weight: undefined,
+      shipmentType: "heavy",
+      lengthCm: undefined,
+      widthCm: undefined,
+      heightCm: undefined,
       image: null,
       thumbnails: [],
       categoryIds: [],
@@ -325,6 +334,10 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
           price: values.price,
           stock: values.stock,
           weight: values.weight ?? null,
+          shipmentType: values.shipmentType,
+          lengthCm: values.lengthCm ?? null,
+          widthCm: values.widthCm ?? null,
+          heightCm: values.heightCm ?? null,
           image: values.image || null,
           thumbnails: values.thumbnails ?? [],
           categoryIds: values.categoryIds ?? [],
@@ -564,35 +577,37 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="weight"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Vikt (kg) – PostNord frakt</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    placeholder="t.ex. 2.5"
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === ""
-                          ? undefined
-                          : Number(e.target.value)
-                      )
-                    }
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {/* Shipment details — same component the product edit page uses, so the
+              two forms cannot drift. Weight lives here now rather than beside
+              Lager; it is a shipping input, not a stock one. */}
+          <div className="md:col-span-2">
+            <ShipmentSection
+              value={{
+                shipmentType: form.watch("shipmentType") ?? "heavy",
+                weight: form.watch("weight") != null ? String(form.watch("weight")) : "",
+                lengthCm: form.watch("lengthCm") != null ? String(form.watch("lengthCm")) : "",
+                widthCm: form.watch("widthCm") != null ? String(form.watch("widthCm")) : "",
+                heightCm: form.watch("heightCm") != null ? String(form.watch("heightCm")) : "",
+              }}
+              onChange={(patch) => {
+                if (patch.shipmentType !== undefined) {
+                  form.setValue("shipmentType", patch.shipmentType, { shouldDirty: true });
+                }
+                for (const key of ["weight", "lengthCm", "widthCm", "heightCm"] as const) {
+                  const raw = patch[key];
+                  if (raw === undefined) continue;
+                  const trimmed = raw.trim();
+                  form.setValue(
+                    key,
+                    trimmed === "" || !Number.isFinite(Number(trimmed))
+                      ? undefined
+                      : Number(trimmed),
+                    { shouldDirty: true },
+                  );
+                }
+              }}
+            />
+          </div>
 
         </div>
 

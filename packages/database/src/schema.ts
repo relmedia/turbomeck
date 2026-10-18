@@ -93,6 +93,21 @@ export const products = pgTable("products", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   stock: integer("stock").default(0).notNull(),
   weight: decimal("weight", { precision: 8, scale: 2 }), // kg, for PostNord shipping
+  /**
+   * PostNord shipment class, mirroring their "Vad är det du skickar?" choice:
+   * "light" (Lätt, max 3 kg), "heavy" (Tung, max 35 kg) or "pallet"
+   * (Pall, max 1000 kg). NULL on products that predate the shipping section —
+   * the admin derives a sensible default from `weight` when one is missing.
+   */
+  shipmentType: text("shipment_type"),
+  /**
+   * Parcel dimensions in whole centimetres. Optional, exactly as in PostNord's
+   * own form ("Mått (valfritt) — ange mått för en mer exakt prisuppskattning"):
+   * a shipment prices on weight alone until dimensions are known.
+   */
+  lengthCm: integer("length_cm"),
+  widthCm: integer("width_cm"),
+  heightCm: integer("height_cm"),
   image: text("image"), // Main product image
   thumbnails: jsonb("thumbnails").$type<string[]>().default([]), // Additional gallery images
   /** Product variants e.g. [{ name: "Typ", options: ["13C","13T","14t"] }] - customer must choose when adding to cart */
