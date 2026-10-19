@@ -84,6 +84,60 @@ export const EU_COUNTRY_CODES = new Set([
   "SI", "ES",
 ]);
 
+/**
+ * Countries the shop ships to, in Swedish, matching the list the storefront
+ * offers at checkout (`EUROPEAN_COUNTRIES` in the client's PhoneInput, which
+ * also carries dial codes and so stays separate). Sweden first, then the other
+ * Nordics, then the rest alphabetically — the order the admin's country picker
+ * renders them in.
+ */
+export const SHIPPING_COUNTRIES: ReadonlyArray<{ code: string; name: string }> = [
+  { code: "SE", name: "Sverige" },
+  { code: "NO", name: "Norge" },
+  { code: "DK", name: "Danmark" },
+  { code: "FI", name: "Finland" },
+  { code: "AT", name: "Österrike" },
+  { code: "BE", name: "Belgien" },
+  { code: "BG", name: "Bulgarien" },
+  { code: "CH", name: "Schweiz" },
+  { code: "CY", name: "Cypern" },
+  { code: "CZ", name: "Tjeckien" },
+  { code: "DE", name: "Tyskland" },
+  { code: "EE", name: "Estland" },
+  { code: "ES", name: "Spanien" },
+  { code: "FR", name: "Frankrike" },
+  { code: "GB", name: "Storbritannien" },
+  { code: "GR", name: "Grekland" },
+  { code: "HR", name: "Kroatien" },
+  { code: "HU", name: "Ungern" },
+  { code: "IE", name: "Irland" },
+  { code: "IS", name: "Island" },
+  { code: "IT", name: "Italien" },
+  { code: "LT", name: "Litauen" },
+  { code: "LU", name: "Luxemburg" },
+  { code: "LV", name: "Lettland" },
+  { code: "MT", name: "Malta" },
+  { code: "NL", name: "Nederländerna" },
+  { code: "PL", name: "Polen" },
+  { code: "PT", name: "Portugal" },
+  { code: "RO", name: "Rumänien" },
+  { code: "SI", name: "Slovenien" },
+  { code: "SK", name: "Slovakien" },
+];
+
+/** Which tier table a country prices against. */
+export type ShippingZone = "domestic" | "eu" | "non-eu";
+
+/**
+ * The pricing zone a destination falls in. Useful for labelling a price in the
+ * admin, where "Norge" alone does not explain why it costs what it does.
+ */
+export function shippingZone(countryCode: string): ShippingZone {
+  const cc = countryCode?.toUpperCase().trim() || "";
+  if (cc === "SE") return "domestic";
+  return EU_COUNTRY_CODES.has(cc) ? "eu" : "non-eu";
+}
+
 /** Surcharge for a parcel whose longest side exceeds OVERSIZE_LENGTH_CM (SEK). */
 export const POSTPAKET_OVERSIZE_FEE = 215;
 

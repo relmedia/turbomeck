@@ -26,9 +26,18 @@ import {
   OVERSIZE_LENGTH_CM,
   POSTPAKET_OVERSIZE_FEE,
   RATES_LAST_UPDATED,
+  SHIPPING_COUNTRIES,
   getShippingPrice,
   isOversize,
+  shippingZone,
 } from "@repo/shipping";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/ui/components/select";
 import {
   Collapsible,
   CollapsibleContent,
@@ -104,6 +113,23 @@ export function shipmentTypeForWeight(weightKg: number | null | undefined): Ship
   return weightKg <= 3 ? "light" : "heavy";
 }
 
+/** Why a destination costs what it does — "Norge" alone does not explain it. */
+const ZONE_LABELS: Record<ReturnType<typeof shippingZone>, string> = {
+  domestic: "inrikes",
+  eu: "EU",
+  "non-eu": "utanför EU",
+};
+
+/**
+ * Always shown alongside the picked country: Sweden is the home market and
+ * Norway is the other big one, and they sit in different pricing zones, so
+ * between them they show the spread without any clicking.
+ */
+const PINNED_COUNTRIES = ["SE", "NO"] as const;
+
+/** Default for the third row — the EU zone's most common destination here. */
+const DEFAULT_PICKED_COUNTRY = "DE";
+
 /** Formats kg the Swedish way, and without a trailing ",0" on whole numbers. */
 function formatKg(kg: number): string {
   return kg.toLocaleString("sv-SE", { maximumFractionDigits: 1 });
@@ -161,6 +187,7 @@ export function ShipmentSection({
     () => !!(value.lengthCm || value.widthCm || value.heightCm),
   );
 
+  const [pickedCountry, setPickedCountry] = useState<string>(DEFAULT_PICKED_COUNTRY);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<ShipmentSuggestion | null>(null);
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -256,12 +283,34 @@ export function ShipmentSection({
         heightCm: toCm(value.heightCm),
       },
     ]);
+    // The picked country is dropped when it is already pinned, so Sverige or
+    // Norge cannot appear twice in the table.
+    const codes = [
+      ...PINNED_COUNTRIES,
+      ...(PINNED_COUNTRIES.includes(pickedCountry as (typeof PINNED_COUNTRIES)[number])
+        ? []
+        : [pickedCountry]),
+    ];
     return {
-      servicePoint: getShippingPrice(weightNum, "SE", "servicepoint", oversize),
-      home: getShippingPrice(weightNum, "SE", "home", oversize),
       oversize,
+      rows: codes.map((code) => ({
+        code,
+        name: SHIPPING_COUNTRIES.find((c) => c.code === code)?.name ?? code,
+        zone: ZONE_LABELS[shippingZone(code)],
+        servicePoint: getShippingPrice(weightNum, code, "servicepoint", oversize),
+        home: getShippingPrice(weightNum, code, "home", oversize),
+        /** The surcharge is a domestic Postpaket fee; it reaches SE rows only. */
+        oversizeApplies: oversize && shippingZone(code) === "domestic",
+      })),
     };
-  }, [hasWeight, weightNum, value.lengthCm, value.widthCm, value.heightCm]);
+  }, [
+    hasWeight,
+    weightNum,
+    value.lengthCm,
+    value.widthCm,
+    value.heightCm,
+    pickedCountry,
+  ]);
 
   function selectType(next: ShipmentType) {
     const nextOption = SHIPMENT_TYPE_OPTIONS.find((o) => o.value === next);
@@ -528,31 +577,75 @@ export function ShipmentSection({
 
         {/* ——— What this parcel will cost to ship ——— */}
         <div className="rounded-lg border bg-muted/30 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">Beräknat fraktpris</span>
-            <span className="text-xs text-muted-foreground">Sverige, inkl. moms</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-sm font-semibold">Beräknat fraktpris</span>
+              <span className="ml-2 text-xs text-muted-foreground">inkl. moms</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Jämför med</span>
+              <Select value={pickedCountry} onValueChange={setPickedCountry}>
+                <SelectTrigger className="h-8 w-[180px]" aria-label="Land att jämföra med">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SHIPPING_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {shippingPreview ? (
             <>
-              <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Ombud</p>
-                  <p className="text-lg font-semibold tabular-nums">
-                    {shippingPreview.servicePoint} kr
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Hemleverans</p>
-                  <p className="text-lg font-semibold tabular-nums">
-                    {shippingPreview.home} kr
-                  </p>
-                </div>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[22rem] text-sm">
+                  <thead>
+                    <tr className="text-xs text-muted-foreground">
+                      <th className="py-1 text-left font-normal">Land</th>
+                      <th className="py-1 text-right font-normal">Ombud</th>
+                      <th className="py-1 text-right font-normal">Hemleverans</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shippingPreview.rows.map((row) => (
+                      <tr key={row.code} className="border-t">
+                        <td className="py-2">
+                          {row.name}
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            ({row.zone})
+                          </span>
+                        </td>
+                        <td className="py-2 text-right font-semibold tabular-nums">
+                          {row.servicePoint} kr
+                          {row.oversizeApplies && (
+                            <span className="ml-1 text-xs font-normal text-amber-700 dark:text-amber-500">
+                              *
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right font-semibold tabular-nums">
+                          {row.home} kr
+                          {row.oversizeApplies && (
+                            <span className="ml-1 text-xs font-normal text-amber-700 dark:text-amber-500">
+                              *
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+
               {shippingPreview.oversize && (
                 <p className="mt-3 text-xs text-amber-700 dark:text-amber-500">
-                  Inkluderar {POSTPAKET_OVERSIZE_FEE} kr övermåttstillägg — paketet är
-                  längre än {OVERSIZE_LENGTH_CM} cm.
+                  * inkluderar {POSTPAKET_OVERSIZE_FEE} kr övermåttstillägg — paketet är
+                  längre än {OVERSIZE_LENGTH_CM} cm. Tillägget är en inrikes
+                  Postpaket-avgift och läggs inte på utrikes frakt.
                 </p>
               )}
             </>
