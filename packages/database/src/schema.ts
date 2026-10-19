@@ -95,9 +95,13 @@ export const products = pgTable("products", {
   weight: decimal("weight", { precision: 8, scale: 2 }), // kg, for PostNord shipping
   /**
    * PostNord shipment class, mirroring their "Vad är det du skickar?" choice:
-   * "light" (Lätt, max 3 kg), "heavy" (Tung, max 35 kg) or "pallet"
-   * (Pall, max 1000 kg). NULL on products that predate the shipping section —
-   * the admin derives a sensible default from `weight` when one is missing.
+   * "light" (Lätt, max 3 kg) or "heavy" (Tung, max 15 kg). NULL on products
+   * that predate the shipping section — the admin derives a sensible default
+   * from `weight` when one is missing.
+   *
+   * A "pallet" class shipped briefly in migration 0020 and was dropped before
+   * use; that migration's column COMMENT still mentions it. Nothing stores the
+   * value, and the API rejects it.
    */
   shipmentType: text("shipment_type"),
   /**

@@ -820,6 +820,14 @@ export default function ProductDetailPage() {
             onChange={(patch: Partial<ShipmentValue>) =>
               setFormData((prev) => ({ ...prev, ...patch }))
             }
+            product={{
+              name: formData.name,
+              shortDescription: formData.shortDescription,
+              description: formData.description,
+              specifications: formData.specifications
+                .filter((r) => r.label.trim() !== "" && r.value.trim() !== "")
+                .map((r) => ({ label: r.label, value: r.value })),
+            }}
           />
 
           <Card>

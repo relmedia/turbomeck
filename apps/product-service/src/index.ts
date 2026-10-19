@@ -1261,7 +1261,7 @@ function sanitizeSpecifications(input: unknown): { group?: string; label: string
 }
 
 /** PostNord shipment classes the admin's "Forsandelse" section offers. */
-const SHIPMENT_TYPES = new Set(["light", "heavy", "pallet"]);
+const SHIPMENT_TYPES = new Set(["light", "heavy"]);
 
 /**
  * Accept only a known shipment class; anything else (including "" from a form

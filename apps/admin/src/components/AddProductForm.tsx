@@ -67,7 +67,7 @@ const formSchema = z.object({
   }),
   stock: z.coerce.number().min(0).default(0),
   weight: z.coerce.number().min(0).optional().nullable(),
-  shipmentType: z.enum(["light", "heavy", "pallet"]).default("heavy"),
+  shipmentType: z.enum(["light", "heavy"]).default("heavy"),
   lengthCm: z.coerce.number().int().min(0).optional().nullable(),
   widthCm: z.coerce.number().int().min(0).optional().nullable(),
   heightCm: z.coerce.number().int().min(0).optional().nullable(),
@@ -605,6 +605,14 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                     { shouldDirty: true },
                   );
                 }
+              }}
+              product={{
+                name: form.watch("name") ?? "",
+                shortDescription: form.watch("shortDescription") ?? "",
+                description: form.watch("description") ?? "",
+                specifications: specifications
+                  .filter((r) => r.label.trim() !== "" && r.value.trim() !== "")
+                  .map((r) => ({ label: r.label, value: r.value })),
               }}
             />
           </div>

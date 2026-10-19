@@ -18,6 +18,7 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
+import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Slider } from "@repo/ui/components/slider";
@@ -26,9 +27,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@repo/ui/components/collapsible";
-import { ChevronDown, Feather, PackageCheck, SlidersHorizontal, Truck } from "lucide-react";
+import {
+  ChevronDown,
+  Feather,
+  Loader2,
+  PackageCheck,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
 
-export type ShipmentType = "light" | "heavy" | "pallet";
+export type ShipmentType = "light" | "heavy";
 
 export type ShipmentValue = {
   shipmentType: ShipmentType;
@@ -61,18 +69,10 @@ export const SHIPMENT_TYPE_OPTIONS: ShipmentTypeOption[] = [
   {
     value: "heavy",
     label: "Tung",
-    hint: "Max 35 kg",
-    maxKg: 35,
-    stops: [3, 5, 10, 15, 20, 31.5, 35],
+    hint: "Max 15 kg",
+    maxKg: 15,
+    stops: [3, 5, 10, 15],
     Icon: PackageCheck,
-  },
-  {
-    value: "pallet",
-    label: "Pall",
-    hint: "Max 1000 kg",
-    maxKg: 1000,
-    stops: [50, 100, 250, 500, 750, 1000],
-    Icon: Truck,
   },
 ];
 
@@ -90,13 +90,11 @@ const DIMENSIONS: Array<{
 /**
  * Pick the shipment class a legacy product belongs to from its weight alone.
  * Everything created before this section existed has `shipmentType` NULL, and
- * showing all three cards unselected would invite someone to pick the wrong one.
+ * showing both cards unselected would invite someone to pick the wrong one.
  */
 export function shipmentTypeForWeight(weightKg: number | null | undefined): ShipmentType {
   if (weightKg == null || !Number.isFinite(weightKg)) return "heavy";
-  if (weightKg <= 3) return "light";
-  if (weightKg <= 35) return "heavy";
-  return "pallet";
+  return weightKg <= 3 ? "light" : "heavy";
 }
 
 /** Formats kg the Swedish way, and without a trailing ",0" on whole numbers. */
@@ -118,16 +116,34 @@ function nearestStopIndex(stops: number[], kg: number): number {
   return best;
 }
 
+/** What the AI lookup needs to identify the product it is sizing. */
+export type ShipmentProductContext = {
+  name: string;
+  shortDescription?: string;
+  description?: string;
+  specifications?: { label: string; value: string }[];
+};
+
+type ShipmentSuggestion = {
+  basis: string;
+  notes: string;
+  sources: string[];
+  applied: string[];
+};
+
 export function ShipmentSection({
   value,
   onChange,
+  product,
 }: {
   value: ShipmentValue;
   onChange: (patch: Partial<ShipmentValue>) => void;
+  /** Omit to hide the AI button (e.g. where no product text exists yet). */
+  product?: ShipmentProductContext;
 }) {
   const option =
     SHIPMENT_TYPE_OPTIONS.find((o) => o.value === value.shipmentType) ??
-    SHIPMENT_TYPE_OPTIONS[1]!;
+    SHIPMENT_TYPE_OPTIONS[1]!; // "heavy" is the sane default for a turbo
 
   const weightNum = Number(value.weight);
   const hasWeight = value.weight.trim() !== "" && Number.isFinite(weightNum);
@@ -137,6 +153,71 @@ export function ShipmentSection({
   const [dimsOpen, setDimsOpen] = useState(
     () => !!(value.lengthCm || value.widthCm || value.heightCm),
   );
+
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<ShipmentSuggestion | null>(null);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  const canSuggest = !!product?.name?.trim();
+
+  async function suggestShipping() {
+    if (!product) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    setSuggestion(null);
+    try {
+      const res = await fetch("/api/suggest-shipping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(product),
+      });
+      const data = (await res.json()) as {
+        weightKg?: number | null;
+        lengthCm?: number | null;
+        widthCm?: number | null;
+        heightCm?: number | null;
+        basis?: string;
+        notes?: string;
+        sources?: string[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error || "Kunde inte hämta fraktuppgifter.");
+
+      // The admin asked for these figures, so they are applied rather than
+      // merely offered — but every field that changed is listed back, because
+      // silently overwriting a weight that prices shipping is not acceptable.
+      const patch: Partial<ShipmentValue> = {};
+      const applied: string[] = [];
+      if (typeof data.weightKg === "number") {
+        patch.weight = String(data.weightKg);
+        patch.shipmentType = shipmentTypeForWeight(data.weightKg);
+        applied.push(`vikt ${formatKg(data.weightKg)} kg`);
+      }
+      const dimLabels = { lengthCm: "längd", widthCm: "bredd", heightCm: "höjd" } as const;
+      for (const key of ["lengthCm", "widthCm", "heightCm"] as const) {
+        const n = data[key];
+        if (typeof n === "number") {
+          patch[key] = String(n);
+          applied.push(`${dimLabels[key]} ${n} cm`);
+        }
+      }
+      if (applied.length === 0) {
+        throw new Error("AI hittade inga användbara mått.");
+      }
+      onChange(patch);
+      if (patch.lengthCm || patch.widthCm || patch.heightCm) setDimsOpen(true);
+      setSuggestion({
+        basis: (data.basis ?? "").trim(),
+        notes: (data.notes ?? "").trim(),
+        sources: Array.isArray(data.sources) ? data.sources : [],
+        applied,
+      });
+    } catch (err) {
+      setSuggestError(err instanceof Error ? err.message : "Något gick fel.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   const sliderIndex = useMemo(
     () => (hasWeight ? nearestStopIndex(option.stops, weightNum) : 0),
@@ -166,21 +247,80 @@ export function ShipmentSection({
           <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <SlidersHorizontal className="size-4" />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <CardTitle>Försändelse</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Välj vilken typ av försändelse produkten skickas som. Vikten används
               för att räkna ut fraktpriset i kassan.
             </p>
           </div>
+          {product && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              onClick={suggestShipping}
+              disabled={suggesting || !canSuggest}
+              title={
+                canSuggest
+                  ? "Låt AI ta fram fraktvikt och paketmått"
+                  : "Fyll i produktnamn först"
+              }
+            >
+              {suggesting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+              {suggesting ? "Söker…" : "Föreslå med AI"}
+            </Button>
+          )}
         </div>
       </CardHeader>
 
       <CardContent className="space-y-8">
+        {suggestError && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {suggestError}
+          </p>
+        )}
+
+        {suggestion && (
+          <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <p className="font-medium">AI fyllde i: {suggestion.applied.join(", ")}</p>
+            {suggestion.basis && (
+              <p className="mt-1 text-muted-foreground">Underlag: {suggestion.basis}</p>
+            )}
+            {suggestion.notes && (
+              <p className="mt-1 text-muted-foreground">{suggestion.notes}</p>
+            )}
+            {suggestion.sources.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {suggestion.sources.map((url) => (
+                  <li key={url} className="truncate">
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Kontrollera siffrorna innan du sparar — vikten styr fraktpriset i kassan.
+            </p>
+          </div>
+        )}
+
         {/* ——— What are you sending? ——— */}
         <div className="space-y-3">
           <Label className="text-base font-semibold">Vad är det du skickar?</Label>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {SHIPMENT_TYPE_OPTIONS.map((opt) => {
               const selected = opt.value === option.value;
               return (
