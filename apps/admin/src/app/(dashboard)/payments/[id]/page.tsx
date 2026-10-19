@@ -17,15 +17,18 @@ import {
   AlertDialogTrigger,
 } from "@repo/ui/components/alert-dialog";
 import {
+  AlertTriangle,
   ChevronLeft,
   Printer,
   CreditCard,
+  Loader2,
+  Mail,
   Package,
   Truck,
   CheckCircle2,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -75,7 +78,6 @@ type OrderDetail = {
   coreReceivedAt?: string | null;
   status?: string;
   deliveryStatus: "processing" | "shipped" | "out_for_delivery" | "delivered";
-  shippedDate?: string;
   servicePointName?: string;
   servicePointId?: string;
   deliveryOption?: string;
@@ -116,19 +118,6 @@ function toValidTrackingId(val: unknown): string {
   return s && s.toLowerCase() !== "null" ? s : "";
 }
 
-const POSTNORD_BOOKING_COUNTRY_SET = new Set(
-  typeof process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES === "string" &&
-    process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES.trim()
-    ? process.env.NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES.split(/[\s,]+/)
-        .map((c) => c.trim().toUpperCase())
-        .filter(Boolean)
-    : ["SE", "NO", "DK"],
-);
-
-/** Must match server-side allowed countries (NEXT_PUBLIC_POSTNORD_EDI_DESTINATION_COUNTRIES or SE,NO,DK). */
-function isPostNordServicePointBookingCountry(country: string | null | undefined): boolean {
-  return POSTNORD_BOOKING_COUNTRY_SET.has((country ?? "").toUpperCase());
-}
 
 const DELIVERY_STEPS = [
   { id: "processing", label: "Behandlas", icon: Package },
@@ -213,7 +202,19 @@ export default function OrderDetailPage() {
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [markingCoreReceived, setMarkingCoreReceived] = useState(false);
   const [postnordBooking, setPostnordBooking] = useState(false);
-  const [bookWeightKg, setBookWeightKg] = useState(3);
+  /**
+   * Held as a string, not a number. `parseFloat(e.target.value) || 0` meant a
+   * cleared field rendered "0" while the payload silently booked 3 kg.
+   */
+  const [bookWeightKg, setBookWeightKg] = useState("");
+  const [preflight, setPreflight] = useState<BookingPreflight | null>(null);
+  const [bookingError, setBookingError] = useState<{
+    error: string;
+    details?: string;
+    diagnostics?: unknown;
+  } | null>(null);
+  const [sendingShipmentEmail, setSendingShipmentEmail] = useState(false);
+  const [confirmRebookOpen, setConfirmRebookOpen] = useState(false);
   const [labelOptions, setLabelOptions] = useState<PostNordLabelOptionsResponse | null>(null);
   const [labelOptionsLoading, setLabelOptionsLoading] = useState(false);
   const [labelOptionsError, setLabelOptionsError] = useState<string | null>(null);
@@ -338,52 +339,139 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handlePostnordBook = async () => {
-    if (!id || !order) return;
-    const tid = toValidTrackingId(order.postNordTrackingId);
-    const payload: { weightKg: number; replaceExisting?: boolean } = {
-      weightKg: Math.max(0.1, Math.min(35, Number(bookWeightKg) || 3)),
+  /** Preflight: eligibility, config readiness, suggested weight, booked state. */
+  type BookingPreflight = {
+    eligible: boolean;
+    ineligibleReason: { code: string; message: string } | null;
+    booked: {
+      isBooked: boolean;
+      trackingId: string | null;
+      printId: string | null;
+      hasLabel: boolean;
+      bookedAt: string | null;
+      testBooking: boolean;
+      weightKg: number | null;
     };
-    if (tid) {
-      const ok = window.confirm(
-        "Ordern har redan ett spårningsnummer. Vill du boka en ny försändelse hos PostNord och ersätta det?"
-      );
-      if (!ok) return;
-      payload.replaceExisting = true;
+    weight: {
+      suggestedKg: number;
+      source: "products" | "fallback";
+      oversize: boolean;
+      missingWeights: string[];
+    };
+    config: {
+      ready: boolean;
+      mode: "test" | "production";
+      host: string;
+      blocking: { key: string; label: string; hint: string }[];
+      warnings: { key: string; label: string; hint: string; shownValue?: string }[];
+    };
+  };
+
+  const refreshPreflight = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/orders/${id}/postnord-book-shipment`);
+      setPreflight(res.ok ? await res.json() : null);
+    } catch {
+      setPreflight(null);
     }
+  }, [id]);
+
+  useEffect(() => {
+    void refreshPreflight();
+  }, [refreshPreflight]);
+
+  // Prefill the weight from the products once the preflight lands, unless the
+  // admin has already typed something.
+  useEffect(() => {
+    if (preflight && bookWeightKg === "") {
+      setBookWeightKg(String(preflight.weight.suggestedKg));
+    }
+  }, [preflight, bookWeightKg]);
+
+  const handleSendShipmentEmail = async () => {
+    if (!id) return;
+    setSendingShipmentEmail(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/send-shipment-email`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof data.error === "string" ? data.error : "Kunde inte skicka mejlet");
+        return;
+      }
+      toast.success("Leveransmejl skickat till kund");
+    } catch {
+      toast.error("Kunde inte skicka mejlet");
+    } finally {
+      setSendingShipmentEmail(false);
+    }
+  };
+
+  const handlePostnordBook = async (replaceExisting = false) => {
+    if (!id || !order) return;
+
+    const weight = Number(bookWeightKg);
+    if (!Number.isFinite(weight) || weight < 0.1 || weight > 35) {
+      setBookingError({ error: "Ange en vikt mellan 0,1 och 35 kg." });
+      return;
+    }
+
     setPostnordBooking(true);
+    setBookingError(null);
     try {
       const res = await fetch(`/api/orders/${id}/postnord-book-shipment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          weightKg: weight,
+          ...(replaceExisting ? { replaceExisting: true } : {}),
+          // Only meaningful against the test API; the server ignores it otherwise.
+          ...(preflight && !preflight.config.ready && preflight.config.mode === "test"
+            ? { allowUnconfigured: true }
+            : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Keep the full rejection on screen. It used to go to the browser
+        // console (and only when under 500 chars), which is why nobody could
+        // say why booking failed.
+        setBookingError({
+          error: typeof data.error === "string" ? data.error : "Bokning misslyckades",
+          details: typeof data.details === "string" ? data.details : undefined,
+          diagnostics: data.diagnostics,
+        });
         toast.error(typeof data.error === "string" ? data.error : "Bokning misslyckades");
-        if (typeof data.details === "string" && data.details.length < 500) {
-          console.error("[PostNord bokning]", data.details);
-        }
         return;
       }
-      toast.success(`Frakt bokad — spårning: ${data.postNordTrackingId ?? ""}`);
+
+      if (data.needsManualId) {
+        toast.warn(
+          "PostNord accepterade bokningen men returnerade inget spårningsnummer — hämta det i PostNords portal."
+        );
+        setBookingError({
+          error:
+            "Bokningen gick igenom men PostNord returnerade inget spårningsnummer. Paketet finns — hämta numret i PostNords portal och klistra in det i fältet ovan.",
+          diagnostics: data.diagnostics,
+        });
+      } else {
+        toast.success(`Frakt bokad — spårning: ${data.postNordTrackingId ?? ""}`);
+      }
       if (data.postNordLabelAvailable === false) {
-        toast.warn("Ingen etikett-snapshot sparades — PDF kan saknas. Kontrollera bokningssvaret hos PostNord.");
+        toast.warn("Ingen etikett-snapshot sparades — PDF kan saknas.");
       }
-      if (data.postNordPrintId) {
-        toast.info(`PrintId (etikett): ${data.postNordPrintId}`);
-      }
-      if (data.shipmentEmailSent === true) {
-        toast.info("Leveransmejl skickat till kund");
-      } else if (data.shipmentEmailError) {
-        toast.warn(`Leveransmejl: ${data.shipmentEmailError}`);
-      }
+
       const refetch = await fetch(`/api/orders/${id}`);
       const updated = await refetch.json();
       setOrder(updated);
       setEditStatus(updated.status ?? "confirmed");
       setEditTrackingId(toValidTrackingId(updated.postNordTrackingId));
-    } catch {
+      await refreshPreflight();
+    } catch (err) {
+      setBookingError({
+        error: "Bokning misslyckades",
+        details: err instanceof Error ? err.message : String(err),
+      });
       toast.error("Bokning misslyckades");
     } finally {
       setPostnordBooking(false);
@@ -458,9 +546,11 @@ export default function OrderDetailPage() {
           </Link>
         </Button>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          {/* Prints the order page. The shipping label has its own PDF button
+              in the Försändelse block — this one had no onClick at all. */}
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="mr-2 h-4 w-4" />
-            Skriv ut
+            Skriv ut order
           </Button>
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <AlertDialogTrigger asChild>
@@ -730,10 +820,157 @@ export default function OrderDetailPage() {
                 style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
               />
             </div>
-            {isPostNordServicePointBookingCountry(order.country) &&
-              (order.deliveryOption ?? "servicepoint").toLowerCase() === "servicepoint" &&
-              order.servicePointId && (
-                <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
+            {/* Fraktbokning. Renders in every state — when booking is not
+                possible it says why, instead of silently disappearing. */}
+            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
+              {!preflight ? (
+                <Skeleton className="h-9 w-48 rounded" aria-hidden />
+              ) : !preflight.eligible ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {preflight.ineligibleReason?.message ?? "Frakt kan inte bokas för denna order."}
+                </p>
+              ) : preflight.booked.isBooked ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                      Frakt bokad
+                    </span>
+                    {preflight.booked.testBooking && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
+                        TESTBOKNING
+                      </span>
+                    )}
+                    {preflight.booked.bookedAt && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatDate(preflight.booked.bookedAt)}
+                      </span>
+                    )}
+                    {preflight.booked.weightKg != null && (
+                      <span className="text-[11px] text-muted-foreground">
+                        Bokad vikt: {preflight.booked.weightKg} kg
+                      </span>
+                    )}
+                  </div>
+
+                  {preflight.booked.trackingId ? (
+                    <p className="font-mono text-[11px] break-all">
+                      Spårningsnr: {preflight.booked.trackingId}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-amber-700">
+                      Inget spårningsnummer returnerades — hämta det hos PostNord och klistra in det ovan.
+                    </p>
+                  )}
+                  {preflight.booked.printId && (
+                    <p className="font-mono text-[11px] text-muted-foreground break-all">
+                      PrintId: {preflight.booked.printId}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {preflight.booked.hasLabel && (
+                      <Button variant="outline" size="sm" className="h-8 gap-1 bg-white text-xs" asChild>
+                        <a
+                          href={`/api/orders/${id}/postnord-label-pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Printer className="h-3.5 w-3.5" aria-hidden />
+                          Fraktetikett PDF
+                        </a>
+                      </Button>
+                    )}
+                    {preflight.booked.trackingId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 bg-white text-xs"
+                        onClick={fetchLabelOptions}
+                        disabled={labelOptionsLoading}
+                      >
+                        {labelOptionsLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Printer className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        Etikettalternativ
+                      </Button>
+                    )}
+                    {preflight.booked.trackingId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 bg-white text-xs"
+                        onClick={handleSendShipmentEmail}
+                        disabled={sendingShipmentEmail}
+                        title="Bokningen skickar inget mejl automatiskt"
+                      >
+                        {sendingShipmentEmail ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Mail className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        Skicka leveransmejl
+                      </Button>
+                    )}
+                    <AlertDialog open={confirmRebookOpen} onOpenChange={setConfirmRebookOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs">
+                          Boka om
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Boka om frakten?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Det gamla spårningsnumret ersätts. Den tidigare bokningen avbokas
+                            INTE hos PostNord — det måste göras i PostNords portal.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              setConfirmRebookOpen(false);
+                              void handlePostnordBook(true);
+                            }}
+                          >
+                            Boka om
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {!preflight.config.ready && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                      <p className="flex items-center gap-1.5 font-medium">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                        PostNord är inte konfigurerat — bokning avstängd
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {preflight.config.blocking.map((c) => (
+                          <li key={c.key}>
+                            <code className="font-mono text-[11px]">{c.key}</code>
+                            <span className="text-[11px]"> — {c.hint}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {preflight.config.warnings.length > 0 && (
+                        <ul className="mt-2 space-y-1 border-t border-amber-200 pt-2">
+                          {preflight.config.warnings.map((w) => (
+                            <li key={w.key} className="text-[11px]">
+                              <code className="font-mono">{w.key}</code> — {w.hint}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1">
                       <Label htmlFor="postnord-book-weight-kg" className="text-xs">
@@ -747,28 +984,78 @@ export default function OrderDetailPage() {
                         max={35}
                         className="h-9 w-24"
                         value={bookWeightKg}
-                        onChange={(e) => setBookWeightKg(parseFloat(e.target.value) || 0)}
+                        placeholder="—"
+                        onChange={(e) => setBookWeightKg(e.target.value)}
                       />
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       className="h-9 gap-2"
-                      disabled={postnordBooking}
-                      onClick={handlePostnordBook}
+                      disabled={
+                        postnordBooking ||
+                        (!preflight.config.ready && preflight.config.mode !== "test")
+                      }
+                      title={
+                        !preflight.config.ready && preflight.config.mode !== "test"
+                          ? "PostNord är inte konfigurerat"
+                          : undefined
+                      }
+                      onClick={() => void handlePostnordBook(false)}
                     >
                       {postnordBooking ? (
-                        <Skeleton className="h-4 w-4 shrink-0 rounded" aria-hidden />
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                       ) : null}
-                      Boka frakt
+                      {postnordBooking
+                        ? "Bokar…"
+                        : preflight.config.ready
+                          ? "Boka frakt"
+                          : "Testa mot PostNord ändå"}
                     </Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground font-mono break-all">
-                    Ombud: {order.servicePointId}
-                    {order.servicePointName ? ` — ${order.servicePointName}` : ""}
+
+                  <p className="text-[11px] text-muted-foreground">
+                    {preflight.weight.source === "products"
+                      ? `Uppskattad från produktvikter (${preflight.weight.suggestedKg} kg).`
+                      : "Inga produktvikter registrerade — 1 kg per enhet antaget."}
+                    {preflight.weight.missingWeights.length > 0 &&
+                      ` Saknar vikt: ${preflight.weight.missingWeights.join(", ")}.`}
+                    {preflight.weight.oversize &&
+                      " Skrymmande (>120 cm längsta sida) — PostNord kan debitera tilläggsavgift."}
                   </p>
+                </>
+              )}
+
+              {bookingError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="font-medium text-destructive">{bookingError.error}</p>
+                  {Boolean(bookingError.details || bookingError.diagnostics) && (
+                    <details className="mt-1.5">
+                      <summary className="cursor-pointer text-[11px] text-muted-foreground">
+                        Teknisk information
+                      </summary>
+                      <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-[10px] whitespace-pre-wrap break-all">
+                        {[
+                          bookingError.details,
+                          bookingError.diagnostics
+                            ? JSON.stringify(bookingError.diagnostics, null, 2)
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join("\n\n")}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
+
+              {order.servicePointId && (
+                <p className="font-mono text-[11px] break-all text-muted-foreground">
+                  Ombud: {order.servicePointId}
+                  {order.servicePointName ? ` — ${order.servicePointName}` : ""}
+                </p>
+              )}
+            </div>
             <div className="mt-4 space-y-3 border-t pt-4">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="space-y-1.5">
@@ -820,54 +1107,6 @@ export default function OrderDetailPage() {
                 </Button>
               </div>
             </div>
-            {(order.shippedDate ||
-              toValidTrackingId(order.postNordTrackingId) ||
-              order.hasPostNordLabel) && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
-                  Skickad
-                </span>
-                {order.shippedDate && (
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(order.shippedDate)}
-                  </span>
-                )}
-                {toValidTrackingId(order.postNordTrackingId) && (
-                  <a
-                    href={`https://www.postnord.se/en/our-tools/track-and-trace?shipmentId=${encodeURIComponent(toValidTrackingId(order.postNordTrackingId))}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-sky-600 hover:text-sky-700 hover:underline"
-                  >
-                    Spårningsnr: {toValidTrackingId(order.postNordTrackingId)} →
-                  </a>
-                )}
-                {order.hasPostNordLabel && (
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-white" asChild>
-                    <a href={`/api/orders/${id}/postnord-label-pdf`} target="_blank" rel="noopener noreferrer">
-                      <Printer className="h-3.5 w-3.5" aria-hidden />
-                      Fraktetikett PDF
-                    </a>
-                  </Button>
-                )}
-                {toValidTrackingId(order.postNordTrackingId) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1 bg-white"
-                    onClick={fetchLabelOptions}
-                    disabled={labelOptionsLoading}
-                  >
-                    {labelOptionsLoading ? (
-                      <Skeleton className="h-3.5 w-3.5 shrink-0 rounded" aria-hidden />
-                    ) : (
-                      <Printer className="h-3.5 w-3.5" aria-hidden />
-                    )}
-                    Etikettalternativ
-                  </Button>
-                )}
-              </div>
-            )}
             {(labelOptionsError || labelOptions) && (
               <div className="mt-2 rounded-md border bg-muted/40 p-3 text-xs">
                 {labelOptionsError && (

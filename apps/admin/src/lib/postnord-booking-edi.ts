@@ -212,7 +212,14 @@ export type PostnordEdiBookResult =
   | {
       ok: true;
       data: unknown;
-      trackableId: string;
+      /**
+       * Null when PostNord accepted the booking but returned no parseable
+       * shipment id. The parcel exists either way, so this is deliberately NOT
+       * a failure — see `needsManualId`.
+       */
+      trackableId: string | null;
+      /** True when the booking was accepted but no id could be extracted. */
+      needsManualId: boolean;
       printId: string | null;
       rawBookingJson: unknown;
     }
@@ -301,6 +308,12 @@ export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise
     body.byteLength > 0 && body.byteLength < 12000
       ? new TextDecoder().decode(body)
       : undefined;
+  console.error("[postnord-edi] label API did not return a PDF", {
+    status: res.status,
+    contentType: res.headers.get("content-type"),
+    bytes: body.byteLength,
+    body: details?.slice(0, 2000),
+  });
   return {
     ok: false,
     status: res.status,
@@ -324,15 +337,26 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     "Content-Type": "application/json",
   };
 
+  /**
+   * Captured before the request so every failure branch can report it.
+   * Whether a Bearer was attached is the single most useful fact when
+   * diagnosing a rejection, because the OAuth token host was decommissioned
+   * and the fallback is silent.
+   */
+  let bearerAttached = false;
+  const messageId =
+    (shipmentInformation as { messageId?: unknown }).messageId ?? "(okänt)";
+
   try {
     const bearer = await getPostNordBearerTokenNullable();
-    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+    if (bearer) {
+      headers.Authorization = `Bearer ${bearer}`;
+      bearerAttached = true;
+    }
   } catch (e) {
-    return {
-      ok: false,
-      status: 503,
-      message: e instanceof Error ? e.message : "PostNord OAuth misslyckades",
-    };
+    const message = e instanceof Error ? e.message : "PostNord OAuth misslyckades";
+    console.error("[postnord-edi] OAuth failed, booking aborted", { host, messageId, message });
+    return { ok: false, status: 503, message };
   }
 
   let res: Response;
@@ -343,11 +367,14 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
       body: JSON.stringify(shipmentInformation),
     });
   } catch (e) {
-    return {
-      ok: false,
-      status: 503,
-      message: describePostNordNetworkError("Boknings-API", e),
-    };
+    const message = describePostNordNetworkError("Boknings-API", e);
+    console.error("[postnord-edi] booking request failed before a response", {
+      host,
+      messageId,
+      bearerAttached,
+      message,
+    });
+    return { ok: false, status: 503, message };
   }
 
   const text = await res.text();
@@ -358,7 +385,22 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     data = { raw: text };
   }
 
-  if (res.status !== 201) {
+  /**
+   * `res.ok`, not `=== 201`.
+   *
+   * Treating a 200 as a failure is the worst outcome available here: PostNord
+   * has created a real parcel and we report an error, so the shipment is
+   * orphaned — booked, billed, and invisible to the shop.
+   */
+  if (!res.ok) {
+    console.error("[postnord-edi] booking rejected", {
+      status: res.status,
+      host,
+      path: "/rest/shipment/v3/edi",
+      bearerAttached,
+      messageId,
+      body: text.slice(0, 2000),
+    });
     return {
       ok: false,
       status: res.status,
@@ -368,15 +410,27 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
   }
 
   const trackableId = extractPostNordTrackableShipmentId(data);
+  const printId = extractPostNordPrintId(data);
+
   if (!trackableId) {
-    return {
-      ok: false,
-      status: 502,
-      message: "Booking succeeded but no trackable id was found in the response",
-      details: text.slice(0, 2000),
-    };
+    // Accepted, but we cannot read an id out of the response. The parcel is
+    // real, so this stays a success and the caller surfaces a warning asking
+    // the operator to paste the number from PostNord's portal.
+    console.error("[postnord-edi] booking accepted but no trackable id found", {
+      status: res.status,
+      host,
+      bearerAttached,
+      messageId,
+      body: text.slice(0, 4000),
+    });
   }
 
-  const printId = extractPostNordPrintId(data);
-  return { ok: true, data, trackableId, printId, rawBookingJson: data };
+  return {
+    ok: true,
+    data,
+    trackableId,
+    needsManualId: !trackableId,
+    printId,
+    rawBookingJson: data,
+  };
 }
