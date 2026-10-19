@@ -101,7 +101,7 @@ function adminSecurityHeaders(): { key: string; value: string }[] {
 }
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@repo/ui", "@repo/currency"],
+  transpilePackages: ["@repo/ui", "@repo/currency", "@repo/shipping"],
   async headers() {
     return [
       {

@@ -23,6 +23,13 @@ import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Slider } from "@repo/ui/components/slider";
 import {
+  OVERSIZE_LENGTH_CM,
+  POSTPAKET_OVERSIZE_FEE,
+  RATES_LAST_UPDATED,
+  getShippingPrice,
+  isOversize,
+} from "@repo/shipping";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -227,6 +234,34 @@ export function ShipmentSection({
   /** True when the typed weight sits between stops — the slider is then approximate. */
   const offStop = hasWeight && option.stops[sliderIndex] !== weightNum;
   const overMax = hasWeight && weightNum > option.maxKg;
+
+  /**
+   * What checkout will charge for this parcel, computed live from the same
+   * `@repo/shipping` tiers that price the real order — so this is the figure
+   * the customer sees, not an approximation of it.
+   *
+   * No request is made: PostNord publishes no rate API, so the rates are a
+   * local table and the preview is a pure function of the fields above.
+   */
+  const shippingPreview = useMemo(() => {
+    if (!hasWeight || weightNum <= 0) return null;
+    const toCm = (raw: string) => {
+      const n = Number(raw);
+      return raw.trim() !== "" && Number.isFinite(n) ? n : null;
+    };
+    const oversize = isOversize([
+      {
+        lengthCm: toCm(value.lengthCm),
+        widthCm: toCm(value.widthCm),
+        heightCm: toCm(value.heightCm),
+      },
+    ]);
+    return {
+      servicePoint: getShippingPrice(weightNum, "SE", "servicepoint", oversize),
+      home: getShippingPrice(weightNum, "SE", "home", oversize),
+      oversize,
+    };
+  }, [hasWeight, weightNum, value.lengthCm, value.widthCm, value.heightCm]);
 
   function selectType(next: ShipmentType) {
     const nextOption = SHIPMENT_TYPE_OPTIONS.find((o) => o.value === next);
@@ -490,6 +525,48 @@ export function ShipmentSection({
             })}
           </CollapsibleContent>
         </Collapsible>
+
+        {/* ——— What this parcel will cost to ship ——— */}
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold">Beräknat fraktpris</span>
+            <span className="text-xs text-muted-foreground">Sverige, inkl. moms</span>
+          </div>
+
+          {shippingPreview ? (
+            <>
+              <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Ombud</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {shippingPreview.servicePoint} kr
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Hemleverans</p>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {shippingPreview.home} kr
+                  </p>
+                </div>
+              </div>
+              {shippingPreview.oversize && (
+                <p className="mt-3 text-xs text-amber-700 dark:text-amber-500">
+                  Inkluderar {POSTPAKET_OVERSIZE_FEE} kr övermåttstillägg — paketet är
+                  längre än {OVERSIZE_LENGTH_CM} cm.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Fyll i vikten för att se fraktpriset.
+            </p>
+          )}
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            Samma prislista som kassan debiterar. PostNord har inget pris-API, så
+            satserna underhålls manuellt — senast uppdaterade {RATES_LAST_UPDATED}.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
