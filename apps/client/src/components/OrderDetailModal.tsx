@@ -1,5 +1,6 @@
 "use client";
 
+import { postNordTrackingUrl } from "@repo/shipping";
 import type { ReactNode } from "react";
 import type { Order } from "@/lib/api";
 import { resolveImageUrl } from "@/lib/api";
@@ -25,8 +26,6 @@ import {
   Info,
 } from "lucide-react";
 
-const POSTNORD_TRACKING_BASE =
-  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
 type OrderDetailModalProps = {
   order: Order | null;
@@ -120,7 +119,7 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
   const displayRef = normalizeShopOrderNumber(order.orderNumber);
 
   const trackingUrl = order.postNordTrackingId
-    ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
+    ? postNordTrackingUrl(order.postNordTrackingId)
     : null;
 
   const StatusIcon = statusBadge.Icon;

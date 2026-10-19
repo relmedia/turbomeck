@@ -1,5 +1,6 @@
 "use client";
 
+import { postNordTrackingUrl } from "@repo/shipping";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -34,8 +35,6 @@ import {
   type SupportedCurrency,
 } from "@repo/currency";
 
-const POSTNORD_TRACKING_BASE =
-  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
 /**
  * What actually happened to the payment.
@@ -592,9 +591,7 @@ function OrderSuccessContent() {
     totalFromStorage;
   const isValidTotal = totalDisplay !== null && !isNaN(totalDisplay);
   const trackingId = trackingParam?.trim() ?? "";
-  const postNordTrackingUrl = trackingId
-    ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(trackingId)}`
-    : null;
+  const trackingUrl = trackingId ? postNordTrackingUrl(trackingId) : null;
 
   const displayOrderNumber =
     orderDetails?.orderNumber?.trim().replace(/^#+/u, "") || null;
@@ -731,7 +728,7 @@ function OrderSuccessContent() {
             </ol>
           </div>
 
-          {postNordTrackingUrl && (
+          {trackingUrl && (
             <div className="mt-6 rounded-lg border border-sky-200/90 bg-sky-50/70 px-4 py-3 text-sm dark:border-sky-900/60 dark:bg-sky-950/30">
               <div className="mb-2 flex items-center gap-2 font-medium text-sky-950 dark:text-sky-100">
                 <Package className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
@@ -741,7 +738,7 @@ function OrderSuccessContent() {
                 {trackingId}
               </p>
               <a
-                href={postNordTrackingUrl}
+                href={trackingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mb-3 inline-flex"

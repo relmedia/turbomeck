@@ -1,5 +1,6 @@
 "use client";
 
+import { postNordTrackingUrl } from "@repo/shipping";
 import { useSession, signOut } from "next-auth/react";
 import { useLanguage, useTranslation } from "@/i18n/context";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
@@ -59,8 +60,6 @@ import { type SavedAddress } from "@/types";
 import { useWishlist } from "@/hooks/useWishlist";
 import { cn, normalizeShopOrderNumber, productUrl } from "@/lib/utils";
 
-const POSTNORD_TRACKING_BASE =
-  "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
 
 function getMemberSince(date: Date, locale: string): string {
   return date.toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE", {
@@ -614,7 +613,7 @@ export default function AccountPage() {
                 <div className="space-y-3">
                   {orders.map((order) => {
                     const trackingUrl = order.postNordTrackingId
-                      ? `${POSTNORD_TRACKING_BASE}?shipmentId=${encodeURIComponent(order.postNordTrackingId)}`
+                      ? postNordTrackingUrl(order.postNordTrackingId)
                       : null;
                     const trackingPending =
                       (order.status === "shipped" ||

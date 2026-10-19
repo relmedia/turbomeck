@@ -39,6 +39,7 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { toast } from "react-toastify";
+import { postNordTrackingUrl } from "@repo/shipping";
 import { DashboardOrderDetailSkeleton } from "@/components/dashboard-skeletons";
 import { Skeleton } from "@repo/ui/components/skeleton";
 import { resolveImageUrl } from "@/lib/image-utils";
@@ -1086,7 +1087,7 @@ export default function OrderDetailPage() {
                       />
                       {(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId)) && (
                         <a
-                          href={`https://www.postnord.se/en/our-tools/track-and-trace?shipmentId=${encodeURIComponent(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId) || "")}`}
+                          href={postNordTrackingUrl(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId) || "")}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-sky-600 hover:text-sky-700 hover:underline shrink-0"

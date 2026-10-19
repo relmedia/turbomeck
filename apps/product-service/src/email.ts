@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { db, appSettings } from "@repo/database";
 import { eq } from "drizzle-orm";
+import { postNordTrackingUrl } from "@repo/shipping";
 
 /** Customer-facing contact address in transactional emails */
 export const SHOP_CONTACT_EMAIL = "shop@turbomeck.se";
@@ -375,7 +376,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
   const logoUrl = getOrderEmailLogoUrl();
 
   const trackingUrl = data.trackingId
-    ? `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`
+    ? postNordTrackingUrl(data.trackingId)
     : null;
 
   // 25 % VAT included in prices (Swedish B2C): VAT share of gross = 20 %
@@ -725,7 +726,7 @@ function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): strin
   const t = shipmentDispatchedTranslations[locale];
   const logoUrl = getOrderEmailLogoUrl();
   const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
-  const trackingUrl = `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`;
+  const trackingUrl = postNordTrackingUrl(data.trackingId);
   const orderNo = escapeHtml(String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber);
   const tracking = escapeHtml(data.trackingId);
   const firstName = escapeHtml(data.firstName);
@@ -1463,7 +1464,7 @@ export type AdminShipmentBookedEmailData = {
 
 function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): string {
   const orderUrl = `${getAdminBaseUrl()}/payments/${data.orderId}`;
-  const trackingUrl = `https://www.postnord.se/vara-verktyg/spara-din-forsandelse?shipmentId=${encodeURIComponent(data.trackingId)}`;
+  const trackingUrl = postNordTrackingUrl(data.trackingId);
   const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
 
   const rows: Array<{ label: string; value: string }> = [

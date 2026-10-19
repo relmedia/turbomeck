@@ -1,5 +1,6 @@
 "use client";
 
+import { postNordTrackingUrl } from "@repo/shipping";
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { Button } from "@repo/ui/components/button";
@@ -101,7 +102,7 @@ export const createShippingColumns = (): ColumnDef<ShippingRow>[] => [
       if (!tid) return <span className="text-muted-foreground">—</span>;
       return (
         <a
-          href={`https://www.postnord.se/en/our-tools/track-and-trace?shipmentId=${encodeURIComponent(tid)}`}
+          href={postNordTrackingUrl(tid)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sky-600 hover:text-sky-700 hover:underline text-sm"
@@ -273,7 +274,7 @@ export const createShippingColumns = (): ColumnDef<ShippingRow>[] => [
             {tid ? (
               <DropdownMenuItem asChild>
                 <a
-                  href={`https://www.postnord.se/en/our-tools/track-and-trace?shipmentId=${encodeURIComponent(tid)}`}
+                  href={postNordTrackingUrl(tid)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

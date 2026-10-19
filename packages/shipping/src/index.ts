@@ -138,6 +138,26 @@ export function shippingZone(countryCode: string): ShippingZone {
   return EU_COUNTRY_CODES.has(cc) ? "eu" : "non-eu";
 }
 
+/**
+ * PostNord's public Track & Trace page for one shipment.
+ *
+ * The path is locale-specific. This lived as a hardcoded string in nine places
+ * across three apps, and the three admin copies used the English path
+ * (`/en/our-tools/track-and-trace`) while the storefront and every customer
+ * email used the Swedish one — so clicking "Spåra" in the Swedish admin opened
+ * an English page. One function, so the next copy cannot drift again.
+ *
+ * `locale` defaults to Swedish, which is what every existing call site wanted.
+ * Pass "en" where an English-speaking customer is being linked.
+ */
+export function postNordTrackingUrl(trackingId: string, locale: "sv" | "en" = "sv"): string {
+  const path =
+    locale === "en"
+      ? "https://www.postnord.se/en/our-tools/track-and-trace"
+      : "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
+  return `${path}?shipmentId=${encodeURIComponent(trackingId)}`;
+}
+
 /** Surcharge for a parcel whose longest side exceeds OVERSIZE_LENGTH_CM (SEK). */
 export const POSTPAKET_OVERSIZE_FEE = 215;
 
