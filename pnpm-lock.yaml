@@ -288,6 +288,9 @@ importers:
       '@repo/sanitize-html':
         specifier: workspace:*
         version: link:../../packages/sanitize-html
+      '@repo/shipping':
+        specifier: workspace:*
+        version: link:../../packages/shipping
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -462,6 +465,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/shipping':
+        specifier: workspace:*
+        version: link:../../packages/shipping
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -618,6 +624,15 @@ importers:
       isomorphic-dompurify:
         specifier: ^3.5.0
         version: 3.12.0
+
+  packages/shipping:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
 
   packages/types:
     devDependencies:
@@ -5202,6 +5217,7 @@ packages:
   typescript@5.9.2:
     resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
     engines: {node: '>=14.17'}
+    hasBin: true
 
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}

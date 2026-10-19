@@ -6,7 +6,7 @@ import {
 } from "@repo/currency";
 import { getSekRate } from "@repo/currency/rate";
 import { sql, inArray } from "drizzle-orm";
-import { getShippingPrice } from "./shipping-pricing.js";
+import { getShippingPrice, isOversize } from "./shipping-pricing.js";
 
 /** Fixed SEK surcharge when Swedish customer opts not to return the old turbo (charged at checkout). */
 export const CORE_KEEP_FEE_SEK = 1000;
@@ -172,6 +172,12 @@ export async function resolveCheckoutOrder(body: {
 
   let subtotal = 0;
   let totalWeightKg = 0;
+  /** Parcel dimensions of the catalog rows, for the oversize surcharge. */
+  const parcelDimensions: Array<{
+    lengthCm: number | null;
+    widthCm: number | null;
+    heightCm: number | null;
+  }> = [];
 
   for (const it of body.items) {
     const pid = it.productId!;
@@ -200,6 +206,12 @@ export async function resolveCheckoutOrder(body: {
     const w = p.weight != null ? Number(p.weight) : 1;
     const wkg = Number.isFinite(w) && w > 0 ? w : 1;
     totalWeightKg += wkg * it.quantity;
+
+    parcelDimensions.push({
+      lengthCm: p.lengthCm ?? null,
+      widthCm: p.widthCm ?? null,
+      heightCm: p.heightCm ?? null,
+    });
 
     const submittedImage = it.productImage;
     const safeImage = isStaleProductImageUrl(submittedImage)
@@ -234,7 +246,20 @@ export async function resolveCheckoutOrder(body: {
       ? CORE_KEEP_FEE_SEK
       : 0;
 
-  const shipping = getShippingPrice(Math.max(0.1, totalWeightKg), country, deliveryOption);
+  /**
+   * PostNord charges extra for a parcel longer than 1.2 m. The flag existed on
+   * the pricing helpers from the start but nothing ever passed it, so the fee
+   * was never applied and the shop absorbed it. Products now record their
+   * dimensions, so it can finally be computed — from the catalog rows, never
+   * from the client.
+   */
+  const oversize = isOversize(parcelDimensions);
+  const shipping = getShippingPrice(
+    Math.max(0.1, totalWeightKg),
+    country,
+    deliveryOption,
+    oversize,
+  );
 
   let discount = 0;
   const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";

@@ -282,174 +282,25 @@ function parseServicePointResponse(text: string): PostNordServicePoint[] {
 }
 
 /**
- * PostNord Postpaket inrikes pricing (Sverige, hos ombud) - BUSINESS rates.
- * @see https://www.postnord.se/kop-frakt/tjanster?customerType=BUSINESS
- * Prices in SEK. Weight in kg. For weights between tiers, rounds up to next tier.
- * Last updated: 2026-03-19
+ * Shipping rates live in `@repo/shipping` — one copy, shared with
+ * product-service, which is what actually charges the customer. These tiers
+ * used to be duplicated here and kept aligned by a "keep in sync" comment; any
+ * drift meant the price shown at checkout was not the price billed.
+ *
+ * Re-exported so existing imports from this module keep working.
  */
-const POSTPAKET_PRICE_TIERS: Array<{ maxKg: number; price: number }> = [
-  { maxKg: 1, price: 84 },
-  { maxKg: 2, price: 116 },
-  { maxKg: 3, price: 128 },
-  { maxKg: 5, price: 152 },
-  { maxKg: 10, price: 196 },
-  { maxKg: 15, price: 236 },
-  { maxKg: 20, price: 276 },
-];
-
-/** Extra fee for parcels over 1.2m length (SEK) */
-const POSTPAKET_OVERSIZE_FEE = 215;
-
-/**
- * Get Postpaket price for given weight (kg).
- * Uses official PostNord Postpaket inrikes pricing.
- * @param weightKg Total parcel weight in kg
- * @param oversize Optional: parcel exceeds 1.2m length
- */
-export function getPostpaketPrice(
-  weightKg: number,
-  oversize = false
-): number {
-  const w = Math.max(0.1, Math.ceil(weightKg));
-  const tier = POSTPAKET_PRICE_TIERS.find((t) => w <= t.maxKg);
-  const lastTier = POSTPAKET_PRICE_TIERS[POSTPAKET_PRICE_TIERS.length - 1];
-  const base = tier?.price ?? lastTier?.price ?? 355;
-  return base + (oversize ? POSTPAKET_OVERSIZE_FEE : 0);
-}
-
-/**
- * PostNord Home Delivery pricing (Sverige, hemleverans) - BUSINESS rates.
- * For light packages (1-2 kg): "Skicka Hem" service (cheaper)
- * For heavier packages (3+ kg): "Home" service
- * @see https://www.postnord.se/kop-frakt/tjanster?customerType=BUSINESS
- * Last updated: 2026-03-19
- */
-const HOME_DELIVERY_PRICE_TIERS: Array<{ maxKg: number; price: number }> = [
-  { maxKg: 1, price: 67 },
-  { maxKg: 2, price: 99 },
-  { maxKg: 3, price: 224 },
-  { maxKg: 5, price: 272 },
-  { maxKg: 10, price: 352 },
-  { maxKg: 15, price: 424 },
-  { maxKg: 20, price: 480 },
-];
-
-/**
- * Get home delivery price (Hemleverans) - domestic Sweden only.
- * Uses PostNord business rates.
- */
-export function getHomeDeliveryPrice(
-  weightKg: number,
-  oversize = false
-): number {
-  const w = Math.max(0.1, Math.ceil(weightKg));
-  const tier = HOME_DELIVERY_PRICE_TIERS.find((t) => w <= t.maxKg);
-  const lastTier = HOME_DELIVERY_PRICE_TIERS[HOME_DELIVERY_PRICE_TIERS.length - 1];
-  const base = tier?.price ?? lastTier?.price ?? 480;
-  return base + (oversize ? POSTPAKET_OVERSIZE_FEE : 0);
-}
-
-/**
- * PostNord Postpaket utrikes - EU countries.
- * NOTE: These are retail/private prices. Business rates may be lower.
- * @see https://www.postnord.se/privat/skicka/brev-och-paket/postpaket-utrikes/
- * Prices in SEK. Weight in kg.
- */
-const POSTPAKET_EU_TIERS: Array<{ maxKg: number; price: number }> = [
-  { maxKg: 1, price: 358 },
-  { maxKg: 2, price: 403 },
-  { maxKg: 3, price: 446 },
-  { maxKg: 5, price: 536 },
-  { maxKg: 10, price: 760 },
-  { maxKg: 15, price: 984 },
-  { maxKg: 20, price: 1207 },
-];
-
-/**
- * PostNord Postpaket utrikes - countries outside EU.
- * Higher tier for Norway, Switzerland, UK, Iceland, etc.
- */
-const POSTPAKET_NON_EU_TIERS: Array<{ maxKg: number; price: number }> = [
-  { maxKg: 1, price: 408 },
-  { maxKg: 2, price: 453 },
-  { maxKg: 3, price: 496 },
-  { maxKg: 5, price: 586 },
-  { maxKg: 10, price: 810 },
-  { maxKg: 15, price: 1034 },
-  { maxKg: 20, price: 1257 },
-];
-
-/** EU member states (ISO 3166-1 alpha-2) - used for PostNord international pricing zone */
-export const EU_COUNTRY_CODES = new Set([
-  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
-  "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK",
-  "SI", "ES",
-]);
-
-/**
- * Get Postpaket utrikes price for European destinations (excl. Sweden).
- * @param weightKg Parcel weight in kg
- * @param countryCode ISO 3166-1 alpha-2 (e.g. DE, NO)
- */
-export function getPostpaketInternationalPrice(
-  weightKg: number,
-  countryCode: string
-): number {
-  const normalized = countryCode?.toUpperCase().trim() || "";
-  if (normalized === "SE") return getPostpaketPrice(weightKg);
-
-  const tiers = EU_COUNTRY_CODES.has(normalized)
-    ? POSTPAKET_EU_TIERS
-    : POSTPAKET_NON_EU_TIERS;
-  const w = Math.max(0.1, Math.ceil(weightKg));
-  const tier = tiers.find((t) => w <= t.maxKg);
-  return tier?.price ?? tiers[tiers.length - 1]!.price;
-}
-
-/**
- * Get hemleverans (home delivery) price for European destinations.
- * International hemleverans: ~50 kr premium over Postpaket (estimate).
- */
-export function getHomeDeliveryInternationalPrice(
-  weightKg: number,
-  countryCode: string
-): number {
-  const base = getPostpaketInternationalPrice(weightKg, countryCode);
-  const w = Math.max(0.1, Math.ceil(weightKg));
-  const premium = w <= 5 ? 50 : w <= 10 ? 60 : 70;
-  return base + premium;
-}
-
-/** Swedish VAT rate (25%) */
-const VAT_RATE = 0.25;
-
-/**
- * Get shipping cost (SEK) for a given weight, country and delivery type.
- * Sweden uses domestic Postpaket/Hemleverans; other European countries use international tiers.
- * Prices include 25% VAT (moms).
- */
-export function getShippingPrice(
-  weightKg: number,
-  countryCode: string,
-  deliveryOption: "home" | "servicepoint"
-): number {
-  const cc = countryCode?.toUpperCase().trim() || "SE";
-  const isServicePoint = deliveryOption === "servicepoint";
-
-  let basePrice: number;
-  if (cc === "SE") {
-    basePrice = isServicePoint
-      ? getPostpaketPrice(weightKg)
-      : getHomeDeliveryPrice(weightKg);
-  } else {
-    basePrice = isServicePoint
-      ? getPostpaketInternationalPrice(weightKg, cc)
-      : getHomeDeliveryInternationalPrice(weightKg, cc);
-  }
-
-  // Add 25% VAT and round to nearest whole number
-  return Math.round(basePrice * (1 + VAT_RATE));
-}
+export {
+  EU_COUNTRY_CODES,
+  OVERSIZE_LENGTH_CM,
+  POSTPAKET_OVERSIZE_FEE,
+  RATES_LAST_UPDATED,
+  getHomeDeliveryInternationalPrice,
+  getHomeDeliveryPrice,
+  getPostpaketInternationalPrice,
+  getPostpaketPrice,
+  getShippingPrice,
+  isOversize,
+} from "@repo/shipping";
 
 const COUNTRY_NAMES: Record<string, string> = {
   SE: "Sweden",
