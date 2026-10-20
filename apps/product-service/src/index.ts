@@ -2262,7 +2262,7 @@ app.post("/api/orders/:id/refund", async (req, res) => {
             currency: result.refund.currency,
             refundAmount: result.refund.amount,
             isFullRefund: result.fullyRefunded,
-            chargeLabel: charge?.label ?? "Betalning",
+            chargeKind: kind,
             last4: charge?.last4 ?? null,
             locale: body.locale === "en" ? "en" : "sv",
           });

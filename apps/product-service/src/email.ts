@@ -851,8 +851,11 @@ export type RefundIssuedEmailData = {
   refundAmount: number;
   /** True when nothing is left refundable on the order. */
   isFullRefund: boolean;
-  /** "Betalning" / "Deposition" / "Restbetalning". */
-  chargeLabel: string;
+  /**
+   * Which charge was refunded. Passed as a kind rather than a ready-made
+   * label: the admin's Swedish wording must not end up inside an English mail.
+   */
+  chargeKind: "full" | "deposit" | "balance";
   last4?: string | null;
   locale?: "sv" | "en";
 };
@@ -868,6 +871,7 @@ const refundIssuedTranslations = {
     amount: "Återbetalat belopp",
     paidWith: "Avser",
     card: "Kort som slutar på",
+    chargeKinds: { full: "Betalning", deposit: "Deposition", balance: "Restbetalning" },
     note: "Beloppet återförs till samma betalningsmetod som användes vid köpet och syns vanligtvis på ditt konto inom 5–10 bankdagar.",
     questions: "Har du frågor? Kontakta oss på",
     rights: "Alla rättigheter förbehållna.",
@@ -882,6 +886,7 @@ const refundIssuedTranslations = {
     amount: "Refunded amount",
     paidWith: "Applies to",
     card: "Card ending in",
+    chargeKinds: { full: "Payment", deposit: "Deposit", balance: "Remaining balance" },
     note: "The amount is returned to the payment method used at purchase and usually appears on your account within 5-10 banking days.",
     questions: "Questions? Contact us at",
     rights: "All rights reserved.",
@@ -905,7 +910,8 @@ function formatRefundMoney(amount: unknown, currency: string | undefined): strin
   return `${formatted} ${currencySuffix(currency)}`;
 }
 
-function renderRefundIssuedEmail(data: RefundIssuedEmailData): string {
+/** Exported so the template can be previewed without sending mail. */
+export function renderRefundIssuedEmail(data: RefundIssuedEmailData): string {
   const locale = data.locale === "en" ? "en" : "sv";
   const t = refundIssuedTranslations[locale];
   const logoUrl = getOrderEmailLogoUrl();
@@ -913,7 +919,7 @@ function renderRefundIssuedEmail(data: RefundIssuedEmailData): string {
   const orderNo = escapeHtml(String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber);
   const firstName = escapeHtml(data.firstName);
   const amount = escapeHtml(formatRefundMoney(data.refundAmount, data.currency));
-  const chargeLabel = escapeHtml(data.chargeLabel);
+  const chargeLabel = escapeHtml(t.chargeKinds[data.chargeKind] ?? t.chargeKinds.full);
   const last4 = data.last4 ? escapeHtml(data.last4) : null;
   const lead = data.isFullRefund ? t.leadFull : t.leadPartial;
   const cardLine = last4 ? ` &middot; ${t.card} ${last4}` : "";
