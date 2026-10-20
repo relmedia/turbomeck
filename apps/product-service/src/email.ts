@@ -950,7 +950,7 @@ export function renderRefundIssuedEmail(data: RefundIssuedEmailData): string {
                     <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto; border-radius: 9999px; overflow: hidden; background-color: #dcfce7;">
                       <tr>
                         <td width="56" height="56" style="width: 56px; height: 56px; max-width: 56px; max-height: 56px; background-color: #dcfce7; border-radius: 9999px; -webkit-border-radius: 9999px; text-align: center; vertical-align: middle; line-height: 56px; mso-line-height-rule: exactly;">
-                          <span style="font-size: 26px; line-height: 56px; display: inline-block; vertical-align: middle;">&#128179;</span>
+                          <span style="font-size: 28px; color: #16a34a; line-height: 56px; display: inline-block; vertical-align: middle;">✓</span>
                         </td>
                       </tr>
                     </table>
