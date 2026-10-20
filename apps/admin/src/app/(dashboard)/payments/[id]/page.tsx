@@ -818,6 +818,483 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="gap-4 py-4">
+            <CardHeader className="py-2 px-4">
+              <CardTitle className="text-sm">Leveransstatus</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="flex flex-col gap-4">
+                <div
+                  className="mb-2 grid w-full gap-2"
+                  style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
+                >
+                  {DELIVERY_STEPS.map((step, i) => {
+                    const Icon = step.icon;
+                    const isComplete = i < stepIndex;
+                    const isCurrent = i === stepIndex;
+                    const isDone = isComplete || isCurrent;
+                    return (
+                      <div
+                        key={step.id}
+                        className="flex items-center justify-center gap-2"
+                      >
+                        <div
+                          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                            isComplete
+                              ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/25"
+                              : isCurrent
+                                ? "bg-sky-500 text-white shadow-md shadow-sky-500/30 ring-4 ring-sky-500/15"
+                                : "border-2 border-muted-foreground/20 bg-background text-muted-foreground/60"
+                          }`}
+                        >
+                          {isComplete ? (
+                            <CheckCircle2 className="h-4 w-4" strokeWidth={2.25} />
+                          ) : (
+                            <Icon className="h-4 w-4" strokeWidth={isCurrent ? 2.25 : 1.75} />
+                          )}
+                          {isCurrent && (
+                            <span
+                              aria-hidden
+                              className="absolute inset-0 rounded-full ring-2 ring-sky-400/50 animate-ping"
+                            />
+                          )}
+                        </div>
+                        <p
+                          className={`text-xs transition-colors ${
+                            isComplete
+                              ? "font-medium text-emerald-700 dark:text-emerald-400"
+                              : isCurrent
+                                ? "font-medium text-sky-700 dark:text-sky-400"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {step.label}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                  <div
+                    className="h-full rounded-full bg-linear-to-r from-emerald-500 to-sky-500 transition-all duration-500"
+                    style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
+                  />
+                </div>
+                {/* Fraktbokning. Renders in every state — when booking is not
+                    possible it says why, instead of silently disappearing. */}
+                <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
+                  {!preflight ? (
+                    <Skeleton className="h-9 w-48 rounded" aria-hidden />
+                  ) : !preflight.eligible ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      {preflight.ineligibleReason?.message ?? "Frakt kan inte bokas för denna order."}
+                    </p>
+                  ) : preflight.booked.isBooked ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                          Frakt bokad
+                        </span>
+                        {preflight.booked.testBooking && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                            <AlertTriangle className="h-3 w-3" aria-hidden />
+                            TESTBOKNING
+                          </span>
+                        )}
+                        {preflight.booked.bookedAt && (
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatDate(preflight.booked.bookedAt)}
+                          </span>
+                        )}
+                        {preflight.booked.weightKg != null && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Bokad vikt: {preflight.booked.weightKg} kg
+                          </span>
+                        )}
+                      </div>
+
+                      {preflight.booked.trackingId ? (
+                        <p className="font-mono text-[11px] break-all">
+                          Spårningsnr: {preflight.booked.trackingId}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-amber-700">
+                          Inget spårningsnummer returnerades — hämta det hos PostNord och klistra in det ovan.
+                        </p>
+                      )}
+                      {preflight.booked.printId && (
+                        <p className="font-mono text-[11px] text-muted-foreground break-all">
+                          PrintId: {preflight.booked.printId}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {preflight.booked.hasLabel && (
+                          <Button variant="outline" size="sm" className="h-8 gap-1 bg-white text-xs" asChild>
+                            <a
+                              href={`/api/orders/${id}/postnord-label-pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Printer className="h-3.5 w-3.5" aria-hidden />
+                              Fraktetikett PDF
+                            </a>
+                          </Button>
+                        )}
+                        {preflight.booked.trackingId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 bg-white text-xs"
+                            onClick={fetchLabelOptions}
+                            disabled={labelOptionsLoading}
+                          >
+                            {labelOptionsLoading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <Printer className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                            Etikettalternativ
+                          </Button>
+                        )}
+                        {preflight.booked.trackingId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 bg-white text-xs"
+                            onClick={handleSendShipmentEmail}
+                            disabled={sendingShipmentEmail}
+                            title="Bokningen skickar inget mejl automatiskt"
+                          >
+                            {sendingShipmentEmail ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <Mail className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                            Skicka leveransmejl
+                          </Button>
+                        )}
+                        <AlertDialog open={confirmRebookOpen} onOpenChange={setConfirmRebookOpen}>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 text-xs">
+                              Boka om
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Boka om frakten?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Det gamla spårningsnumret ersätts. Den tidigare bokningen avbokas
+                                INTE hos PostNord — det måste göras i PostNords portal.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => {
+                                  setConfirmRebookOpen(false);
+                                  void handlePostnordBook(true);
+                                }}
+                              >
+                                Boka om
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {!preflight.config.ready && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                          <p className="flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                            PostNord är inte konfigurerat — bokning avstängd
+                          </p>
+                          <ul className="mt-2 space-y-1">
+                            {preflight.config.blocking.map((c) => (
+                              <li key={c.key}>
+                                <code className="font-mono text-[11px]">{c.key}</code>
+                                <span className="text-[11px]"> — {c.hint}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {preflight.config.warnings.length > 0 && (
+                            <ul className="mt-2 space-y-1 border-t border-amber-200 pt-2">
+                              {preflight.config.warnings.map((w) => (
+                                <li key={w.key} className="text-[11px]">
+                                  <code className="font-mono">{w.key}</code> — {w.hint}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="postnord-book-weight-kg" className="text-xs">
+                            Vikt (kg)
+                          </Label>
+                          <Input
+                            id="postnord-book-weight-kg"
+                            type="number"
+                            step="0.1"
+                            min={0.1}
+                            max={35}
+                            className="h-9 w-24"
+                            value={bookWeightKg}
+                            placeholder="—"
+                            onChange={(e) => setBookWeightKg(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-9 gap-2"
+                          disabled={
+                            postnordBooking ||
+                            (!preflight.config.ready && preflight.config.mode !== "test")
+                          }
+                          title={
+                            !preflight.config.ready && preflight.config.mode !== "test"
+                              ? "PostNord är inte konfigurerat"
+                              : undefined
+                          }
+                          onClick={() => void handlePostnordBook(false)}
+                        >
+                          {postnordBooking ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : null}
+                          {postnordBooking
+                            ? "Bokar…"
+                            : preflight.config.ready
+                              ? "Boka frakt"
+                              : "Testa mot PostNord ändå"}
+                        </Button>
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground">
+                        {preflight.weight.source === "products"
+                          ? `Uppskattad från produktvikter (${preflight.weight.suggestedKg} kg).`
+                          : "Inga produktvikter registrerade — 1 kg per enhet antaget."}
+                        {preflight.weight.missingWeights.length > 0 &&
+                          ` Saknar vikt: ${preflight.weight.missingWeights.join(", ")}.`}
+                        {preflight.weight.oversize &&
+                          " Skrymmande (>120 cm längsta sida) — PostNord kan debitera tilläggsavgift."}
+                      </p>
+                    </>
+                  )}
+
+                  {bookingError && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="font-medium text-destructive">{bookingError.error}</p>
+                      {Boolean(bookingError.details || bookingError.diagnostics) && (
+                        <details className="mt-1.5">
+                          <summary className="cursor-pointer text-[11px] text-muted-foreground">
+                            Teknisk information
+                          </summary>
+                          <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-[10px] whitespace-pre-wrap break-all">
+                            {[
+                              bookingError.details,
+                              bookingError.diagnostics
+                                ? JSON.stringify(bookingError.diagnostics, null, 2)
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join("\n\n")}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {order.servicePointId && (
+                    <p className="font-mono text-[11px] break-all text-muted-foreground">
+                      Ombud: {order.servicePointId}
+                      {order.servicePointName ? ` — ${order.servicePointName}` : ""}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-4 space-y-3 border-t pt-4">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="order-status" className="text-xs">Status</Label>
+                      <Select value={editStatus} onValueChange={setEditStatus}>
+                        <SelectTrigger id="order-status" className="w-[180px] h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {(editStatus === "shipped" || editStatus === "delivered") && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="order-tracking" className="text-xs">PostNord spårningsnr</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="order-tracking"
+                            placeholder="Klistra in från PostNord-kvitto"
+                            value={editTrackingId}
+                            onChange={(e) => setEditTrackingId(e.target.value)}
+                            className="h-9 w-[200px]"
+                          />
+                          {(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId)) && (
+                            <a
+                              href={postNordTrackingUrl(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId) || "")}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-sky-600 hover:text-sky-700 hover:underline shrink-0"
+                            >
+                              Spåra
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleSaveStatus}
+                      disabled={saving}
+                      className="h-9"
+                    >
+                      {saving ? "Sparar..." : "Spara"}
+                    </Button>
+                  </div>
+                </div>
+                {(labelOptionsError || labelOptions) && (
+                  <div className="mt-2 rounded-md border bg-muted/40 p-3 text-xs">
+                    {labelOptionsError && (
+                      <p className="text-destructive">{labelOptionsError}</p>
+                    )}
+                    {labelOptions && (
+                      <div className="space-y-2">
+                        <p className="font-medium">
+                          Tillgängliga etikettformat
+                          {labelOptions.requestedIds.length > 0 && (
+                            <span className="ml-1 text-muted-foreground font-normal break-all">
+                              ({labelOptions.requestedIds.join(", ")})
+                            </span>
+                          )}
+                        </p>
+                        {labelOptions.options.summaryPrintoutLabelOptions &&
+                          labelOptions.options.summaryPrintoutLabelOptions.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                Gemensamma alternativ
+                              </p>
+                              <ul className="space-y-1">
+                                {labelOptions.options.summaryPrintoutLabelOptions.map((opt, i) => (
+                                  <li key={`sum-${i}`} className="font-mono break-all">
+                                    {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        {labelOptions.options.printoutLabelOptions?.map((row) => (
+                          <div key={row.id} className="space-y-1">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              ID {row.id}
+                            </p>
+                            <ul className="space-y-1">
+                              {row.printoutOptions.map((opt, i) => (
+                                <li key={`row-${row.id}-${i}`} className="font-mono break-all">
+                                  {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
+                                  {opt.rotate?.length ? ` · rotate=${opt.rotate.join("|")}` : ""}
+                                  {opt.definePrintout?.length ? ` · ${opt.definePrintout.join("|")}` : ""}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {(editStatus === "shipped" || editStatus === "delivered") && (
+                  <div className="mt-4 space-y-2 border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-medium">Spårningsstatus från PostNord</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={fetchTrackingStatus}
+                        disabled={trackingLoading || !(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId))}
+                      >
+                        {trackingLoading ? "Hämtar..." : "Hämta status"}
+                      </Button>
+                    </div>
+                    {trackingError && (
+                      <p className="text-xs text-destructive">{trackingError}</p>
+                    )}
+                    {trackingData && (
+                      <>
+                        <TrackingIdentifiers
+                          data={trackingData}
+                          savedId={toValidTrackingId(order.postNordTrackingId)}
+                          onUse={(id) => {
+                            setEditTrackingId(id);
+                            toast.info("Spårningsnummer ifyllt — tryck Spara för att spara det på ordern");
+                          }}
+                        />
+                        <TrackingEvents data={trackingData} />
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm">Orderrader</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="pb-2 font-medium">Produkt</th>
+                      <th className="pb-2 font-medium w-16">Antal</th>
+                      <th className="pb-2 font-medium text-right w-20">Pris</th>
+                      <th className="pb-2 font-medium text-right w-20">Totalt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items.map((item, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted">
+                              <img src={resolveImageUrl(item.productImage)} alt={item.productName} className="h-full w-full object-cover" />
+                            </div>
+                            <div>
+                              <span className="font-medium">{item.productName}</span>
+                              {item.variant && (
+                                <span className="block text-sm text-muted-foreground">{item.variant}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2">{item.quantity}</td>
+                        <td className="py-2 text-right text-muted-foreground">{formatCurrency(item.price)}</td>
+                        <td className="py-2 text-right font-medium">{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -884,483 +1361,6 @@ export default function OrderDetailPage() {
           />
         </div>
       </div>
-
-      <Card className="gap-4 py-4">
-        <CardHeader className="py-2 px-4">
-          <CardTitle className="text-sm">Leveransstatus</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-3 pt-0">
-          <div className="flex flex-col gap-4">
-            <div
-              className="mb-2 grid w-full gap-2"
-              style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
-            >
-              {DELIVERY_STEPS.map((step, i) => {
-                const Icon = step.icon;
-                const isComplete = i < stepIndex;
-                const isCurrent = i === stepIndex;
-                const isDone = isComplete || isCurrent;
-                return (
-                  <div
-                    key={step.id}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <div
-                      className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
-                        isComplete
-                          ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/25"
-                          : isCurrent
-                            ? "bg-sky-500 text-white shadow-md shadow-sky-500/30 ring-4 ring-sky-500/15"
-                            : "border-2 border-muted-foreground/20 bg-background text-muted-foreground/60"
-                      }`}
-                    >
-                      {isComplete ? (
-                        <CheckCircle2 className="h-4 w-4" strokeWidth={2.25} />
-                      ) : (
-                        <Icon className="h-4 w-4" strokeWidth={isCurrent ? 2.25 : 1.75} />
-                      )}
-                      {isCurrent && (
-                        <span
-                          aria-hidden
-                          className="absolute inset-0 rounded-full ring-2 ring-sky-400/50 animate-ping"
-                        />
-                      )}
-                    </div>
-                    <p
-                      className={`text-xs transition-colors ${
-                        isComplete
-                          ? "font-medium text-emerald-700 dark:text-emerald-400"
-                          : isCurrent
-                            ? "font-medium text-sky-700 dark:text-sky-400"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {step.label}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
-              <div
-                className="h-full rounded-full bg-linear-to-r from-emerald-500 to-sky-500 transition-all duration-500"
-                style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
-              />
-            </div>
-            {/* Fraktbokning. Renders in every state — when booking is not
-                possible it says why, instead of silently disappearing. */}
-            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
-              {!preflight ? (
-                <Skeleton className="h-9 w-48 rounded" aria-hidden />
-              ) : !preflight.eligible ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {preflight.ineligibleReason?.message ?? "Frakt kan inte bokas för denna order."}
-                </p>
-              ) : preflight.booked.isBooked ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                      Frakt bokad
-                    </span>
-                    {preflight.booked.testBooking && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                        <AlertTriangle className="h-3 w-3" aria-hidden />
-                        TESTBOKNING
-                      </span>
-                    )}
-                    {preflight.booked.bookedAt && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {formatDate(preflight.booked.bookedAt)}
-                      </span>
-                    )}
-                    {preflight.booked.weightKg != null && (
-                      <span className="text-[11px] text-muted-foreground">
-                        Bokad vikt: {preflight.booked.weightKg} kg
-                      </span>
-                    )}
-                  </div>
-
-                  {preflight.booked.trackingId ? (
-                    <p className="font-mono text-[11px] break-all">
-                      Spårningsnr: {preflight.booked.trackingId}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-amber-700">
-                      Inget spårningsnummer returnerades — hämta det hos PostNord och klistra in det ovan.
-                    </p>
-                  )}
-                  {preflight.booked.printId && (
-                    <p className="font-mono text-[11px] text-muted-foreground break-all">
-                      PrintId: {preflight.booked.printId}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {preflight.booked.hasLabel && (
-                      <Button variant="outline" size="sm" className="h-8 gap-1 bg-white text-xs" asChild>
-                        <a
-                          href={`/api/orders/${id}/postnord-label-pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Printer className="h-3.5 w-3.5" aria-hidden />
-                          Fraktetikett PDF
-                        </a>
-                      </Button>
-                    )}
-                    {preflight.booked.trackingId && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1 bg-white text-xs"
-                        onClick={fetchLabelOptions}
-                        disabled={labelOptionsLoading}
-                      >
-                        {labelOptionsLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        ) : (
-                          <Printer className="h-3.5 w-3.5" aria-hidden />
-                        )}
-                        Etikettalternativ
-                      </Button>
-                    )}
-                    {preflight.booked.trackingId && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1 bg-white text-xs"
-                        onClick={handleSendShipmentEmail}
-                        disabled={sendingShipmentEmail}
-                        title="Bokningen skickar inget mejl automatiskt"
-                      >
-                        {sendingShipmentEmail ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        ) : (
-                          <Mail className="h-3.5 w-3.5" aria-hidden />
-                        )}
-                        Skicka leveransmejl
-                      </Button>
-                    )}
-                    <AlertDialog open={confirmRebookOpen} onOpenChange={setConfirmRebookOpen}>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 text-xs">
-                          Boka om
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Boka om frakten?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Det gamla spårningsnumret ersätts. Den tidigare bokningen avbokas
-                            INTE hos PostNord — det måste göras i PostNords portal.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Avbryt</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => {
-                              setConfirmRebookOpen(false);
-                              void handlePostnordBook(true);
-                            }}
-                          >
-                            Boka om
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {!preflight.config.ready && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                      <p className="flex items-center gap-1.5 font-medium">
-                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-                        PostNord är inte konfigurerat — bokning avstängd
-                      </p>
-                      <ul className="mt-2 space-y-1">
-                        {preflight.config.blocking.map((c) => (
-                          <li key={c.key}>
-                            <code className="font-mono text-[11px]">{c.key}</code>
-                            <span className="text-[11px]"> — {c.hint}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {preflight.config.warnings.length > 0 && (
-                        <ul className="mt-2 space-y-1 border-t border-amber-200 pt-2">
-                          {preflight.config.warnings.map((w) => (
-                            <li key={w.key} className="text-[11px]">
-                              <code className="font-mono">{w.key}</code> — {w.hint}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="postnord-book-weight-kg" className="text-xs">
-                        Vikt (kg)
-                      </Label>
-                      <Input
-                        id="postnord-book-weight-kg"
-                        type="number"
-                        step="0.1"
-                        min={0.1}
-                        max={35}
-                        className="h-9 w-24"
-                        value={bookWeightKg}
-                        placeholder="—"
-                        onChange={(e) => setBookWeightKg(e.target.value)}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-9 gap-2"
-                      disabled={
-                        postnordBooking ||
-                        (!preflight.config.ready && preflight.config.mode !== "test")
-                      }
-                      title={
-                        !preflight.config.ready && preflight.config.mode !== "test"
-                          ? "PostNord är inte konfigurerat"
-                          : undefined
-                      }
-                      onClick={() => void handlePostnordBook(false)}
-                    >
-                      {postnordBooking ? (
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                      ) : null}
-                      {postnordBooking
-                        ? "Bokar…"
-                        : preflight.config.ready
-                          ? "Boka frakt"
-                          : "Testa mot PostNord ändå"}
-                    </Button>
-                  </div>
-
-                  <p className="text-[11px] text-muted-foreground">
-                    {preflight.weight.source === "products"
-                      ? `Uppskattad från produktvikter (${preflight.weight.suggestedKg} kg).`
-                      : "Inga produktvikter registrerade — 1 kg per enhet antaget."}
-                    {preflight.weight.missingWeights.length > 0 &&
-                      ` Saknar vikt: ${preflight.weight.missingWeights.join(", ")}.`}
-                    {preflight.weight.oversize &&
-                      " Skrymmande (>120 cm längsta sida) — PostNord kan debitera tilläggsavgift."}
-                  </p>
-                </>
-              )}
-
-              {bookingError && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                  <p className="font-medium text-destructive">{bookingError.error}</p>
-                  {Boolean(bookingError.details || bookingError.diagnostics) && (
-                    <details className="mt-1.5">
-                      <summary className="cursor-pointer text-[11px] text-muted-foreground">
-                        Teknisk information
-                      </summary>
-                      <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-[10px] whitespace-pre-wrap break-all">
-                        {[
-                          bookingError.details,
-                          bookingError.diagnostics
-                            ? JSON.stringify(bookingError.diagnostics, null, 2)
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join("\n\n")}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              )}
-
-              {order.servicePointId && (
-                <p className="font-mono text-[11px] break-all text-muted-foreground">
-                  Ombud: {order.servicePointId}
-                  {order.servicePointName ? ` — ${order.servicePointName}` : ""}
-                </p>
-              )}
-            </div>
-            <div className="mt-4 space-y-3 border-t pt-4">
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="order-status" className="text-xs">Status</Label>
-                  <Select value={editStatus} onValueChange={setEditStatus}>
-                    <SelectTrigger id="order-status" className="w-[180px] h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {(editStatus === "shipped" || editStatus === "delivered") && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="order-tracking" className="text-xs">PostNord spårningsnr</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="order-tracking"
-                        placeholder="Klistra in från PostNord-kvitto"
-                        value={editTrackingId}
-                        onChange={(e) => setEditTrackingId(e.target.value)}
-                        className="h-9 w-[200px]"
-                      />
-                      {(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId)) && (
-                        <a
-                          href={postNordTrackingUrl(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId) || "")}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-sky-600 hover:text-sky-700 hover:underline shrink-0"
-                        >
-                          Spåra
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  onClick={handleSaveStatus}
-                  disabled={saving}
-                  className="h-9"
-                >
-                  {saving ? "Sparar..." : "Spara"}
-                </Button>
-              </div>
-            </div>
-            {(labelOptionsError || labelOptions) && (
-              <div className="mt-2 rounded-md border bg-muted/40 p-3 text-xs">
-                {labelOptionsError && (
-                  <p className="text-destructive">{labelOptionsError}</p>
-                )}
-                {labelOptions && (
-                  <div className="space-y-2">
-                    <p className="font-medium">
-                      Tillgängliga etikettformat
-                      {labelOptions.requestedIds.length > 0 && (
-                        <span className="ml-1 text-muted-foreground font-normal break-all">
-                          ({labelOptions.requestedIds.join(", ")})
-                        </span>
-                      )}
-                    </p>
-                    {labelOptions.options.summaryPrintoutLabelOptions &&
-                      labelOptions.options.summaryPrintoutLabelOptions.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                            Gemensamma alternativ
-                          </p>
-                          <ul className="space-y-1">
-                            {labelOptions.options.summaryPrintoutLabelOptions.map((opt, i) => (
-                              <li key={`sum-${i}`} className="font-mono break-all">
-                                {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    {labelOptions.options.printoutLabelOptions?.map((row) => (
-                      <div key={row.id} className="space-y-1">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          ID {row.id}
-                        </p>
-                        <ul className="space-y-1">
-                          {row.printoutOptions.map((opt, i) => (
-                            <li key={`row-${row.id}-${i}`} className="font-mono break-all">
-                              {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
-                              {opt.rotate?.length ? ` · rotate=${opt.rotate.join("|")}` : ""}
-                              {opt.definePrintout?.length ? ` · ${opt.definePrintout.join("|")}` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {(editStatus === "shipped" || editStatus === "delivered") && (
-              <div className="mt-4 space-y-2 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium">Spårningsstatus från PostNord</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={fetchTrackingStatus}
-                    disabled={trackingLoading || !(editTrackingId.trim() || toValidTrackingId(order.postNordTrackingId))}
-                  >
-                    {trackingLoading ? "Hämtar..." : "Hämta status"}
-                  </Button>
-                </div>
-                {trackingError && (
-                  <p className="text-xs text-destructive">{trackingError}</p>
-                )}
-                {trackingData && (
-                  <>
-                    <TrackingIdentifiers
-                      data={trackingData}
-                      savedId={toValidTrackingId(order.postNordTrackingId)}
-                      onUse={(id) => {
-                        setEditTrackingId(id);
-                        toast.info("Spårningsnummer ifyllt — tryck Spara för att spara det på ordern");
-                      }}
-                    />
-                    <TrackingEvents data={trackingData} />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="text-sm">Orderrader</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-2 font-medium">Produkt</th>
-                  <th className="pb-2 font-medium w-16">Antal</th>
-                  <th className="pb-2 font-medium text-right w-20">Pris</th>
-                  <th className="pb-2 font-medium text-right w-20">Totalt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((item, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="h-9 w-9 shrink-0 overflow-hidden rounded bg-muted">
-                          <img src={resolveImageUrl(item.productImage)} alt={item.productName} className="h-full w-full object-cover" />
-                        </div>
-                        <div>
-                          <span className="font-medium">{item.productName}</span>
-                          {item.variant && (
-                            <span className="block text-sm text-muted-foreground">{item.variant}</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2">{item.quantity}</td>
-                    <td className="py-2 text-right text-muted-foreground">{formatCurrency(item.price)}</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(item.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
