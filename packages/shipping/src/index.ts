@@ -147,6 +147,12 @@ export function shippingZone(countryCode: string): ShippingZone {
  * email used the Swedish one — so clicking "Spåra" in the Swedish admin opened
  * an English page. One function, so the next copy cannot drift again.
  *
+ * PostNord retired the Swedish path `/vara-verktyg/spara-din-forsandelse` and
+ * serves a 404 for it — every "Spåra" link, in the admin and in all three
+ * customer mails, landed on "Här finns inget att se". The replacement is
+ * `/vara-verktyg/spara-brev-paket-och-pall`; `?shipmentId=` is unchanged, and
+ * the English path still resolves. Both were checked against a live parcel.
+ *
  * `locale` defaults to Swedish, which is what every existing call site wanted.
  * Pass "en" where an English-speaking customer is being linked.
  */
@@ -154,7 +160,7 @@ export function postNordTrackingUrl(trackingId: string, locale: "sv" | "en" = "s
   const path =
     locale === "en"
       ? "https://www.postnord.se/en/our-tools/track-and-trace"
-      : "https://www.postnord.se/vara-verktyg/spara-din-forsandelse";
+      : "https://www.postnord.se/vara-verktyg/spara-brev-paket-och-pall";
   return `${path}?shipmentId=${encodeURIComponent(trackingId)}`;
 }
 
