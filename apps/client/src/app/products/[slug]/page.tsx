@@ -21,7 +21,7 @@ import type { Metadata } from "next";
 import { ProductPageClient } from "@/components/ProductPageClient";
 import { BreadcrumbJsonLd, ProductJsonLd } from "@/components/seo/JsonLd";
 import { fetchProduct, fetchCategories } from "@/lib/api";
-import { LOCALE_COOKIE_NAME, type Locale } from "@/i18n/context";
+import { LOCALE_COOKIE_NAME, type Locale } from "@/i18n/locale";
 import { categorySlug } from "@/lib/utils";
 import { htmlToText, truncateAtWord } from "@/lib/html-text";
 

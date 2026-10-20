@@ -7,7 +7,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { fetchSliderProducts, fetchCategories, fetchProducts } from "@/lib/api";
 import { buildCategoryImageMap } from "@/lib/category-images";
 import { categorySlug } from "@/lib/utils";
-import { LOCALE_COOKIE_NAME, type Locale } from "@/i18n/context";
+import { LOCALE_COOKIE_NAME, type Locale } from "@/i18n/locale";
 import type { Metadata } from "next";
 
 /**

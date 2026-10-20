@@ -5,10 +5,16 @@ import { useRouter } from "next/navigation";
 import svTranslations from "./translations/sv.json";
 import enTranslations from "./translations/en.json";
 
-const STORAGE_KEY = "turbomeck-lang";
-export const LOCALE_COOKIE_NAME = "turbomeck-locale";
+import { LOCALE_COOKIE_NAME, type Locale } from "./locale";
 
-export type Locale = "sv" | "en";
+const STORAGE_KEY = "turbomeck-lang";
+
+/**
+ * Re-exported so existing client imports keep working. Server components must
+ * import from "@/i18n/locale" instead — see the note in that file.
+ */
+export { LOCALE_COOKIE_NAME };
+export type { Locale };
 
 type Translations = Record<string, unknown>;
 

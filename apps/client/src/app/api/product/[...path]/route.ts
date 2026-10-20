@@ -2,7 +2,7 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@repo/auth";
-import { LOCALE_COOKIE_NAME } from "@/i18n/context";
+import { LOCALE_COOKIE_NAME } from "@/i18n/locale";
 import {
   internalProductApiAuthHeaders,
   requireInternalProductApiSecret,
