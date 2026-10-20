@@ -1377,7 +1377,10 @@ app.post("/api/products", async (req, res) => {
     console.error("Error creating product:", error);
     // A foreign-key violation here means a category id that does not exist.
     // That is a 400 the operator can act on, not an opaque server fault.
-    const code = (error as { code?: string } | null)?.code;
+    // Drizzle wraps the driver error, so the Postgres SQLSTATE sits on `cause`
+    // rather than on the error itself — check both.
+    const err = error as { code?: string; cause?: { code?: string } } | null;
+    const code = err?.code ?? err?.cause?.code;
     if (code === "23503") {
       return res.status(400).json({
         error: "En vald kategori finns inte längre. Ladda om sidan och välj kategori igen.",
