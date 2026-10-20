@@ -16,6 +16,7 @@ import {
   FolderTree,
   LogOut,
   EllipsisVertical,
+  RotateCcw,
 } from "lucide-react";
 import {
   Sidebar,
@@ -208,6 +209,14 @@ const AppSidebar = ({
                   <Link href="/payments">
                     <ShoppingBag />
                     Visa alla Transaktioner
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/refunds">
+                    <RotateCcw />
+                    Återbetalningar
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
