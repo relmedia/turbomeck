@@ -6,6 +6,11 @@
  *
  * Writes one file per case into the OS temp dir and prints the paths. Nothing
  * is mailed and nothing touches the database.
+ *
+ * Runs with --env-file=.env on purpose: the header logo is resolved from
+ * EMAIL_LOGO_URL / R2_PUBLIC_URL, and without them the template falls back to
+ * a plain "T" badge. A preview that silently shows the fallback is worse than
+ * no preview, because it looks like the real mail is missing its logo.
  */
 
 import { writeFileSync } from "node:fs";
