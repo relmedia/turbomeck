@@ -25,8 +25,8 @@ async function getDashboardStats(): Promise<DashboardStats> {
     const [revenue, userStats] = await Promise.all([
       db.execute(sql`
         SELECT
-          COALESCE(SUM(CASE WHEN date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) AND status != 'cancelled' THEN total::numeric ELSE 0 END), 0) AS this_month,
-          COALESCE(SUM(CASE WHEN date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month') AND status != 'cancelled' THEN total::numeric ELSE 0 END), 0) AS last_month
+          COALESCE(SUM(CASE WHEN date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) AND status NOT IN ('cancelled', 'refunded') THEN total::numeric ELSE 0 END), 0) AS this_month,
+          COALESCE(SUM(CASE WHEN date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month') AND status NOT IN ('cancelled', 'refunded') THEN total::numeric ELSE 0 END), 0) AS last_month
         FROM orders
       `),
       db.execute(sql`
@@ -107,6 +107,8 @@ async function getRecentOrders(): Promise<OrderRow[]> {
       shipped: "shipped",
       delivered: "success",
       cancelled: "failed",
+      partially_refunded: "processing",
+      refunded: "failed",
     };
     return rows.map((o) => ({
       id: String(o.id),

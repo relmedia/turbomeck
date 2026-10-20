@@ -17,9 +17,9 @@ export async function GET() {
     const rows = await db.execute(sql`
       SELECT
         date_trunc('month', created_at) AS month,
-        COUNT(*) FILTER (WHERE status != 'cancelled')::int AS totalt,
+        COUNT(*) FILTER (WHERE status NOT IN ('cancelled', 'refunded'))::int AS totalt,
         COUNT(*) FILTER (WHERE status = 'delivered')::int AS slutforda,
-        COUNT(*) FILTER (WHERE status != 'cancelled' AND status != 'delivered')::int AS pagang
+        COUNT(*) FILTER (WHERE status NOT IN ('cancelled', 'refunded') AND status != 'delivered')::int AS pagang
       FROM orders
       WHERE created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '5 months')
       GROUP BY date_trunc('month', created_at)

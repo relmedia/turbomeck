@@ -1,6 +1,6 @@
 import { db } from "@repo/database";
 import { orders } from "@repo/database/schema";
-import { sql, and, gte, lt, ne } from "drizzle-orm";
+import { sql, and, gte, lt, notInArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -39,7 +39,7 @@ export async function GET() {
         total: sql<string>`SUM((${orders.total})::numeric)`,
       })
       .from(orders)
-      .where(and(gte(orders.createdAt, days28Ago), ne(orders.status, "cancelled")))
+      .where(and(gte(orders.createdAt, days28Ago), notInArray(orders.status, ["cancelled", "refunded"])))
       .groupBy(orders.country);
 
     // Prior period (28-56 days ago) for change calculation
@@ -53,7 +53,7 @@ export async function GET() {
         and(
           gte(orders.createdAt, days56Ago),
           lt(orders.createdAt, days28Ago),
-          ne(orders.status, "cancelled")
+          notInArray(orders.status, ["cancelled", "refunded"])
         )
       )
       .groupBy(orders.country);

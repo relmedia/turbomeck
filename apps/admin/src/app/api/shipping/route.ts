@@ -24,6 +24,8 @@ const STATUS_LABELS: Record<string, string> = {
   shipped: "Skickad",
   delivered: "Levererad",
   cancelled: "Avbruten",
+  partially_refunded: "Delvis återbetald",
+  refunded: "Återbetald",
 };
 
 /** GET /api/shipping - List all orders with full shipping details */

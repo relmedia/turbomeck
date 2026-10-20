@@ -1,6 +1,6 @@
 import { db } from "@repo/database";
 import { orderItems, orders, products } from "@repo/database/schema";
-import { sql, eq, ne } from "drizzle-orm";
+import { sql, eq, notInArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -20,7 +20,7 @@ export async function GET() {
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .leftJoin(products, eq(orderItems.productId, products.id))
-      .where(ne(orders.status, "cancelled"))
+      .where(notInArray(orders.status, ["cancelled", "refunded"]))
       .groupBy(orderItems.productId, orderItems.productName, orderItems.productImage, products.name, products.image);
 
     const list = rows.map((r) => ({

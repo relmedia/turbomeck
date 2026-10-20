@@ -17,7 +17,7 @@ export async function GET() {
     const rows = await db.execute(sql`
       SELECT
         date_trunc('month', created_at) AS month,
-        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total::numeric ELSE 0 END), 0) AS totalt,
+        COALESCE(SUM(CASE WHEN status NOT IN ('cancelled', 'refunded') THEN total::numeric ELSE 0 END), 0) AS totalt,
         COALESCE(SUM(CASE WHEN status = 'delivered' THEN total::numeric ELSE 0 END), 0) AS successfull
       FROM orders
       WHERE created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '5 months')

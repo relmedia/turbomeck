@@ -6,7 +6,17 @@ import { NextResponse } from "next/server";
 import { triggerShipmentDispatchedEmail } from "@/lib/trigger-shipment-dispatched-email";
 import { requireAdmin } from "@/lib/require-admin";
 
-const VALID_STATUSES = ["confirmed", "shipped", "delivered", "cancelled", "completed"] as const;
+const VALID_STATUSES = [
+  "confirmed",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "completed",
+  /** Money partly returned. The order still stands; the refund rows say how much. */
+  "partially_refunded",
+  /** Nothing left refundable on any charge. */
+  "refunded",
+] as const;
 
 /** PATCH /api/orders/[id] - Admin update order status and tracking */
 export async function PATCH(
@@ -39,7 +49,7 @@ export async function PATCH(
     if (status !== undefined) {
       if (!VALID_STATUSES.includes(status as (typeof VALID_STATUSES)[number])) {
         return NextResponse.json(
-          { error: "Ogiltig status. Använd: confirmed, shipped, delivered, cancelled" },
+          { error: `Ogiltig status. Använd: ${VALID_STATUSES.join(", ")}` },
           { status: 400 }
         );
       }
@@ -267,6 +277,11 @@ function mapToDeliveryStatus(
     case "completed":
       return "delivered";
     case "cancelled":
+    // A refunded order has no delivery to track. There is no refunded step in
+    // DELIVERY_STEPS, so it reads as "processing"; the UI hides the stepper
+    // instead of showing a progress bar for a parcel nobody is sending.
+    case "partially_refunded":
+    case "refunded":
       return "processing";
     default:
       return "processing";

@@ -43,6 +43,7 @@ import { postNordTrackingUrl } from "@repo/shipping";
 import { DashboardOrderDetailSkeleton } from "@/components/dashboard-skeletons";
 import { Skeleton } from "@repo/ui/components/skeleton";
 import { resolveImageUrl } from "@/lib/image-utils";
+import RefundSection from "@/components/RefundSection";
 
 type OrderItem = {
   productName: string;
@@ -95,6 +96,12 @@ const STATUS_OPTIONS = [
   { value: "delivered", label: "Levererad" },
   { value: "completed", label: "Slutförd" },
   { value: "cancelled", label: "Avbruten" },
+  /**
+   * Required, not cosmetic: handleSaveStatus ends with setEditStatus(updated.status),
+   * and a Select whose value matches no SelectItem renders an empty trigger.
+   */
+  { value: "partially_refunded", label: "Delvis återbetald" },
+  { value: "refunded", label: "Återbetald" },
 ] as const;
 
 type PostNordPrintoutOption = {
@@ -865,6 +872,18 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Directly under the money figures, which is what a refund is about. */}
+      <RefundSection
+        orderId={order.orderId}
+        customerEmail={order.customerEmail}
+        onRefunded={async () => {
+          const refetch = await fetch(`/api/orders/${id}`);
+          const updated = await refetch.json();
+          setOrder(updated);
+          setEditStatus(updated.status ?? "confirmed");
+        }}
+      />
 
       <Card className="gap-4 py-4">
         <CardHeader className="py-2 px-4">

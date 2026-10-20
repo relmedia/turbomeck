@@ -30,14 +30,22 @@ import { requireAdmin } from "@/lib/require-admin";
 type OrderRow = typeof orders.$inferSelect;
 
 type Ineligible = {
-  code: "cancelled" | "country" | "home_delivery" | "no_service_point";
+  code: "cancelled" | "refunded" | "country" | "home_delivery" | "no_service_point";
   /** Swedish, shown verbatim in the admin. */
   message: string;
 };
 
 function checkBookingEligibility(order: OrderRow): Ineligible | null {
-  if ((order.status ?? "").toLowerCase() === "cancelled") {
+  const status = (order.status ?? "").toLowerCase();
+  if (status === "cancelled") {
     return { code: "cancelled", message: "Ordern är avbruten — ingen frakt kan bokas." };
+  }
+  // Buying a label for a parcel whose money has gone back is a straight loss.
+  if (status === "refunded" || status === "partially_refunded") {
+    return {
+      code: "refunded",
+      message: "Ordern är återbetald — ingen frakt kan bokas.",
+    };
   }
 
   const country = (order.country ?? "SE").toUpperCase();

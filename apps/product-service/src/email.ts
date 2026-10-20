@@ -841,6 +841,199 @@ export async function sendShipmentDispatchedEmail(data: ShipmentDispatchedEmailD
   }
 }
 
+export type RefundIssuedEmailData = {
+  firstName: string;
+  email: string;
+  orderNumber: string;
+  /** The CHARGE currency, not a display currency. */
+  currency?: string;
+  /** Major units. */
+  refundAmount: number;
+  /** True when nothing is left refundable on the order. */
+  isFullRefund: boolean;
+  /** "Betalning" / "Deposition" / "Restbetalning". */
+  chargeLabel: string;
+  last4?: string | null;
+  locale?: "sv" | "en";
+};
+
+const refundIssuedTranslations = {
+  sv: {
+    subject: "Din återbetalning är på väg",
+    heading: "Vi har återbetalat dig",
+    greeting: "Hej",
+    leadFull: "Hela beloppet för din order är nu återbetalat.",
+    leadPartial: "En del av beloppet för din order är nu återbetalat.",
+    orderNumber: "Ordernummer",
+    amount: "Återbetalat belopp",
+    paidWith: "Avser",
+    card: "Kort som slutar på",
+    note: "Beloppet återförs till samma betalningsmetod som användes vid köpet och syns vanligtvis på ditt konto inom 5–10 bankdagar.",
+    questions: "Har du frågor? Kontakta oss på",
+    rights: "Alla rättigheter förbehållna.",
+  },
+  en: {
+    subject: "Your refund is on its way",
+    heading: "We have issued your refund",
+    greeting: "Hi",
+    leadFull: "The full amount for your order has now been refunded.",
+    leadPartial: "Part of the amount for your order has now been refunded.",
+    orderNumber: "Order number",
+    amount: "Refunded amount",
+    paidWith: "Applies to",
+    card: "Card ending in",
+    note: "The amount is returned to the payment method used at purchase and usually appears on your account within 5-10 banking days.",
+    questions: "Questions? Contact us at",
+    rights: "All rights reserved.",
+  },
+};
+
+/**
+ * A refund amount is written at the currency's real precision, unlike
+ * `formatMoney`, which renders SEK/NOK/DKK with zero decimals because catalog
+ * prices are whole units. A 123,50 kr partial refund shown as "124 kr" would
+ * not reconcile against the customer's bank statement.
+ */
+function formatRefundMoney(amount: unknown, currency: string | undefined): string {
+  const { locale } = currencyNumberFormat(currency);
+  const n = Number(amount);
+  const decimals = Number.isInteger(n) ? 0 : 2;
+  const formatted = n.toLocaleString(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: 2,
+  });
+  return `${formatted} ${currencySuffix(currency)}`;
+}
+
+function renderRefundIssuedEmail(data: RefundIssuedEmailData): string {
+  const locale = data.locale === "en" ? "en" : "sv";
+  const t = refundIssuedTranslations[locale];
+  const logoUrl = getOrderEmailLogoUrl();
+  const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
+  const orderNo = escapeHtml(String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber);
+  const firstName = escapeHtml(data.firstName);
+  const amount = escapeHtml(formatRefundMoney(data.refundAmount, data.currency));
+  const chargeLabel = escapeHtml(data.chargeLabel);
+  const last4 = data.last4 ? escapeHtml(data.last4) : null;
+  const lead = data.isFullRefund ? t.leadFull : t.leadPartial;
+  const cardLine = last4 ? ` &middot; ${t.card} ${last4}` : "";
+
+  return `
+<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${t.subject} - Turbomeck</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table cellpadding="0" cellspacing="0" border="0" width="680" style="max-width: 680px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 32px 32px 12px 32px; text-align: center;">
+              ${headerBrandInner}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 36px 40px 24px 40px; text-align: center;">
+              <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto;">
+                <tr>
+                  <td style="padding: 0; text-align: center;">
+                    <table cellpadding="0" cellspacing="0" border="0" align="center" role="presentation" style="margin: 0 auto; border-radius: 9999px; overflow: hidden; background-color: #dcfce7;">
+                      <tr>
+                        <td width="56" height="56" style="width: 56px; height: 56px; max-width: 56px; max-height: 56px; background-color: #dcfce7; border-radius: 9999px; -webkit-border-radius: 9999px; text-align: center; vertical-align: middle; line-height: 56px; mso-line-height-rule: exactly;">
+                          <span style="font-size: 26px; line-height: 56px; display: inline-block; vertical-align: middle;">&#128179;</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              <h2 style="margin: 20px 0 12px 0; font-size: 22px; font-weight: 700; color: #111827;">${t.heading}</h2>
+              <p style="margin: 0 0 8px 0; color: #111827; font-size: 15px;">${t.greeting} ${firstName},</p>
+              <p style="margin: 0; color: #6b7280; font-size: 15px; line-height: 1.55;">${lead}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 28px 40px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 22px;">
+                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b7280;">${t.orderNumber}</p>
+                    <p style="margin: 0 0 16px 0; font-weight: 600; color: #111827; font-size: 17px;">#${orderNo}</p>
+                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b7280;">${t.amount}</p>
+                    <p style="margin: 0 0 16px 0; font-weight: 700; color: #15803d; font-size: 22px;">${amount}</p>
+                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #6b7280;">${t.paidWith}</p>
+                    <p style="margin: 0; font-weight: 600; color: #111827; font-size: 15px;">${chargeLabel}${cardLine}</p>
+                    <p style="margin: 16px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.45;">${t.note}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fafb; padding: 22px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280;">
+                ${t.questions} <a href="mailto:${SHOP_CONTACT_EMAIL}" style="color: #6ec900; text-decoration: none;">${SHOP_CONTACT_EMAIL}</a>
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                &copy; ${new Date().getFullYear()} Turbomeck. ${t.rights}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Returns false rather than throwing: by the time this runs the money has
+ * already left Stripe, so a mail failure must never be reported to the admin as
+ * a failed refund. The caller surfaces `emailSent: false` instead.
+ */
+export async function sendRefundIssuedEmail(data: RefundIssuedEmailData): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) {
+    console.warn("[email] No mail config, skipping refund-issued email");
+    return false;
+  }
+
+  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    tls: skipTlsVerify
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : {},
+  });
+
+  const locale = data.locale === "en" ? "en" : "sv";
+  const t = refundIssuedTranslations[locale];
+  const html = renderRefundIssuedEmail(data);
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck" <${config.from}>`,
+      to: data.email,
+      subject: `${t.subject} (#${String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber}) - Turbomeck`,
+      html,
+    });
+    console.log(`[email] Refund notice sent to ${data.email} order ${data.orderNumber}`);
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send refund-issued email:", error);
+    return false;
+  }
+}
+
 export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<boolean> {
   const config = await getMailConfig();
   if (!config) {

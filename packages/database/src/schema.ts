@@ -10,6 +10,7 @@ import {
   foreignKey,
   primaryKey,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -230,7 +231,7 @@ export const orders = pgTable("orders", {
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0").notNull(),
   total: decimal("total", { precision: 12, scale: 2 }).notNull(),
-  status: text("status").default("confirmed").notNull(), // confirmed, deposit_paid, shipped, delivered, cancelled, completed
+  status: text("status").default("confirmed").notNull(), // confirmed, deposit_paid, shipped, delivered, cancelled, completed, partially_refunded, refunded
   /** Deposit flow: amount paid upfront (SEK); null for full-payment orders */
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   /** Balance due after deposit; paid when customer sends old part and receives new turbo */
@@ -329,9 +330,80 @@ export const checkoutIntents = pgTable("checkout_intent", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/**
+ * One row per Stripe refund attempt against an order.
+ *
+ * A table rather than columns on `orders` because Stripe allows several partial
+ * refunds against one charge, and because the row is what makes a double-submit
+ * impossible: it is written as `pending` *before* Stripe is called, under a
+ * unique idempotency key, so a retry finds the reservation instead of issuing a
+ * second refund.
+ *
+ * Never the source of truth for what is still refundable — that is read live
+ * from Stripe, since a refund issued from the Stripe dashboard never reaches us
+ * (the webhook handles only payment_intent.*). These rows exist to reserve,
+ * to audit, and to show history.
+ */
+export const orderRefunds = pgTable("order_refunds", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id")
+    .references(() => orders.id, { onDelete: "cascade" })
+    .notNull(),
+  /**
+   * The PaymentIntent this was taken against — `orders.stripePaymentId` or
+   * `orders.stripeBalancePaymentId`. Stored rather than derived so the row
+   * still says what it refunded if the order is later edited.
+   */
+  stripePaymentIntentId: text("stripe_payment_intent_id").notNull(),
+  /** The Charge actually refunded (`pi.latest_charge` as of the quote). */
+  stripeChargeId: text("stripe_charge_id"),
+  /** Which slot of the order the PaymentIntent came from: full | deposit | balance. */
+  chargeKind: text("charge_kind").notNull(),
+  /**
+   * NULL until Stripe answers. Postgres treats NULLs as distinct, so any number
+   * of pending rows coexist under the unique index below — the same property
+   * `orders_stripe_payment_id_unique` relies on.
+   */
+  stripeRefundId: text("stripe_refund_id"),
+  /** Major units, decimal like `orders.total`. Drizzle returns these as STRINGS. */
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  /** The charge currency. Never assume SEK — orders can be NOK, DKK or EUR. */
+  currency: text("currency").notNull(),
+  /** pending | succeeded | failed */
+  status: text("status").default("pending").notNull(),
+  /** Internal note from the admin. Never shown to the customer. */
+  note: text("note"),
+  stripeFailureReason: text("stripe_failure_reason"),
+  /** What makes the retry of a half-finished refund a no-op. */
+  idempotencyKey: text("idempotency_key").notNull(),
+  /**
+   * `session.user.email ?? session.user.id`. Any admin may refund, so this plus
+   * the server log is the entire audit trail — write it unconditionally.
+   */
+  performedBy: text("performed_by"),
+  emailSentAt: timestamp("email_sent_at", { mode: "date" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("order_refunds_idempotency_key_unique").on(table.idempotencyKey),
+  uniqueIndex("order_refunds_stripe_refund_id_unique").on(table.stripeRefundId),
+  index("order_refunds_order_id_idx").on(table.orderId),
+]);
+
 export const ordersRelations = relations(orders, ({ many }) => ({
   items: many(orderItems, {
     relationName: "order_items",
+  }),
+  refunds: many(orderRefunds, {
+    relationName: "order_refunds",
+  }),
+}));
+
+export const orderRefundsRelations = relations(orderRefunds, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderRefunds.orderId],
+    references: [orders.id],
+    relationName: "order_refunds",
   }),
 }));
 
@@ -420,6 +492,8 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+export type OrderRefund = typeof orderRefunds.$inferSelect;
+export type NewOrderRefund = typeof orderRefunds.$inferInsert;
 
 export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;

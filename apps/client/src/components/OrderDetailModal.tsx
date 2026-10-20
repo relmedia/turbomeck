@@ -24,6 +24,7 @@ import {
   Receipt,
   Route,
   Info,
+  RotateCcw,
 } from "lucide-react";
 
 
@@ -78,7 +79,11 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
               ? t("orderDetail.orderStatusCompleted")
               : order.status === "cancelled"
                 ? t("orderDetail.orderStatusCancelled")
-                : order.status;
+                : order.status === "partially_refunded"
+                  ? t("orderDetail.orderStatusPartiallyRefunded")
+                  : order.status === "refunded"
+                    ? t("orderDetail.orderStatusRefunded")
+                    : order.status;
 
   const statusBadge =
     order.status === "confirmed" || order.status === "deposit_paid"
@@ -104,10 +109,16 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
                 className:
                   "border-destructive/30 bg-destructive/10 text-destructive dark:text-red-300",
               }
-            : {
-                Icon: Package,
-                className: "border-border bg-muted/60 text-foreground",
-              };
+            : order.status === "refunded" || order.status === "partially_refunded"
+              ? {
+                  Icon: RotateCcw,
+                  className:
+                    "border-slate-500/25 bg-slate-500/10 text-slate-900 dark:text-slate-200",
+                }
+              : {
+                  Icon: Package,
+                  className: "border-border bg-muted/60 text-foreground",
+                };
 
   /**
    * A past order is shown in the currency it was charged in, not in the
@@ -124,9 +135,14 @@ export default function OrderDetailModal({ order, onClose }: OrderDetailModalPro
 
   const StatusIcon = statusBadge.Icon;
 
+  // A refunded order advertises no shipment. An existing tracking link still
+  // shows, because a parcel that was already sent does not un-send itself when
+  // the money goes back.
   const showShipmentSection =
     Boolean(trackingUrl) ||
     (order.status !== "cancelled" &&
+      order.status !== "refunded" &&
+      order.status !== "partially_refunded" &&
       (order.status === "confirmed" ||
         order.status === "deposit_paid" ||
         order.status === "shipped" ||

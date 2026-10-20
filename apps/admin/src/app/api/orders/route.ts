@@ -71,7 +71,14 @@ export async function GET() {
         productName: firstItem?.productName,
         productImage: firstItem?.productImage,
         date: o.createdAt?.toISOString?.()?.slice(0, 10),
-        type: "sale" as const,
+        /**
+         * Backs the "Returer" tab, which filtered on this field while the API
+         * hard-coded every row as a sale, so the tab was permanently empty.
+         */
+        type:
+          o.status === "refunded" || o.status === "partially_refunded"
+            ? ("return" as const)
+            : ("sale" as const),
       };
     });
     return NextResponse.json(list);
@@ -83,7 +90,15 @@ export async function GET() {
 
 function mapOrderStatus(
   status: string | null
-): "pending" | "processing" | "success" | "shipped" | "delivered" | "failed" {
+):
+  | "pending"
+  | "processing"
+  | "success"
+  | "shipped"
+  | "delivered"
+  | "failed"
+  | "partially_refunded"
+  | "refunded" {
   switch (status) {
     case "confirmed":
       return "processing";
@@ -93,6 +108,10 @@ function mapOrderStatus(
       return "delivered";
     case "cancelled":
       return "failed";
+    case "partially_refunded":
+      return "partially_refunded";
+    case "refunded":
+      return "refunded";
     default:
       return "processing";
   }

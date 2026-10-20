@@ -92,6 +92,8 @@ export default function AccountPage() {
     if (s === "delivered") return t("account.orderStatusDelivered");
     if (s === "completed") return t("account.orderStatusCompleted");
     if (s === "cancelled") return t("account.orderStatusCancelled");
+    if (s === "partially_refunded") return t("account.orderStatusPartiallyRefunded");
+    if (s === "refunded") return t("account.orderStatusRefunded");
     return s;
   }
 
@@ -108,6 +110,9 @@ export default function AccountPage() {
         return "border-emerald-500/30 bg-emerald-500/12 text-emerald-950 dark:border-emerald-400/35 dark:bg-emerald-400/15 dark:text-emerald-100";
       case "cancelled":
         return "border-rose-500/35 bg-rose-500/12 text-rose-950 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-100";
+      case "partially_refunded":
+      case "refunded":
+        return "border-slate-500/30 bg-slate-500/12 text-slate-950 dark:border-slate-400/35 dark:bg-slate-400/15 dark:text-slate-100";
       default:
         return "border-border bg-muted/70 text-muted-foreground";
     }

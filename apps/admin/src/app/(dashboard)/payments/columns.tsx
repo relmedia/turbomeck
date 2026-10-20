@@ -44,7 +44,15 @@ export type Payment = {
   fullName: string;
   userId: string;
   email: string;
-  status: "pending" | "processing" | "success" | "failed" | "shipped" | "delivered";
+  status:
+    | "pending"
+    | "processing"
+    | "success"
+    | "failed"
+    | "shipped"
+    | "delivered"
+    | "partially_refunded"
+    | "refunded";
   productName?: string;
   productImage?: string;
   date?: string;
@@ -59,6 +67,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   shipped: { label: "Skickad", className: "bg-gray-100 text-gray-700 border border-gray-200" },
   delivered: { label: "Levererad", className: "bg-emerald-50 text-emerald-600 border border-emerald-200" },
   failed: { label: "Avbruten", className: "bg-red-50 text-red-700 border border-red-200" },
+  partially_refunded: { label: "Delvis återbetald", className: "bg-amber-50 text-amber-700 border border-amber-200" },
+  refunded: { label: "Återbetald", className: "bg-slate-100 text-slate-700 border border-slate-300" },
 };
 
 function DeleteOrderDialog({

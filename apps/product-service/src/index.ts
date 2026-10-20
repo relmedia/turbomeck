@@ -22,8 +22,17 @@ import {
   sendAdminUserDeletedEmail,
   sendOrderConfirmationEmail,
   sendShipmentDispatchedEmail,
+  sendRefundIssuedEmail,
 } from "./email.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
+import { stripeClient } from "./stripe-client.js";
+import {
+  quoteRefundable,
+  issueRefund,
+  markRefundEmailSent,
+  RefundError,
+  type ChargeKind,
+} from "./order-refunds.js";
 import { resolveCheckoutOrder, type OrderItemInput } from "./order-pricing.js";
 import { normalizeCurrency } from "@repo/currency";
 import { assertAllowedRemoveBackgroundUrl } from "./safe-image-fetch-url.js";
@@ -81,11 +90,7 @@ function canAccessBalanceWithViewToken(
   return timingSafeTokenEqual(token, order.viewToken);
 }
 
-const stripeClient =
-  process.env.STRIPE_SECRET_KEY?.trim() &&
-  !process.env.STRIPE_SECRET_KEY.includes("placeholder")
-    ? new Stripe(process.env.STRIPE_SECRET_KEY)
-    : null;
+
 
 async function verifySucceededBalancePaymentIntent(
   paymentIntentId: string,
@@ -2141,6 +2146,124 @@ app.post("/api/orders", async (req, res) => {
  * Sends “package shipped” email with PostNord tracking (called by admin after saving tracking).
  * Body: optional { locale?: "sv" | "en" } (defaults to sv).
  */
+const VALID_CHARGE_KINDS = new Set<ChargeKind>(["full", "deposit", "balance"]);
+
+function refundErrorResponse(res: express.Response, error: unknown, context: string) {
+  if (error instanceof RefundError) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  console.error(`${context}:`, error);
+  return res.status(500).json({ error: "Internt fel vid återbetalning" });
+}
+
+/**
+ * GET /api/orders/:id/refundable
+ * What each charge on the order can still give back, read live from Stripe.
+ * Read-only: safe to call on every page load.
+ */
+app.get("/api/orders/:id/refundable", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+    return res.json(await quoteRefundable(id));
+  } catch (error) {
+    return refundErrorResponse(res, error, "refundable");
+  }
+});
+
+/**
+ * POST /api/orders/:id/refund
+ * Issues one refund against one charge of this order.
+ *
+ * The response always reports the email separately: once Stripe has moved the
+ * money, a failed mail must not read to the admin as a failed refund.
+ */
+app.post("/api/orders/:id/refund", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const body = (req.body ?? {}) as {
+      kind?: string;
+      amount?: number | string;
+      requestId?: string;
+      note?: string;
+      performedBy?: string;
+      notifyCustomer?: boolean;
+      locale?: string;
+    };
+
+    const kind = String(body.kind ?? "") as ChargeKind;
+    if (!VALID_CHARGE_KINDS.has(kind)) {
+      return res.status(400).json({ error: "Ogiltig betalning vald" });
+    }
+
+    const result = await issueRefund({
+      orderId: id,
+      kind,
+      amount: Number(body.amount),
+      requestId: String(body.requestId ?? ""),
+      note: body.note ?? null,
+      performedBy: body.performedBy ?? null,
+    });
+
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    if (body.notifyCustomer !== false && !result.deduplicated) {
+      try {
+        const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+        const quote = await quoteRefundable(id);
+        const charge = quote.charges.find((c) => c.kind === kind);
+        if (order) {
+          emailSent = await sendRefundIssuedEmail({
+            firstName: order.firstName,
+            email: order.email,
+            orderNumber: order.orderNumber,
+            currency: result.refund.currency,
+            refundAmount: result.refund.amount,
+            isFullRefund: result.fullyRefunded,
+            chargeLabel: charge?.label ?? "Betalning",
+            last4: charge?.last4 ?? null,
+            locale: body.locale === "en" ? "en" : "sv",
+          });
+          if (emailSent) {
+            await markRefundEmailSent(result.refund.id);
+          } else {
+            emailError = "E-post ej konfigurerad eller kunde inte skickas";
+          }
+        }
+      } catch (e) {
+        // Never fail the request for this. The refund already happened.
+        emailError = e instanceof Error ? e.message : "Okänt fel vid e-postutskick";
+        console.error("refund email:", e);
+      }
+    }
+
+    console.log(
+      `[refund] order=${id} kind=${kind} amount=${result.refund.amount} ${result.refund.currency} ` +
+        `stripeRefund=${result.refund.stripeRefundId ?? "-"} by=${result.refund.performedBy ?? "-"} ` +
+        `dedup=${result.deduplicated} status=${result.orderStatus}`,
+    );
+
+    return res.json({
+      success: true,
+      refund: result.refund,
+      deduplicated: result.deduplicated,
+      orderStatus: result.orderStatus,
+      fullyRefunded: result.fullyRefunded,
+      emailSent,
+      emailError,
+    });
+  } catch (error) {
+    return refundErrorResponse(res, error, "refund");
+  }
+});
+
 app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
