@@ -820,8 +820,8 @@ export default function OrderDetailPage() {
           </Card>
         </div>
 
-        <div className="flex flex-col">
-          <Card className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-sm">Ordersammanfattning</CardTitle>
             </CardHeader>
@@ -870,20 +870,20 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Directly under the money figures, which is what a refund is about. */}
+          <RefundSection
+            orderId={order.orderId}
+            customerEmail={order.customerEmail}
+            onRefunded={async () => {
+              const refetch = await fetch(`/api/orders/${id}`);
+              const updated = await refetch.json();
+              setOrder(updated);
+              setEditStatus(updated.status ?? "confirmed");
+            }}
+          />
         </div>
       </div>
-
-      {/* Directly under the money figures, which is what a refund is about. */}
-      <RefundSection
-        orderId={order.orderId}
-        customerEmail={order.customerEmail}
-        onRefunded={async () => {
-          const refetch = await fetch(`/api/orders/${id}`);
-          const updated = await refetch.json();
-          setOrder(updated);
-          setEditStatus(updated.status ?? "confirmed");
-        }}
-      />
 
       <Card className="gap-4 py-4">
         <CardHeader className="py-2 px-4">

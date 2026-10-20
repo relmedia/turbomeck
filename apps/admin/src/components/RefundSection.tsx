@@ -236,7 +236,7 @@ export default function RefundSection({
                 </p>
               )}
               {quote.charges.map((c) => (
-                <div key={c.kind} className="flex flex-wrap items-baseline justify-between gap-2">
+                <div key={c.kind} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                   <span className="text-xs font-medium">
                     {c.label}
                     {c.last4 ? (
@@ -265,14 +265,14 @@ export default function RefundSection({
             {nothingRefundable ? (
               <p className="text-xs text-muted-foreground">Inget belopp kvar att återbetala.</p>
             ) : (
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-3">
                 {quote.charges.length > 1 && (
                   <div className="space-y-1.5">
                     <Label htmlFor="refund-kind" className="text-xs">
                       Vilken betalning?
                     </Label>
                     <Select value={kind} onValueChange={pickCharge}>
-                      <SelectTrigger id="refund-kind" className="h-9 w-[220px]">
+                      <SelectTrigger id="refund-kind" className="h-9 w-full">
                         <SelectValue placeholder="Välj betalning" />
                       </SelectTrigger>
                       <SelectContent>
@@ -296,7 +296,7 @@ export default function RefundSection({
                     inputMode="decimal"
                     value={amountInput}
                     onChange={(e) => setAmountInput(e.target.value)}
-                    className="h-9 w-[140px]"
+                    className="h-9 w-full"
                   />
                   {selected && (
                     <p className="text-[11px] text-muted-foreground">
@@ -314,11 +314,11 @@ export default function RefundSection({
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Visas inte för kunden"
-                    className="h-9 w-[240px]"
+                    className="h-9 w-full"
                   />
                 </div>
 
-                <label className="flex h-9 items-center gap-2 text-xs">
+                <label className="flex items-center gap-2 text-xs">
                   <input
                     type="checkbox"
                     checked={notifyCustomer}
@@ -339,7 +339,7 @@ export default function RefundSection({
                   }}
                 >
                   <AlertDialogTrigger asChild>
-                    <Button size="sm" className="h-9" disabled={!amountValid || refunding}>
+                    <Button size="sm" className="h-9 w-full" disabled={!amountValid || refunding}>
                       {refunding ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
