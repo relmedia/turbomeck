@@ -21,10 +21,16 @@ function loadTranslations(locale: Locale): Translations {
   return translationModules[locale] ?? translationModules.sv;
 }
 
-function getStoredLocale(): Locale {
-  if (typeof window === "undefined") return "sv";
+/**
+ * `fallback` is the locale the server actually rendered with (from the
+ * cookie). It is the right default when localStorage holds nothing, because
+ * resetting a returning English visitor to Swedish is worse than trusting the
+ * cookie they already carry.
+ */
+function getStoredLocale(fallback: Locale): Locale {
+  if (typeof window === "undefined") return fallback;
   const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
-  return stored === "en" || stored === "sv" ? stored : "sv";
+  return stored === "en" || stored === "sv" ? stored : fallback;
 }
 
 function localeCookieFlags(): string {
@@ -62,22 +68,48 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+/**
+ * `initialLocale` is read from the locale cookie by the root layout and must be
+ * the same value the server components used.
+ *
+ * It used to be hardcoded "sv" here, which meant the chrome was Swedish in
+ * every server-rendered page while the product data — fetched by server
+ * components that DO read the cookie — came back in the visitor's language. An
+ * English visitor got Swedish buttons around English products until hydration
+ * swapped them. Seeding from the cookie makes both halves of the page agree on
+ * the first paint, the same way CurrencyProvider is handed its currency.
+ */
+export function LanguageProvider({
+  children,
+  initialLocale = "sv",
+}: {
+  children: React.ReactNode;
+  initialLocale?: Locale;
+}) {
   const router = useRouter();
-  const [locale, setLocaleState] = useState<Locale>("sv");
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [translationData, setTranslationData] = useState<Translations>(() =>
-    loadTranslations("sv")
+    loadTranslations(initialLocale)
   );
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = getStoredLocale();
-    setLocaleState(stored);
-    document.documentElement.lang = stored === "en" ? "en" : "sv";
-    document.cookie = `${LOCALE_COOKIE_NAME}=${stored};${localeCookieFlags()}`;
-    setTranslationData(loadTranslations(stored));
+    const stored = getStoredLocale(initialLocale);
+    if (stored !== initialLocale) {
+      // localStorage and the cookie have drifted apart — the cookie was
+      // cleared or expired while the choice survived in localStorage. Rewrite
+      // the cookie and refresh, or the chrome flips to English while every
+      // server-rendered product stays Swedish for the rest of the session.
+      setLocaleState(stored);
+      setTranslationData(loadTranslations(stored));
+      setStoredLocale(stored);
+      router.refresh();
+    } else {
+      // Same value; rewrite anyway to roll the cookie's max-age forward.
+      setStoredLocale(stored);
+    }
     setReady(true);
-  }, []);
+  }, [initialLocale, router]);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);

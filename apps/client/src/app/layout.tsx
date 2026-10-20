@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { WishlistProvider } from "@/components/providers/WishlistProvider";
-import { LanguageProvider } from "@/i18n/context";
+import { LanguageProvider, LOCALE_COOKIE_NAME, type Locale } from "@/i18n/context";
 import { CurrencyProvider } from "@/components/providers/CurrencyProvider";
 import { resolveDisplayCurrency } from "@/lib/display-currency";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
@@ -78,15 +79,22 @@ export default async function RootLayout({
   // no flash of SEK, and the visitor's IP never leaves our backend.
   const display = await resolveDisplayCurrency();
 
+  // Same idea for language. Server components already read this cookie to pick
+  // which product names to fetch; the chrome has to read it from the same
+  // place or the two disagree on the first paint.
+  const cookieStore = await cookies();
+  const initialLocale: Locale =
+    cookieStore.get(LOCALE_COOKIE_NAME)?.value === "en" ? "en" : "sv";
+
   return (
-    <html lang="sv" suppressHydrationWarning>
+    <html lang={initialLocale} suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* Site-wide entity markup. Emitted once here rather than per page so
             there is a single Organization node for Google to attach the brand,
             logo and contact details to. */}
         <OrganizationJsonLd />
         <SessionProvider>
-          <LanguageProvider>
+          <LanguageProvider initialLocale={initialLocale}>
           <CurrencyProvider
             currency={display.currency}
             rate={display.rate}
