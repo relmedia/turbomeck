@@ -348,7 +348,21 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create product");
+        // Surface what the server actually said. This used to throw a fixed
+        // "Failed to create product", so a validation message the API had
+        // already written in Swedish never reached the person who could act
+        // on it.
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+        };
+        throw new Error(
+          payload.error
+            ? payload.detail
+              ? `${payload.error} (${payload.detail})`
+              : payload.error
+            : `Kunde inte skapa produkten (HTTP ${response.status})`,
+        );
       }
 
       form.reset();

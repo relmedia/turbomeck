@@ -4,6 +4,10 @@ import {
   requireInternalProductApiSecret,
 } from "@/lib/internal-product-api";
 import { requireAdmin } from "@/lib/require-admin";
+import {
+  affectsStorefrontCatalog,
+  revalidateStorefrontCatalog,
+} from "@/lib/revalidate-storefront";
 
 const PRODUCT_SERVICE =
   process.env.PRODUCT_SERVICE_URL ||
@@ -24,6 +28,23 @@ function parseUpstreamJson(text: string): unknown {
   } catch {
     return { error: "Invalid upstream response" };
   }
+}
+
+/**
+ * Return the upstream response, and on a successful catalogue mutation tell
+ * the storefront to drop its cached catalogue first — awaited, so the admin's
+ * next page view already reflects the change rather than racing it.
+ */
+async function respondAndRevalidate(
+  pathStr: string,
+  method: string,
+  status: number,
+  data: unknown,
+) {
+  if (status >= 200 && status < 300 && affectsStorefrontCatalog(pathStr)) {
+    await revalidateStorefrontCatalog(`${method} ${pathStr}`);
+  }
+  return NextResponse.json(data, { status });
 }
 
 function misconfiguredResponse() {
@@ -115,7 +136,7 @@ export async function POST(
             );
             const text = await res.text();
             const data = parseUpstreamJson(text);
-            return NextResponse.json(data, { status: res.status });
+            return respondAndRevalidate(pathStr, "POST", res.status, data);
           } catch (e) {
             const isConnReset =
               (e as Error)?.cause &&
@@ -137,7 +158,7 @@ export async function POST(
     );
     const text = await res.text();
     const data = parseUpstreamJson(text);
-    return NextResponse.json(data, { status: res.status });
+    return respondAndRevalidate(pathStr, "POST", res.status, data);
   } catch (err) {
     console.error("Product proxy POST error:", err);
     const msg =
@@ -180,7 +201,7 @@ export async function PUT(
     if (!res.ok) {
       console.error(`Product PUT ${url} failed ${res.status}:`, data?.error ?? data);
     }
-    return NextResponse.json(data, { status: res.status });
+    return respondAndRevalidate(pathStr, "PUT", res.status, data);
   } catch (err) {
     console.error("Product proxy PUT error:", err);
     return NextResponse.json(
@@ -220,7 +241,7 @@ export async function PATCH(
     );
     const text = await res.text();
     const data = parseUpstreamJson(text);
-    return NextResponse.json(data, { status: res.status });
+    return respondAndRevalidate(pathStr, "PATCH", res.status, data);
   } catch (err) {
     console.error("Product proxy PATCH error:", err);
     return NextResponse.json(
@@ -250,7 +271,7 @@ export async function DELETE(
     );
     const text = await res.text();
     const data = parseUpstreamJson(text);
-    return NextResponse.json(data, { status: res.status });
+    return respondAndRevalidate(pathStr, "DELETE", res.status, data);
   } catch (err) {
     console.error("Product proxy DELETE error:", err);
     return NextResponse.json(

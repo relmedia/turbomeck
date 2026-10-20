@@ -24,6 +24,19 @@ const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
  */
 const CATALOG_REVALIDATE_SECONDS = 300;
 
+/**
+ * Cache tag on every catalogue read, so an admin edit can flush them all at
+ * once via POST /api/revalidate instead of the shop waiting out the window.
+ * The 300s revalidate stays as the backstop for when that call never arrives.
+ */
+export const CATALOG_CACHE_TAG = "catalog";
+
+function catalogCache() {
+  return {
+    next: { revalidate: CATALOG_REVALIDATE_SECONDS, tags: [CATALOG_CACHE_TAG] },
+  };
+}
+
 export type ApiCategory = {
   id: number;
   name: string;
@@ -150,7 +163,7 @@ export async function fetchCategories(locale?: "sv" | "en"): Promise<ApiCategory
   const url = locale ? `${PRODUCT_API}/categories?locale=${locale}` : `${PRODUCT_API}/categories`;
   const res = await fetchWithRetry(
     url,
-    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+    productApiRequestInit(catalogCache()),
   );
   return readProductApiJson<ApiCategory[]>(res, url, "Failed to fetch categories");
 }
@@ -159,7 +172,7 @@ export async function fetchProducts(locale?: "sv" | "en"): Promise<ProductType[]
   const url = locale ? `${PRODUCT_API}/products?locale=${locale}` : `${PRODUCT_API}/products`;
   const res = await fetchWithRetry(
     url,
-    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+    productApiRequestInit(catalogCache()),
   );
   const data = await readProductApiJson<ApiProduct[]>(res, url, "Failed to fetch products");
   return data.map(apiProductToProductType);
@@ -172,7 +185,7 @@ export async function fetchSliderProducts(locale?: "sv" | "en"): Promise<Product
   const url = `${PRODUCT_API}/products?${params}`;
   const res = await fetchWithRetry(
     url,
-    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+    productApiRequestInit(catalogCache()),
   );
   const text = await res.text();
   if (!res.ok) {
@@ -329,7 +342,7 @@ export async function fetchProduct(idOrSlug: string, locale?: "sv" | "en"): Prom
   const url = locale ? `${base}?locale=${locale}` : base;
   const res = await fetch(
     url,
-    productApiRequestInit({ next: { revalidate: CATALOG_REVALIDATE_SECONDS } }),
+    productApiRequestInit(catalogCache()),
   );
   if (!res.ok) return null;
   const data: ApiProduct = await res.json();

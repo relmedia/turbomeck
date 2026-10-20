@@ -1299,11 +1299,24 @@ app.post("/api/products", async (req, res) => {
       ? categoryIds.filter((x: unknown) => typeof x === "number" || (typeof x === "string" && !isNaN(Number(x)))).map((x: unknown) => parseInt(String(x), 10))
       : [];
 
+    // Validated rather than left to throw inside the try: `price.toString()`
+    // on an undefined price produced a 500 "Failed to create product" whose
+    // real cause only ever reached console.error, and the admin form showed
+    // its own generic text on top of that. Three layers, no message.
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    if (!trimmedName) {
+      return res.status(400).json({ error: "Produkten måste ha ett namn." });
+    }
+    const priceNumber = Number(price);
+    if (price == null || price === "" || !Number.isFinite(priceNumber) || priceNumber < 0) {
+      return res.status(400).json({ error: "Priset måste vara ett tal (0 eller högre)." });
+    }
+
     const newProduct = {
-      name,
+      name: trimmedName,
       shortDescription,
       description,
-      price: price.toString(),
+      price: priceNumber.toString(),
       image: image || null,
       thumbnails: thumbnails && Array.isArray(thumbnails) ? thumbnails : [],
       stock: stock || 0,
@@ -1320,14 +1333,22 @@ app.post("/api/products", async (req, res) => {
         isExchangeTurbo === true || isExchangeTurbo === 1 || isExchangeTurbo === "1" || isExchangeTurbo === "true",
     };
 
-    const inserted = await db.insert(products).values(newProduct).returning();
-    const p = inserted[0];
+    // One transaction. These used to be two independent inserts, so a bad
+    // category id failed the second one, returned 500 — and left the product
+    // row behind. The admin saw an error, retried, and got duplicates for a
+    // product that had in fact been created the first time.
+    const p = await db.transaction(async (tx) => {
+      const inserted = await tx.insert(products).values(newProduct).returning();
+      const row = inserted[0];
+      if (!row) throw new Error("Insert returned no row");
 
-    if (catIds.length > 0) {
-      await db.insert(productCategories).values(
-        catIds.map((categoryId: number) => ({ productId: p.id, categoryId }))
-      );
-    }
+      if (catIds.length > 0) {
+        await tx.insert(productCategories).values(
+          catIds.map((categoryId: number) => ({ productId: row.id, categoryId }))
+        );
+      }
+      return row;
+    });
 
     const categoryIdsRes = (await getProductCategoryIds([p.id])).get(p.id) ?? [];
 
@@ -1354,7 +1375,18 @@ app.post("/api/products", async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating product:", error);
-    res.status(500).json({ error: "Failed to create product" });
+    // A foreign-key violation here means a category id that does not exist.
+    // That is a 400 the operator can act on, not an opaque server fault.
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "23503") {
+      return res.status(400).json({
+        error: "En vald kategori finns inte längre. Ladda om sidan och välj kategori igen.",
+      });
+    }
+    res.status(500).json({
+      error: "Kunde inte skapa produkten.",
+      detail: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 
