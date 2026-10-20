@@ -27,6 +27,7 @@ import {
   Truck,
   CheckCircle2,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -613,6 +614,12 @@ export default function OrderDetailPage() {
   }
 
   const stepIndex = DELIVERY_STEPS.findIndex((s) => s.id === order.deliveryStatus);
+  /**
+   * Read from the saved order rather than `editStatus`: picking a status in the
+   * dropdown must not make the page claim a refund that has not been saved.
+   */
+  const isFullyRefunded = order.status === "refunded";
+  const isPartlyRefunded = order.status === "partially_refunded";
 
   const handleDeleteOrder = async () => {
     setDeleting(true);
@@ -825,6 +832,31 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="px-4 pb-3 pt-0">
               <div className="flex flex-col gap-4">
+                {/* A fully refunded order has no parcel to follow, so the
+                    stepper is replaced rather than left resting on
+                    "Behandlas" — which read as work still to do. A PARTIAL
+                    refund keeps its stepper: the goods may well still ship,
+                    and only the money moved. */}
+                {isFullyRefunded ? (
+                  <div className="rounded-lg border bg-muted/40 px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <p className="text-sm font-medium">Återbetald</p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Hela beloppet är återbetalt — ingen leverans att följa.
+                    </p>
+                  </div>
+                ) : (
+                <>
+                {isPartlyRefunded && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/30">
+                    <RotateCcw className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                    <p className="text-xs text-amber-900 dark:text-amber-200">
+                      Delvis återbetald. Leveransen nedan gäller fortfarande.
+                    </p>
+                  </div>
+                )}
                 <div
                   className="mb-2 grid w-full gap-2"
                   style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
@@ -881,6 +913,8 @@ export default function OrderDetailPage() {
                     style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
                   />
                 </div>
+                </>
+                )}
                 {/* Fraktbokning. Renders in every state — when booking is not
                     possible it says why, instead of silently disappearing. */}
                 <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">

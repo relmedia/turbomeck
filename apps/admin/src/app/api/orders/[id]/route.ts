@@ -277,9 +277,10 @@ function mapToDeliveryStatus(
     case "completed":
       return "delivered";
     case "cancelled":
-    // A refunded order has no delivery to track. There is no refunded step in
-    // DELIVERY_STEPS, so it reads as "processing"; the UI hides the stepper
-    // instead of showing a progress bar for a parcel nobody is sending.
+    // No refunded step exists in DELIVERY_STEPS, so these have to map to
+    // something. "processing" is the inert choice, and the order page does not
+    // render the stepper for a fully refunded order anyway — it shows an
+    // "Återbetald" panel instead, so this value is never drawn for one.
     case "partially_refunded":
     case "refunded":
       return "processing";
