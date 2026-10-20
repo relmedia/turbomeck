@@ -129,15 +129,61 @@ const DELIVERY_STEPS = [
 
 type TrackingEvent = { time?: string; description?: string; location?: string };
 
-function extractTrackingEvents(data: Record<string, unknown>): TrackingEvent[] {
-  const events: TrackingEvent[] = [];
+type TrackedShipment = {
+  shipment: Record<string, unknown>;
+  items: Record<string, unknown>[];
+};
+
+/** Track Shipment v5 and v2 wrap the same shape in plural or singular keys. */
+function extractTrackedShipments(data: Record<string, unknown>): TrackedShipment[] {
   const root = (data.TrackingInformationResponse ?? data) as Record<string, unknown>;
   const shipments = (root.shipment ?? root.shipments ?? []) as unknown[];
+  const out: TrackedShipment[] = [];
   for (const s of Array.isArray(shipments) ? shipments : []) {
     const shipment = (s as Record<string, unknown>) ?? {};
     const items = (shipment.item ?? shipment.items ?? []) as unknown[];
-    for (const it of Array.isArray(items) ? items : []) {
-      const item = (it as Record<string, unknown>) ?? {};
+    out.push({
+      shipment,
+      items: (Array.isArray(items) ? items : []).map(
+        (it) => (it as Record<string, unknown>) ?? {},
+      ),
+    });
+  }
+  return out;
+}
+
+type TrackingIdentifiers = { shipmentIds: string[]; itemIds: string[] };
+
+/**
+ * The numbers PostNord holds for the shipment. The item id is the parcel
+ * number printed on the label — what a customer enters on "spåra din
+ * försändelse" — and it is not always what booking handed back, which can
+ * be the shipment id instead.
+ */
+function extractTrackingIdentifiers(
+  data: Record<string, unknown>,
+): TrackingIdentifiers {
+  const shipmentIds: string[] = [];
+  const itemIds: string[] = [];
+  const push = (list: string[], val: unknown) => {
+    const id = toValidTrackingId(val);
+    if (id && !list.includes(id)) list.push(id);
+  };
+  for (const { shipment, items } of extractTrackedShipments(data)) {
+    const sid = shipment.shipmentIdentification as Record<string, unknown> | undefined;
+    push(shipmentIds, shipment.shipmentId ?? sid?.shipmentId ?? shipment.id);
+    for (const item of items) {
+      const iid = item.itemIdentification as Record<string, unknown> | undefined;
+      push(itemIds, item.itemId ?? iid?.itemId ?? item.id);
+    }
+  }
+  return { shipmentIds, itemIds };
+}
+
+function extractTrackingEvents(data: Record<string, unknown>): TrackingEvent[] {
+  const events: TrackingEvent[] = [];
+  for (const { items } of extractTrackedShipments(data)) {
+    for (const item of items) {
       const evts = (item.event ?? item.events ?? []) as unknown[];
       for (const e of Array.isArray(evts) ? evts : []) {
         const ev = (e as Record<string, unknown>) ?? {};
@@ -173,6 +219,67 @@ function TrackingEvents({ data }: { data: Record<string, unknown> }) {
           {ev.location && <span className="text-[11px] text-muted-foreground">{ev.location}</span>}
         </div>
       ))}
+    </div>
+  );
+}
+
+function TrackingIdentifiers({
+  data,
+  savedId,
+  onUse,
+}: {
+  data: Record<string, unknown>;
+  savedId: string;
+  onUse: (id: string) => void;
+}) {
+  const { shipmentIds, itemIds } = extractTrackingIdentifiers(data);
+  /** Prefer the parcel numbers; fall back to the shipment id if that is all PostNord returned. */
+  const parcelIds = itemIds.length > 0 ? itemIds : shipmentIds;
+  const otherShipmentIds =
+    itemIds.length > 0 ? shipmentIds.filter((id) => !itemIds.includes(id)) : [];
+
+  if (parcelIds.length === 0) return null;
+
+  return (
+    <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {parcelIds.length > 1 ? "Spårningsnummer (paket)" : "Spårningsnummer"}
+      </p>
+      <ul className="space-y-1.5">
+        {parcelIds.map((id) => (
+          <li key={id} className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs break-all">{id}</span>
+            <a
+              href={postNordTrackingUrl(id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-sky-600 hover:text-sky-700 hover:underline shrink-0"
+            >
+              Spåra
+            </a>
+            {id === savedId ? (
+              <span className="text-[11px] text-muted-foreground shrink-0">
+                sparat på ordern
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={() => onUse(id)}
+              >
+                Använd
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {otherShipmentIds.length > 0 && (
+        <p className="text-[11px] text-muted-foreground break-all">
+          Försändelse-id:{" "}
+          <span className="font-mono">{otherShipmentIds.join(", ")}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -1176,7 +1283,17 @@ export default function OrderDetailPage() {
                   <p className="text-xs text-destructive">{trackingError}</p>
                 )}
                 {trackingData && (
-                  <TrackingEvents data={trackingData} />
+                  <>
+                    <TrackingIdentifiers
+                      data={trackingData}
+                      savedId={toValidTrackingId(order.postNordTrackingId)}
+                      onUse={(id) => {
+                        setEditTrackingId(id);
+                        toast.info("Spårningsnummer ifyllt — tryck Spara för att spara det på ordern");
+                      }}
+                    />
+                    <TrackingEvents data={trackingData} />
+                  </>
                 )}
               </div>
             )}
