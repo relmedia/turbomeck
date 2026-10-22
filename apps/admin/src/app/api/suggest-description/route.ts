@@ -11,10 +11,9 @@ const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
 // these limits an admin (or anyone who has compromised an admin session) can
 // inject very long Swedish strings into the Anthropic prompt to burn money or
 // stuff in prompt-injection payloads. Numbers cover real product entries:
-// "name" rarely tops ~200 chars and short descriptions rarely top a couple
-// of paragraphs, so 4 KB is plenty.
+// "name" rarely tops ~200 chars and a few paragraphs of source text fit in 4 KB.
 const MAX_NAME_CHARS = 500;
-const MAX_SHORT_DESCRIPTION_CHARS = 4000;
+const MAX_SOURCE_DESCRIPTION_CHARS = 4000;
 
 /** Strip markdown fences and leading chatter; keep HTML body. */
 function extractHtmlFromModelOutput(raw: string): string {
@@ -48,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const model = process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
 
-  let body: { name?: string; shortDescription?: string };
+  let body: { name?: string; description?: string };
   try {
     body = await req.json();
   } catch {
@@ -59,33 +58,33 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, shortDescription } = body;
+    const { name, description: sourceDescription } = body;
 
-    if (!shortDescription?.trim()) {
+    if (!sourceDescription?.trim()) {
       return NextResponse.json(
-        { error: "Kort beskrivning krävs för att skapa ett förslag." },
+        { error: "En befintlig beskrivning krävs för att skapa ett förslag." },
         { status: 400 },
       );
     }
 
     if (
       (typeof name === "string" && name.length > MAX_NAME_CHARS) ||
-      shortDescription.length > MAX_SHORT_DESCRIPTION_CHARS
+      sourceDescription.length > MAX_SOURCE_DESCRIPTION_CHARS
     ) {
       return NextResponse.json(
         {
-          error: `För lång inmatning (max ${MAX_NAME_CHARS} tecken för namn, ${MAX_SHORT_DESCRIPTION_CHARS} tecken för kort beskrivning).`,
+          error: `För lång inmatning (max ${MAX_NAME_CHARS} tecken för namn, ${MAX_SOURCE_DESCRIPTION_CHARS} tecken för beskrivning).`,
         },
         { status: 413 },
       );
     }
 
     const safeName = (name?.trim() ?? "").slice(0, MAX_NAME_CHARS);
-    const safeShort = shortDescription.trim().slice(0, MAX_SHORT_DESCRIPTION_CHARS);
+    const safeDescription = sourceDescription.trim().slice(0, MAX_SOURCE_DESCRIPTION_CHARS);
 
     const anthropic = new Anthropic({ apiKey });
 
-    const prompt = `Baserat på produktnamn och kort beskrivning nedan, skriv en fullständig produktbeskrivning på svenska för en e-handel (turbo/delar till fordon om relevant).
+    const prompt = `Baserat på produktnamn och befintlig produktbeskrivning nedan, skriv en förbättrad fullständig produktbeskrivning på svenska för en e-handel (turbo/delar till fordon om relevant).
 Utöka innehållet med relevanta detaljer: passform, viktiga specifikationer, vad som ingår, skötselråd eller garanti om det passar — men håll dig till rimliga antaganden utifrån texten; hitta inte på exakta OEM-nummer eller garantier som inte nämns.
 
 Formatera som HTML: <p> för stycken, <ul><li> för punktlistor där det passar, <strong> för betoning.
@@ -95,7 +94,7 @@ Håll texten koncis: 2–4 korta stycken, eventuellt med en punktlista på högs
 VIKTIGT: Svara ENDAST med HTML-fragmentet. Ingen JSON, ingen förklarande text före eller efter, inga markdown-kodblock om du kan undvika det.
 
 Produktnamn: ${safeName || "(okänt)"}
-Kort beskrivning: ${safeShort}`;
+Befintlig beskrivning: ${safeDescription}`;
 
     const message = await anthropic.messages.create({
       model,

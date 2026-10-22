@@ -26,6 +26,7 @@ import { toast } from "react-toastify";
 import { useTranslation } from "@/i18n/context";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { CompareToggle } from "@/components/compare/CompareToggle";
+import { htmlToText, truncateAtWord } from "@/lib/html-text";
 
 const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   product,
@@ -62,6 +63,7 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
           (u): u is string => typeof u === "string" && u.length > 0
         )
       : [product.images?.default || "/logo.svg"];
+  const descriptionExcerpt = truncateAtWord(htmlToText(product.description), 100);
 
 
   // The gallery is a native horizontal scroll-snap track, so a finger drag
@@ -351,9 +353,9 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
           {/* Prose only — the spec sheet belongs on the product page, not in
               the grid. Clamped to three lines so cards in the same row keep
               the same shape whatever the summary length. */}
-          {product.shortDescription && (
+          {descriptionExcerpt && (
             <p className="line-clamp-3 text-sm leading-snug text-muted-foreground">
-              {product.shortDescription}
+              {descriptionExcerpt}
             </p>
           )}
 

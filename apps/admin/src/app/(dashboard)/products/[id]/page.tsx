@@ -57,6 +57,10 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { ThumbnailsUpload } from "@/components/ThumbnailsUpload";
 import { toast } from "react-toastify";
 import { PRODUCT_API } from "@/lib/product-api";
+import {
+  productDescriptionText,
+  shortDescriptionFromFull,
+} from "@/lib/product-description";
 import { DashboardProductEditSkeleton } from "@/components/dashboard-skeletons";
 
 type Category = {
@@ -141,10 +145,8 @@ export default function ProductDetailPage() {
   // Form state
   const [formData, setFormData] = useState<{
     name: string;
-    shortDescription: string;
     description: string;
     nameEn: string;
-    shortDescriptionEn: string;
     descriptionEn: string;
     price: string;
     stock: string;
@@ -161,10 +163,8 @@ export default function ProductDetailPage() {
     isExchangeTurbo: boolean;
   }>({
     name: "",
-    shortDescription: "",
     description: "",
     nameEn: "",
-    shortDescriptionEn: "",
     descriptionEn: "",
     price: "",
     stock: "",
@@ -198,10 +198,8 @@ export default function ProductDetailPage() {
       setCategories(cats);
       setFormData({
         name: data.name || "",
-        shortDescription: data.shortDescription || "",
         description: data.description || "",
         nameEn: data.nameEn || "",
-        shortDescriptionEn: data.shortDescriptionEn || "",
         descriptionEn: data.descriptionEn || "",
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
@@ -285,10 +283,9 @@ export default function ProductDetailPage() {
 
   const handleTranslate = async () => {
     const name = formData.name?.trim();
-    const shortDescription = formData.shortDescription?.trim();
     const description = formData.description?.trim();
-    if (!name && !shortDescription && !description) {
-      toast.error("Fyll i namn, kort beskrivning eller beskrivning först.");
+    if (!name && !description) {
+      toast.error("Fyll i namn eller beskrivning först.");
       return;
     }
     setIsTranslating(true);
@@ -299,7 +296,6 @@ export default function ProductDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || "",
-          shortDescription: shortDescription || "",
           description: description || "",
         }),
       });
@@ -311,7 +307,6 @@ export default function ProductDetailPage() {
       setFormData((prev) => ({
         ...prev,
         nameEn: data.nameEn || "",
-        shortDescriptionEn: data.shortDescriptionEn || "",
         descriptionEn: data.descriptionEn || "",
       }));
       toast.success("Översättning klar!");
@@ -326,9 +321,9 @@ export default function ProductDetailPage() {
 
   const handleSuggestDescription = async () => {
     const name = formData.name?.trim();
-    const shortDescription = formData.shortDescription?.trim();
-    if (!shortDescription) {
-      toast.error("Fyll i kort beskrivning först — AI använder den som underlag.");
+    const description = productDescriptionText(formData.description);
+    if (!description) {
+      toast.error("Fyll i fullständig beskrivning först — AI använder den som underlag.");
       return;
     }
     setIsSuggestingDescription(true);
@@ -339,7 +334,7 @@ export default function ProductDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || "",
-          shortDescription,
+          description: description.slice(0, 4000),
         }),
       });
       if (!res.ok) {
@@ -373,9 +368,8 @@ export default function ProductDetailPage() {
 
   const handleSuggestSpecifications = async () => {
     const name = formData.name?.trim();
-    const shortDescription = formData.shortDescription?.trim();
     const description = formData.description?.trim();
-    if (!name && !shortDescription && !description) {
+    if (!name && !description) {
       toast.error("Fyll i produktnamn eller beskrivning först — AI använder dem som underlag.");
       return;
     }
@@ -385,7 +379,7 @@ export default function ProductDetailPage() {
       const res = await fetch("/api/suggest-specifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, shortDescription, description }),
+        body: JSON.stringify({ name, description }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -467,10 +461,10 @@ export default function ProductDetailPage() {
         },
         body: JSON.stringify({
           name: String(formData.name ?? ""),
-          shortDescription: String(formData.shortDescription ?? ""),
+          shortDescription: shortDescriptionFromFull(formData.description),
           description: String(formData.description ?? ""),
           nameEn: formData.nameEn?.trim() || null,
-          shortDescriptionEn: formData.shortDescriptionEn?.trim() || null,
+          shortDescriptionEn: shortDescriptionFromFull(formData.descriptionEn),
           descriptionEn: formData.descriptionEn?.trim() || null,
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
@@ -648,17 +642,6 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="shortDescription">Kort beskrivning</Label>
-                <Input
-                  id="shortDescription"
-                  name="shortDescription"
-                  value={formData.shortDescription ?? ""}
-                  onChange={handleInputChange}
-                  placeholder="Kort beskrivning för produktlistan"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <Label htmlFor="description" className="mb-0">
                     Fullständig beskrivning
@@ -677,11 +660,12 @@ export default function ProductDetailPage() {
                     )}
                     {isSuggestingDescription
                       ? "Skapar förslag..."
-                      : "Förslag från kort beskrivning"}
+                      : "Förslag utifrån beskrivning"}
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  AI kan fylla i en utökad text utifrån namn och kort beskrivning — granska alltid innan publicering.
+                  AI kan utveckla texten utifrån namn och beskrivning — granska alltid innan publicering.
+                  Korttexten på produktkorten genereras automatiskt från denna beskrivning.
                 </p>
                 <RichTextEditor
                   id="description"
@@ -721,16 +705,6 @@ export default function ProductDetailPage() {
                       value={formData.nameEn}
                       onChange={handleInputChange}
                       placeholder="Product name (English)"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="shortDescriptionEn">Kort beskrivning (engelska)</Label>
-                    <Input
-                      id="shortDescriptionEn"
-                      name="shortDescriptionEn"
-                      value={formData.shortDescriptionEn ?? ""}
-                      onChange={handleInputChange}
-                      placeholder="Short description (English)"
                     />
                   </div>
                   <div className="space-y-2">
@@ -822,7 +796,7 @@ export default function ProductDetailPage() {
             }
             product={{
               name: formData.name,
-              shortDescription: formData.shortDescription,
+              shortDescription: shortDescriptionFromFull(formData.description),
               description: formData.description,
               specifications: formData.specifications
                 .filter((r) => r.label.trim() !== "" && r.value.trim() !== "")

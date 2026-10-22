@@ -40,6 +40,10 @@ import {
   TooltipTrigger,
 } from "@repo/ui/components/tooltip";
 import { PRODUCT_API } from "@/lib/product-api";
+import {
+  productDescriptionText,
+  shortDescriptionFromFull,
+} from "@/lib/product-description";
 
 export type Category = {
   id: number;
@@ -54,13 +58,8 @@ function categoryDisplayName(c: Category): string {
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Produkt namn är obligatoriskt!" }),
-  shortDescription: z
-    .string()
-    .min(1, { message: "Kort beskrivning är obligatoriskt!" })
-    .max(100),
   description: z.string().min(1, { message: "Beskrivning är obligatoriskt!" }),
   nameEn: z.string().optional(),
-  shortDescriptionEn: z.string().max(100).optional(),
   descriptionEn: z.string().optional(),
   price: z.coerce.number().min(0.01, {
     message: "Pris måste vara större än 0!",
@@ -113,10 +112,8 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
       name: "",
-      shortDescription: "",
       description: "",
       nameEn: "",
-      shortDescriptionEn: "",
       descriptionEn: "",
       price: 0,
       stock: 0,
@@ -180,10 +177,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
 
   const handleTranslate = async () => {
     const name = form.getValues("name");
-    const shortDescription = form.getValues("shortDescription");
     const description = form.getValues("description");
-    if (!name?.trim() && !shortDescription?.trim() && !description?.trim()) {
-      setError("Fyll i namn, kort beskrivning eller beskrivning först.");
+    if (!name?.trim() && !description?.trim()) {
+      setError("Fyll i namn eller beskrivning först.");
       return;
     }
     setIsTranslating(true);
@@ -194,7 +190,6 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || "",
-          shortDescription: shortDescription || "",
           description: description || "",
         }),
       });
@@ -204,7 +199,6 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       }
       const data = await res.json();
       form.setValue("nameEn", data.nameEn || "");
-      form.setValue("shortDescriptionEn", data.shortDescriptionEn || "");
       form.setValue("descriptionEn", data.descriptionEn || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ett fel uppstod");
@@ -215,9 +209,8 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
 
   const handleSuggestSpecifications = async () => {
     const name = form.getValues("name")?.trim();
-    const shortDescription = form.getValues("shortDescription")?.trim();
     const description = form.getValues("description")?.trim();
-    if (!name && !shortDescription && !description) {
+    if (!name && !description) {
       setError("Fyll i produktnamn eller beskrivning först — AI använder dem som underlag.");
       return;
     }
@@ -227,7 +220,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
       const res = await fetch("/api/suggest-specifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, shortDescription, description }),
+        body: JSON.stringify({ name, description }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -272,9 +265,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
 
   const handleSuggestDescription = async () => {
     const name = form.getValues("name");
-    const shortDescription = form.getValues("shortDescription");
-    if (!shortDescription?.trim()) {
-      setError("Fyll i kort beskrivning först — AI använder den som underlag.");
+    const description = productDescriptionText(form.getValues("description"));
+    if (!description) {
+      setError("Fyll i fullständig beskrivning först — AI använder den som underlag.");
       return;
     }
     setIsSuggestingDescription(true);
@@ -285,7 +278,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || "",
-          shortDescription: shortDescription || "",
+          description: description.slice(0, 4000),
         }),
       });
       if (!res.ok) {
@@ -326,10 +319,10 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
         },
         body: JSON.stringify({
           name: values.name,
-          shortDescription: values.shortDescription,
+          shortDescription: shortDescriptionFromFull(values.description),
           description: values.description,
           nameEn: values.nameEn || undefined,
-          shortDescriptionEn: values.shortDescriptionEn || undefined,
+          shortDescriptionEn: shortDescriptionFromFull(values.descriptionEn),
           descriptionEn: values.descriptionEn || undefined,
           price: values.price,
           stock: values.stock,
@@ -437,21 +430,6 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
 
         <FormField
           control={form.control}
-          name="shortDescription"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Kort beskrivning</FormLabel>
-              <FormControl>
-                <Input placeholder="Kort beskrivning..." {...field} />
-              </FormControl>
-              <FormDescription>Max 100 tecken</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
@@ -471,11 +449,12 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                   )}
                   {isSuggestingDescription
                     ? "Skapar förslag..."
-                    : "Förslag från kort beskrivning"}
+                    : "Förslag utifrån beskrivning"}
                 </Button>
               </div>
               <FormDescription>
-                AI kan fylla i en utökad text utifrån namn och kort beskrivning — granska alltid innan publicering.
+                AI kan utveckla texten utifrån namn och beskrivning — granska alltid innan publicering.
+                Korttexten på produktkorten genereras automatiskt från denna beskrivning.
               </FormDescription>
               <FormControl>
                 <RichTextEditor
@@ -518,20 +497,6 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
                   <FormControl>
                     <Input placeholder="Product name (English)..." {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="shortDescriptionEn"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Kort beskrivning (engelska)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Short description (English)..." {...field} />
-                  </FormControl>
-                  <FormDescription>Max 100 tecken</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -622,7 +587,7 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
               }}
               product={{
                 name: form.watch("name") ?? "",
-                shortDescription: form.watch("shortDescription") ?? "",
+                shortDescription: shortDescriptionFromFull(form.watch("description")),
                 description: form.watch("description") ?? "",
                 specifications: specifications
                   .filter((r) => r.label.trim() !== "" && r.value.trim() !== "")
