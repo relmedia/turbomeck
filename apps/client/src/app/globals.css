@@ -33,6 +33,28 @@
   }
 }
 
+/* Homepage slider: ticker along the bottom of the hero. The item list is
+   rendered twice and shifted by exactly half the track, so the second copy
+   lands where the first began and the loop has no seam. */
+@keyframes homepage-slider-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.homepage-slider-ticker {
+  animation: homepage-slider-ticker 26s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-slider-ticker {
+    animation: none !important;
+  }
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

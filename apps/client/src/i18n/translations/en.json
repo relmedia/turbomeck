@@ -496,7 +496,12 @@
     "prevSlide": "Previous slide",
     "nextSlide": "Next slide",
     "goToSlide": "Go to slide {{n}}",
-    "position": "{{current}} / {{total}}"
+    "position": "{{current}} / {{total}}",
+    "imageCount": "{{n}} images",
+    "tickerBrand": "Turbomeck · Turbo parts for Saab & Volvo",
+    "tickerShipping": "Fast delivery with PostNord",
+    "tickerPayment": "Secure checkout via Stripe",
+    "tickerExchange": "Exchange turbo · 14-day return"
   },
   "trustBar": {
     "sectionLabel": "Why shop with Turbomeck",

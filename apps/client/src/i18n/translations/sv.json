@@ -496,7 +496,12 @@
     "prevSlide": "Föregående",
     "nextSlide": "Nästa",
     "goToSlide": "Gå till slide {{n}}",
-    "position": "{{current}} / {{total}}"
+    "position": "{{current}} / {{total}}",
+    "imageCount": "{{n}} bilder",
+    "tickerBrand": "Turbomeck · Turbodelar till Saab & Volvo",
+    "tickerShipping": "Snabb leverans med PostNord",
+    "tickerPayment": "Säker betalning via Stripe",
+    "tickerExchange": "Utbytesturbo · 14 dagars retur"
   },
   "trustBar": {
     "sectionLabel": "Varför handla hos Turbomeck",

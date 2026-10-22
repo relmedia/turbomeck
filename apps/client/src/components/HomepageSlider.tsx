@@ -10,6 +10,39 @@ import { useLanguage } from "@/i18n/context";
 import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { ProductType } from "@/types";
 import { ImageWithFallback } from "./ImageWithFallback";
+import { Floating3DParticles } from "@/components/ui/floating-3d-particles";
+
+/**
+ * The hero is dark on purpose, and that is the whole design.
+ *
+ * Every product photo in the catalogue is a transparent cut-out of a bare,
+ * unpainted metal part — turbos, wastegates, housings — in silver-grey cast
+ * iron. On the light grey ground this hero used to have, grey metal sat on grey
+ * background and the silhouette dissolved; the only thing separating the two
+ * was a very heavy drop-shadow, which reads as smudge rather than depth. On a
+ * near-black ground the same photo reads as studio work, with no reshoot.
+ *
+ * Deeper and cooler than `BRAND.inkDeep`, which is tuned for the landing-page
+ * cards sitting on white. Those cards need to stay a panel; this needs to stop
+ * being a panel and become a room, so the part has somewhere to sit.
+ */
+const GROUND =
+  "linear-gradient(115deg, #16181b 0%, #232730 45%, #171a1f 100%)";
+
+/**
+ * One off-centre light, placed where the product sits. It is what keeps the
+ * ground from reading as flat colour. Kept at 10% — a brighter version washed
+ * out the left half of the oversized name behind the part.
+ */
+const SHEEN =
+  "radial-gradient(60% 90% at 70% 36%, rgba(255,255,255,0.10) 0%, transparent 65%)";
+
+/**
+ * The drifting motes take the sheen's colour, not the brand green — they are
+ * lit dust, and dust is the colour of the light falling on it. Green motes read
+ * as decoration stuck on top of the photograph.
+ */
+const PARTICLE_COLOR = "#cfe3f5";
 
 function productSlug(name: string): string {
   return name
@@ -24,6 +57,17 @@ function productSlug(name: string): string {
     || "product";
 }
 
+/**
+ * The display name is split over two lines: a solid first line and an outlined
+ * second one. Two-word names simply get one line — the previous fallback
+ * printed the literal word "TURBO" under every short name, which produced
+ * "BENSINPUMP RACING / TURBO" on a fuel pump.
+ */
+function splitName(name: string): [string, string] {
+  const words = name.split(" ");
+  return [words.slice(0, 2).join(" "), words.slice(2).join(" ")];
+}
+
 function formatPriceKr(price: string | number, locale: "sv" | "en"): string {
   if (typeof price === "number") {
     return `${new Intl.NumberFormat(locale === "en" ? "en-GB" : "sv-SE", {
@@ -31,6 +75,10 @@ function formatPriceKr(price: string | number, locale: "sv" | "en"): string {
     }).format(price)} kr`;
   }
   return String(price);
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
 function useReducedMotion(): boolean {
@@ -47,6 +95,9 @@ function useReducedMotion(): boolean {
 
 const AUTO_ADVANCE_MS = 6000;
 
+/** Sizes hint for the hero shot. */
+const SHOT_SIZES = "(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 600px";
+
 type HomepageSliderProps = {
   /** Server-fetched slider products (same locale as cookie) — avoids client waterfall for LCP */
   initialProducts?: ProductType[];
@@ -59,13 +110,28 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const [products, setProducts] = useState<ProductType[]>(initialProducts);
   const [loading, setLoading] = useState(initialProducts.length === 0);
   const skipHydrationRefetchRef = useRef(initialProducts.length > 0);
-  const [index, setIndex] = useState(0);
+  /**
+   * Position along the track, which is NOT the same as the product index.
+   *
+   * The track carries one extra slide: a copy of the first product pinned to
+   * the end. Advancing off the last product moves one step forward onto that
+   * copy and then silently re-seats the track at the real first slide, which
+   * is pixel-identical, so the loop always travels forwards by one. Without it
+   * the wrap animated from the last slide all the way back to the first,
+   * sweeping the whole catalogue past the viewer in under a second.
+   *
+   * `pos` therefore runs 0..products.length, where products.length is the
+   * clone; `index` is the product actually on screen.
+   */
+  const [pos, setPos] = useState(0);
+  const index = products.length > 0 ? pos % products.length : 0;
   const trackRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const dotRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const prevIndexRef = useRef(0);
   const isFirstRenderRef = useRef(true);
-  const smokeRef = useRef<HTMLDivElement>(null);
+  /** Set when the track has already been placed by hand and must not re-animate. */
+  const silentRef = useRef(false);
   const sliderContainerRef = useRef<HTMLElement>(null);
   const floatTweenRef = useRef<gsap.core.Tween | null>(null);
 
@@ -90,69 +156,66 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       });
   }, [locale]);
 
+  /** Jump straight to a product. Used by the numbered rail, where a jump is
+   *  what the reader asked for. */
   const goTo = useCallback(
     (i: number) => {
       if (products.length === 0) return;
       const next = ((i % products.length) + products.length) % products.length;
+      // Compared against the product on screen rather than the track slot, so
+      // tapping "01" while the trailing clone is showing is correctly a no-op
+      // instead of sweeping the whole track back to the original.
       if (next === index) return;
-      setIndex(next);
+      setPos(next);
     },
     [products.length, index]
   );
 
+  /** One step forward, over the trailing clone when it runs off the end. */
+  const goNext = useCallback(() => {
+    if (products.length <= 1) return;
+    // With motion reduced there is no travel to preserve, so skip the clone
+    // and wrap directly — nothing is animating for the detour to smooth over.
+    setPos((p) => (reducedMotion ? (p + 1) % products.length : p + 1));
+  }, [products.length, reducedMotion]);
+
+  /** One step back. Leaving the first slide is the same problem mirrored: the
+   *  track is re-seated on the clone first, so the move is one step leftwards
+   *  rather than a sweep forwards across everything. */
+  const goPrev = useCallback(() => {
+    if (products.length <= 1) return;
+    if (pos !== 0 || reducedMotion) {
+      setPos((p) => (p === 0 ? products.length - 1 : p - 1));
+      return;
+    }
+    const track = trackRef.current;
+    if (!track) return;
+    const slideWidth = 100 / (products.length + 1);
+    gsap.set(track, { xPercent: -products.length * slideWidth });
+    prevIndexRef.current = products.length;
+    setPos(products.length - 1);
+  }, [pos, products.length, reducedMotion]);
+
   useEffect(() => {
     if (products.length <= 1) return;
-    const id = setInterval(() => goTo(index + 1), AUTO_ADVANCE_MS);
+    const id = setInterval(goNext, AUTO_ADVANCE_MS);
     return () => clearInterval(id);
-  }, [products.length, index, goTo]);
-
-  useEffect(() => {
-    if (reducedMotion || !smokeRef.current || products.length === 0) return;
-    const smokeEls = smokeRef.current.querySelectorAll("[data-smoke]");
-    if (smokeEls.length === 0) return;
-
-    const tweens: gsap.core.Tween[] = [];
-    smokeEls.forEach((smoke, i) => {
-      const xMove = 80 + (i % 4) * 40;
-      const yMove = 40 + (i % 3) * 30;
-      const duration = 12 + i * 3;
-      const t = gsap.fromTo(
-        smoke,
-        { x: 0, y: 0, scale: 1, opacity: 0.5 },
-        {
-          x: i % 2 === 0 ? xMove : -xMove,
-          y: i % 2 === 1 ? yMove : -yMove,
-          scale: 1.3 + (i % 3) * 0.15,
-          opacity: 0.8,
-          duration,
-          ease: "sine.inOut",
-          repeat: -1,
-          yoyo: true,
-          force3D: true,
-        }
-      );
-      tweens.push(t);
-    });
-
-    return () => tweens.forEach((tw) => tw.kill());
-  }, [products.length, reducedMotion]);
+  }, [products.length, pos, goNext]);
 
   // Floating animation for active product image
   useEffect(() => {
     if (reducedMotion || products.length === 0) return;
-    
-    const slideEl = slideRefs.current[index];
+
+    const slideEl = slideRefs.current[pos];
     if (!slideEl) return;
-    
+
     const imgEl = slideEl.querySelector("[data-slide-image]");
     if (!imgEl) return;
 
-    // Kill previous floating animation
     if (floatTweenRef.current) {
       floatTweenRef.current.kill();
     }
 
-    // Create subtle floating animation
     floatTweenRef.current = gsap.to(imgEl, {
       y: -8,
       duration: 2.5,
@@ -166,27 +229,28 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         floatTweenRef.current.kill();
       }
     };
-  }, [index, products.length, reducedMotion]);
+  }, [pos, products.length, reducedMotion]);
 
   // Mouse parallax effect
   useEffect(() => {
     if (reducedMotion || !sliderContainerRef.current || products.length === 0) return;
 
     const container = sliderContainerRef.current;
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      
+
       const mouseX = (e.clientX - centerX) / (rect.width / 2);
       const mouseY = (e.clientY - centerY) / (rect.height / 2);
 
-      const slideEl = slideRefs.current[index];
+      const slideEl = slideRefs.current[pos];
       if (!slideEl) return;
 
       const imgEl = slideEl.querySelector("[data-slide-image]");
       const textEls = slideEl.querySelectorAll("[data-slide-text]");
+      const typeEl = slideEl.querySelector("[data-slide-megatype]");
 
       if (imgEl) {
         gsap.to(imgEl, {
@@ -194,6 +258,17 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
           rotateY: mouseX * 3,
           rotateX: -mouseY * 2,
           duration: 0.6,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+      }
+
+      // The oversized name drifts against the part, which is what sells the
+      // depth between the two layers.
+      if (typeEl) {
+        gsap.to(typeEl, {
+          x: mouseX * -18,
+          duration: 1,
           ease: "power2.out",
           overwrite: "auto",
         });
@@ -210,11 +285,12 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
     };
 
     const handleMouseLeave = () => {
-      const slideEl = slideRefs.current[index];
+      const slideEl = slideRefs.current[pos];
       if (!slideEl) return;
 
       const imgEl = slideEl.querySelector("[data-slide-image]");
       const textEls = slideEl.querySelectorAll("[data-slide-text]");
+      const typeEl = slideEl.querySelector("[data-slide-megatype]");
 
       if (imgEl) {
         gsap.to(imgEl, {
@@ -225,6 +301,10 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
           ease: "power2.out",
           overwrite: "auto",
         });
+      }
+
+      if (typeEl) {
+        gsap.to(typeEl, { x: 0, duration: 1, ease: "power2.out", overwrite: "auto" });
       }
 
       textEls.forEach((el) => {
@@ -244,15 +324,38 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       container.removeEventListener("mousemove", handleMouseMove);
       container.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [index, products.length, reducedMotion]);
+  }, [pos, products.length, reducedMotion]);
 
   useEffect(() => {
     if (!trackRef.current || products.length === 0) return;
 
-    const slideWidth = 100 / products.length;
-    const xPercent = -index * slideWidth;
+    // The clone makes the track one slide longer than the product list.
+    const slideCount = products.length > 1 ? products.length + 1 : products.length;
+    const slideWidth = 100 / slideCount;
+    const xPercent = -pos * slideWidth;
     const prevIndex = prevIndexRef.current;
-    const isTransition = prevIndex !== index;
+    const isTransition = prevIndex !== pos;
+    const isClone = products.length > 1 && pos === products.length;
+
+    /** Put a slide's contents straight into their resting state, no tween. */
+    const settle = (el: Element | null | undefined) => {
+      if (!el) return;
+      gsap.set(el.querySelectorAll("[data-slide-text]"), { opacity: 1, y: 0, x: 0, scale: 1 });
+      const img = el.querySelector("[data-slide-image]");
+      const cta = el.querySelector("[data-slide-cta]");
+      const type = el.querySelector("[data-slide-megatype]");
+      if (img) gsap.set(img, { opacity: 1, scale: 1, rotateY: 0, x: 0 });
+      if (cta) gsap.set(cta, { opacity: 1, y: 0, scale: 1 });
+      if (type) gsap.set(type, { opacity: 1, x: 0 });
+    };
+
+    // Re-seating after the wrap already placed everything; animating again
+    // would play the same slide in twice.
+    if (silentRef.current) {
+      silentRef.current = false;
+      prevIndexRef.current = pos;
+      return;
+    }
 
     if (reducedMotion) {
       gsap.set(trackRef.current, { xPercent });
@@ -261,9 +364,11 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         const textEls = el.querySelectorAll("[data-slide-text]");
         const imgEl = el.querySelector("[data-slide-image]");
         const ctaEl = el.querySelector("[data-slide-cta]");
+        const typeEl = el.querySelector("[data-slide-megatype]");
         gsap.set(textEls, { opacity: 1, y: 0, x: 0 });
         if (imgEl) gsap.set(imgEl, { opacity: 1, scale: 1 });
         if (ctaEl) gsap.set(ctaEl, { opacity: 1, x: 0 });
+        if (typeEl) gsap.set(typeEl, { opacity: 1, x: 0 });
       });
       dotRefs.current.forEach((dot, i) => {
         if (!dot) return;
@@ -272,7 +377,7 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
           track.style.height = i === index ? "32px" : "16px";
         }
       });
-      prevIndexRef.current = index;
+      prevIndexRef.current = pos;
       isFirstRenderRef.current = false;
       return;
     }
@@ -283,6 +388,7 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         const prevTextEls = prevSlideEl.querySelectorAll("[data-slide-text]");
         const prevImgEl = prevSlideEl.querySelector("[data-slide-image]");
         const prevCtaEl = prevSlideEl.querySelector("[data-slide-cta]");
+        const prevTypeEl = prevSlideEl.querySelector("[data-slide-megatype]");
 
         gsap.to(prevTextEls, {
           opacity: 0,
@@ -310,6 +416,13 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
           ease: "power2.inOut",
           overwrite: "auto",
         });
+        gsap.to(prevTypeEl, {
+          opacity: 0,
+          x: -60,
+          duration: 0.6,
+          ease: "power2.inOut",
+          overwrite: "auto",
+        });
       }
     }
 
@@ -318,20 +431,45 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       duration: 0.95,
       ease: "power2.inOut",
       overwrite: "auto",
+      onComplete: isClone
+        ? () => {
+            // Landed on the clone. The real first slide is identical, so
+            // snapping the track back to it is invisible — and it leaves the
+            // next advance as another ordinary step forward.
+            const track = trackRef.current;
+            if (!track) return;
+            gsap.set(track, { xPercent: 0 });
+            settle(slideRefs.current[0]);
+            silentRef.current = true;
+            prevIndexRef.current = 0;
+            setPos(0);
+          }
+        : undefined,
     });
 
-    const slideEl = slideRefs.current[index];
+    const slideEl = slideRefs.current[pos];
     if (slideEl) {
       const textEls = slideEl.querySelectorAll("[data-slide-text]");
       const imgEl = slideEl.querySelector("[data-slide-image]");
       const ctaEl = slideEl.querySelector("[data-slide-cta]");
+      const typeEl = slideEl.querySelector("[data-slide-megatype]");
 
       gsap.set(textEls, { opacity: 0, y: 28, x: -18, scale: 0.98 });
       gsap.set(imgEl, { opacity: 0, scale: 0.92, rotateY: 10, x: 28 });
       gsap.set(ctaEl, { opacity: 0, y: 18, scale: 0.98 });
+      gsap.set(typeEl, { opacity: 0, x: 70 });
 
       const delay = isTransition ? 0.14 : 0.06;
 
+      // The name settles first and slowest, so the part lands on top of it.
+      gsap.to(typeEl, {
+        opacity: 1,
+        x: 0,
+        duration: 1.3,
+        ease: "power3.out",
+        delay,
+        overwrite: "auto",
+      });
       gsap.to(textEls, {
         opacity: 1,
         y: 0,
@@ -375,18 +513,18 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       });
     });
 
-    prevIndexRef.current = index;
+    prevIndexRef.current = pos;
     isFirstRenderRef.current = false;
-  }, [index, products.length, reducedMotion]);
+  }, [pos, index, products.length, reducedMotion]);
 
   if (loading) {
     return (
       <div
-        className="relative mb-12 flex min-h-[300px] w-full overflow-hidden shadow-lg md:min-h-[400px]"
-        style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
+        className="relative flex min-h-[380px] w-full overflow-hidden md:min-h-[460px]"
+        style={{ background: GROUND }}
       >
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-gray-600" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-white/60" />
         </div>
       </div>
     );
@@ -394,9 +532,9 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
 
   if (products.length === 0) {
     return (
-      <div 
-        className="relative mb-12 flex min-h-[300px] w-full overflow-hidden shadow-lg md:min-h-[400px]"
-        style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
+      <div
+        className="relative flex min-h-[380px] w-full overflow-hidden md:min-h-[460px]"
+        style={{ background: GROUND }}
       >
         <div className="relative flex flex-1 items-center justify-center p-8">
           <Image
@@ -404,196 +542,71 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             alt="Featured"
             width={400}
             height={200}
-            className="object-contain opacity-80"
+            className="object-contain opacity-70"
           />
         </div>
       </div>
     );
   }
 
+  /**
+   * The products as laid out on the track: the real list plus a copy of the
+   * first one at the end, which is what lets the wrap travel forwards. Only
+   * worth it when there is more than one product to loop between.
+   */
+  const trackSlides =
+    products.length > 1 && products[0] ? [...products, products[0]] : products;
+
+  const ticker = [
+    t("slider.tickerBrand"),
+    t("slider.tickerShipping"),
+    t("slider.tickerPayment"),
+    t("slider.tickerExchange"),
+  ];
+
   return (
     <section
       ref={sliderContainerRef}
-      className="group/slider relative w-full overflow-hidden border border-b-0 border-gray-200"
+      className="group/slider relative w-full overflow-hidden"
       style={{ perspective: "1000px" }}
       aria-roledescription="carousel"
       aria-label={t("slider.regionLabel")}
     >
-      <div className="relative min-h-[320px] md:min-h-[420px] overflow-hidden">
+      {/* The ticker is part of the frame, so the slides get the height above it. */}
+      <div className="relative min-h-[380px] overflow-hidden pb-8 md:min-h-[460px]">
+        <div className="absolute inset-0 z-0" style={{ background: GROUND }} aria-hidden />
+        <div className="absolute inset-0 z-[1]" style={{ background: SHEEN }} aria-hidden />
 
-        {/* Light textured background */}
-        <div className="absolute inset-0 z-0">
-          {/* Base light gradient */}
-          <div
-            className="absolute inset-0"
-            style={{ background: "linear-gradient(135deg, #f5f5f5 0%, #ebebeb 30%, #f0f0f0 60%, #e8e8e8 100%)" }}
-          />
-          {/* Abstract diagonal lines */}
-          <div
-            className="absolute inset-0 overflow-hidden"
-            aria-hidden
-          >
-            {/* Long diagonal line - top */}
-            <div 
-              className="absolute h-[2px] w-[600px] bg-gradient-to-r from-transparent via-gray-300 to-transparent"
-              style={{ top: "15%", left: "-5%", transform: "rotate(-25deg)" }}
-            />
-            {/* Short accent line */}
-            <div 
-              className="absolute h-[3px] w-[150px] bg-gradient-to-r from-gray-400 to-transparent"
-              style={{ top: "25%", left: "8%", transform: "rotate(-25deg)" }}
-            />
-            {/* Curved arc - right side */}
-            <div 
-              className="absolute h-[400px] w-[400px] rounded-full border-2 border-gray-200"
-              style={{ top: "-20%", right: "-15%", opacity: 0.5 }}
-            />
-            {/* Small circle accent */}
-            <div 
-              className="absolute h-[80px] w-[80px] rounded-full border border-gray-300"
-              style={{ bottom: "20%", left: "5%", opacity: 0.4 }}
-            />
-            {/* Horizontal thin line */}
-            <div 
-              className="absolute h-[1px] w-[200px] bg-gradient-to-r from-transparent via-gray-400 to-transparent"
-              style={{ bottom: "35%", left: "15%" }}
-            />
-            {/* Dotted vertical accent */}
-            <div 
-              className="absolute w-[2px] h-[100px]"
-              style={{ 
-                top: "30%", 
-                right: "25%",
-                backgroundImage: "linear-gradient(to bottom, transparent 50%, rgba(150,150,150,0.3) 50%)",
-                backgroundSize: "2px 8px"
-              }}
-            />
-            {/* Opposing diagonal - bottom right */}
-            <div 
-              className="absolute h-[1px] w-[480px] bg-gradient-to-r from-transparent via-gray-400/60 to-transparent"
-              style={{ bottom: "12%", right: "-8%", transform: "rotate(18deg)" }}
-            />
-            {/* Zigzag band */}
-            <div
-              className="absolute left-[12%] top-[55%] h-12 w-40 opacity-30"
-              style={{
-                backgroundImage: `repeating-linear-gradient(
-                  135deg,
-                  transparent,
-                  transparent 6px,
-                  rgba(120,120,120,0.35) 6px,
-                  rgba(120,120,120,0.35) 7px
-                )`,
-              }}
-            />
-            {/* Ellipse outline */}
-            <div
-              className="absolute rounded-[100%] border border-gray-300/50"
-              style={{ width: "280px", height: "120px", bottom: "8%", right: "12%", transform: "rotate(-8deg)" }}
-            />
-            {/* Parallel hatch - left */}
-            <div
-              className="absolute left-0 top-[40%] h-32 w-24 opacity-25"
-              style={{
-                backgroundImage: `repeating-linear-gradient(
-                  90deg,
-                  transparent,
-                  transparent 11px,
-                  rgba(100,100,100,0.25) 11px,
-                  rgba(100,100,100,0.25) 12px
-                )`,
-              }}
-            />
-            {/* Short perpendicular L-shape */}
-            <div
-              className="absolute border-l-2 border-b-2 border-gray-300/60"
-              style={{ width: "48px", height: "48px", top: "18%", right: "35%" }}
-            />
-            {/* Dashed arc segment (quarter circle stroke) */}
-            <div
-              className="absolute rounded-full border border-dashed border-gray-300/70"
-              style={{ width: "180px", height: "180px", bottom: "-8%", left: "22%", clipPath: "polygon(0 0, 50% 0, 50% 50%, 0 50%)" }}
-            />
-            {/* Thin crossing lines */}
-            <div
-              className="absolute h-[120px] w-[1px] bg-gradient-to-b from-transparent via-gray-400/40 to-transparent"
-              style={{ left: "42%", top: "8%" }}
-            />
-            <div
-              className="absolute h-[1px] w-[160px] bg-gradient-to-r from-gray-400/30 to-transparent"
-              style={{ left: "38%", top: "22%" }}
-            />
-            {/* Stepped / broken line */}
-            <div
-              className="absolute opacity-35"
-              style={{
-                top: "65%",
-                right: "8%",
-                width: "120px",
-                height: "3px",
-                background: `repeating-linear-gradient(
-                  90deg,
-                  rgba(90,90,90,0.45) 0px,
-                  rgba(90,90,90,0.45) 14px,
-                  transparent 14px,
-                  transparent 22px
-                )`,
-                transform: "rotate(-12deg)",
-              }}
-            />
-            {/* Soft grid fragment */}
-            <div
-              className="absolute right-[5%] top-[12%] h-24 w-24 opacity-20"
-              style={{
-                backgroundImage: `
-                  linear-gradient(0deg, rgba(130,130,130,0.4) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(130,130,130,0.4) 1px, transparent 1px)
-                `,
-                backgroundSize: "10px 10px",
-              }}
-            />
-          </div>
-        </div>
+        {/* Fine motes turning slowly through the lit volume, behind the part.
+            Deliberately far below the component's defaults (400 particles at
+            5px and 0.3 opacity): at those values it reads as falling snow over
+            a shop, which is the same mistake the smoke pass made. At this
+            density you do not consciously see particles — the hero just stops
+            looking like a flat panel and starts looking like air with depth in
+            it. `depth` is high rather than low precisely because the parallax
+            between near and far motes is the part that does that work.
+            The component pauses itself off-screen and when the tab is hidden,
+            and paints one static frame under `prefers-reduced-motion`. */}
+        <Floating3DParticles
+          className="z-[3]"
+          quantity={260}
+          color={PARTICLE_COLOR}
+          size={2.2}
+          opacity={0.45}
+          drift={0.22}
+          depth={0.85}
+        />
 
-        {/* Subtle ambient shadows */}
-        <div
-          ref={smokeRef}
-          className="pointer-events-none absolute inset-0 z-[2] overflow-hidden"
-          aria-hidden
-        >
-          <div
-            data-smoke
-            className="absolute left-[10%] top-[40%] h-48 w-64 rounded-full will-change-transform opacity-20"
-            style={{
-              background: "radial-gradient(ellipse at center, rgba(0,0,0,0.08) 0%, transparent 70%)",
-              filter: "blur(40px)",
-            }}
-          />
-          <div
-            data-smoke
-            className="absolute right-[20%] bottom-[30%] h-56 w-72 rounded-full will-change-transform opacity-15"
-            style={{
-              background: "radial-gradient(ellipse at center, rgba(0,0,0,0.06) 0%, transparent 70%)",
-              filter: "blur(50px)",
-            }}
-          />
-        </div>
 
-        {products.length > 1 && (
-          <p
-            className="pointer-events-none absolute left-14 top-5 z-30 text-[11px] font-medium tabular-nums tracking-wider text-gray-400 md:left-20 md:top-6"
-            aria-live="polite"
-          >
-            {String(index + 1).padStart(2, "0")} / {String(products.length).padStart(2, "0")}
-          </p>
-        )}
-
+        {/* Positioned and lifted deliberately: GSAP writes a transform here, which
+            makes the track its own stacking context painted at z-index 0, and the
+            ground and sheen above would otherwise cover the slides. */}
         <div
           ref={trackRef}
           className="relative z-10 flex"
-          style={{ width: `${products.length * 100}%` }}
+          style={{ width: `${trackSlides.length * 100}%` }}
         >
-          {products.map((product, i) => {
+          {trackSlides.map((product, i) => {
             const imgSrc = product.galleryImages?.[0] || product.images?.default || "/logo.svg";
             const slug = product.slug || productSlug(product.name) || String(product.id);
             const href = `/products/${slug}`;
@@ -602,64 +615,93 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
                 ? displayPrice(product.price)
                 : formatPriceKr(product.price, locale);
             const shortDesc = product.shortDescription?.trim() || product.description?.slice(0, 120);
+            const [line1, line2] = splitName(product.name);
+            const imageCount = product.galleryImages?.length ?? 0;
 
             return (
               <div
-                key={product.id}
+                key={`${product.id}-${i}`}
                 ref={(el) => { slideRefs.current[i] = el; }}
                 className="flex flex-shrink-0"
-                style={{ width: `${100 / products.length}%` }}
+                style={{ width: `${100 / trackSlides.length}%` }}
               >
                 <Link
                   href={href}
-                  className="flex min-h-[320px] w-full focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-100 md:min-h-[420px]"
+                  className="flex min-h-[380px] w-full focus-visible:ring-2 focus-visible:ring-[rgb(110,201,0)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#16181b] md:min-h-[460px]"
                 >
                   <div className="relative flex w-full flex-col md:flex-row">
+                    {/* The name, oversized and hollow, running behind the part.
+                        Outline only — a filled version at this size fights the
+                        headline instead of sitting behind it. */}
+                    <span
+                      data-slide-megatype
+                      aria-hidden
+                      className="pointer-events-none absolute left-[-2%] top-1/2 z-[4] hidden -translate-y-1/2 whitespace-nowrap font-black italic uppercase leading-[0.8] tracking-[-0.045em] sm:block"
+                      style={{
+                        fontSize: "clamp(70px, 13vw, 168px)",
+                        WebkitTextStroke: "1.5px rgba(255,255,255,0.14)",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                    >
+                      {line1}
+                    </span>
+
                     {/* Left content */}
-                    <div className="relative flex flex-1 flex-col justify-center px-6 py-8 md:max-w-[55%] md:pl-10 md:pr-0 md:py-10 lg:pl-14">
-                      <h2 data-slide-text className="flex flex-col gap-1">
-                        <span 
-                          className="text-3xl font-black uppercase italic leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl"
-                          style={{
-                            textShadow: "3px 3px 0 rgba(0,0,0,0.15), 5px 5px 0 rgba(0,0,0,0.08)",
-                          }}
-                        >
-                          {product.name.split(" ").slice(0, 2).join(" ")}
+                    <div className="relative z-[12] flex flex-1 flex-col justify-center px-6 py-10 md:max-w-[52%] md:py-12 md:pl-10 md:pr-0 lg:pl-14">
+                      <p
+                        data-slide-text
+                        className="mb-4 flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-white/40"
+                      >
+                        <span className="text-[rgb(110,201,0)]">
+                          {pad((i % products.length) + 1)}
                         </span>
-                        <span 
-                          className="text-2xl font-black uppercase italic leading-none tracking-tight md:text-4xl lg:text-5xl"
-                          style={{
-                            WebkitTextStroke: "1.5px #1a1a1a",
-                            WebkitTextFillColor: "transparent",
-                            textShadow: "2px 2px 0 rgba(0,0,0,0.05)",
-                          }}
-                        >
-                          {product.name.split(" ").slice(2).join(" ") || "TURBO"}
+                        <span>/ {pad(products.length)}</span>
+                        <span className="block h-px w-8 bg-current opacity-45" aria-hidden />
+                        <span>
+                          {imageCount > 1
+                            ? t("slider.imageCount", { n: imageCount })
+                            : t("slider.featured")}
                         </span>
+                      </p>
+
+                      <h2 data-slide-text className="flex flex-col gap-0.5">
+                        <span className="text-3xl font-black uppercase italic leading-[0.96] tracking-tight text-white md:text-4xl lg:text-[46px]">
+                          {line1}
+                        </span>
+                        {line2 && (
+                          <span
+                            className="text-2xl font-black uppercase italic leading-none tracking-tight md:text-3xl lg:text-[38px]"
+                            style={{
+                              WebkitTextStroke: "1.5px rgba(255,255,255,0.5)",
+                              WebkitTextFillColor: "transparent",
+                            }}
+                          >
+                            {line2}
+                          </span>
+                        )}
                       </h2>
-                      
+
+                      {/* Clamped because the copy is admin-authored and runs
+                          anywhere from one line to a paragraph; unclamped, a
+                          long one pushes the CTA down and sits on top of the
+                          oversized name behind it. */}
                       {shortDesc && (
                         <p
                           data-slide-text
-                          className="mt-5 max-w-sm text-xs italic leading-relaxed text-gray-500 md:mt-6 md:text-sm"
+                          className="mt-5 line-clamp-3 max-w-sm text-xs leading-relaxed text-white/60 md:mt-6 md:text-sm"
                         >
                           {shortDesc}
                         </p>
                       )}
-                      
-                      <div data-slide-text className="mt-6 flex flex-wrap items-center gap-5 md:mt-8">
+
+                      <div data-slide-text className="mt-7 flex flex-wrap items-center gap-5 md:mt-8">
                         <span
                           data-slide-cta
-                          className="group/btn relative isolate inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-md bg-gray-900 px-7 py-3 text-sm font-semibold uppercase tracking-wider text-white ring-1 ring-white/0 transition-all duration-300 ring-offset-2 ring-offset-gray-100 hover:-translate-y-0.5 hover:ring-white/15 hover:shadow-lg hover:shadow-gray-900/25 active:translate-y-0 active:scale-[0.99] md:px-8 md:py-3.5"
+                          className="group/btn relative isolate inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-md bg-white px-7 py-3 text-sm font-semibold uppercase tracking-wider text-[#16181b] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 active:translate-y-0 active:scale-[0.99] md:px-8 md:py-3.5"
                         >
-                          {/* Brand tint */}
-                          <span
-                            className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-br from-[rgb(110,201,0)]/0 via-[rgb(110,201,0)]/12 to-[rgb(110,201,0)]/0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100"
-                            aria-hidden
-                          />
                           {/* Shimmer sweep */}
                           <span className="pointer-events-none absolute inset-0 z-[1] overflow-hidden rounded-md" aria-hidden>
-                            <span className="absolute inset-y-0 -left-1/3 w-1/2 -translate-x-full skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-[320%]" />
+                            <span className="absolute inset-y-0 -left-1/3 w-1/2 -translate-x-full skew-x-[-18deg] bg-gradient-to-r from-transparent via-black/10 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-[320%]" />
                           </span>
                           <span className="relative z-[2]">{t("account.shopNow")}</span>
                           <ArrowRight
@@ -668,19 +710,32 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
                             aria-hidden
                           />
                         </span>
-                        <span className="text-xl font-bold tabular-nums tracking-tight text-gray-900 md:text-2xl">
+                        <span className="text-xl font-bold tabular-nums tracking-tight text-white md:text-2xl">
                           {priceStr}
                         </span>
                       </div>
                     </div>
 
                     {/* Right image */}
-                    <div className="relative flex min-h-[240px] flex-1 items-center justify-start px-2 pb-6 pt-0 md:min-h-0 md:pl-0 md:pr-8 md:py-4" style={{ perspective: "800px" }}>
+                    <div
+                      className="relative z-10 flex min-h-[240px] flex-1 items-center justify-center px-4 pb-8 pt-0 md:min-h-0 md:py-6 md:pl-0 md:pr-12"
+                      style={{ perspective: "800px" }}
+                    >
                       <div
                         data-slide-image
-                        className="relative z-10 h-full w-full min-h-[220px] md:min-h-[380px]"
+                        className="relative h-full w-full min-h-[230px] md:min-h-[380px]"
                         style={{ transformStyle: "preserve-3d" }}
                       >
+                        {/* Contact shadow: the part is lit from above, so it has to
+                            cast something onto the ground or it floats. */}
+                        <span
+                          aria-hidden
+                          className="absolute bottom-[12%] left-1/2 z-[1] h-6 w-[54%] -translate-x-1/2 rounded-[50%]"
+                          style={{
+                            background: "radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 72%)",
+                            filter: "blur(9px)",
+                          }}
+                        />
                         <ImageWithFallback
                           src={imgSrc}
                           alt=""
@@ -689,9 +744,9 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
                           fetchPriority={i === 0 ? "high" : "low"}
                           className="relative z-10 object-contain object-center transition-transform duration-700 ease-out group-hover/slider:scale-[1.04]"
                           style={{
-                            filter: "drop-shadow(0 10px 30px rgba(0,0,0,0.6)) drop-shadow(0 30px 60px rgba(0,0,0,0.4))",
+                            filter: "drop-shadow(0 28px 36px rgba(0,0,0,0.68))",
                           }}
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 600px"
+                          sizes={SHOT_SIZES}
                         />
                       </div>
                     </div>
@@ -701,93 +756,103 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             );
           })}
         </div>
+
+        {products.length > 1 && (
+          <>
+            {/* Arrow navigation - bottom right, appears on hover */}
+            <div className="absolute bottom-6 right-16 z-40 flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/slider:opacity-100 md:right-20">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  goPrev();
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/[0.07] text-white/80 backdrop-blur-sm transition-all duration-200 hover:border-[rgb(110,201,0)] hover:bg-[rgb(110,201,0)] hover:text-[#10230a] active:scale-95"
+                aria-label={t("slider.prevSlide")}
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  goNext();
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/[0.07] text-white/80 backdrop-blur-sm transition-all duration-200 hover:border-[rgb(110,201,0)] hover:bg-[rgb(110,201,0)] hover:text-[#10230a] active:scale-95"
+                aria-label={t("slider.nextSlide")}
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* Vertical timeline + slide indicators */}
+            <div className="absolute right-4 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center md:right-6">
+              {products.map((_, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  {i > 0 && (
+                    <div className="h-3 w-px bg-gradient-to-b from-white/10 to-white/20" aria-hidden />
+                  )}
+                  <button
+                    ref={(el) => { dotRefs.current[i] = el; }}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      goTo(i);
+                    }}
+                    className="group/dot flex items-center gap-2 py-0.5"
+                    aria-label={t("slider.goToSlide", { n: i + 1 })}
+                    aria-current={i === index ? "true" : undefined}
+                  >
+                    <span
+                      className="font-mono text-[11px] tabular-nums transition-all duration-300"
+                      style={{
+                        color: i === index ? "rgb(110, 201, 0)" : "rgba(255,255,255,0.32)",
+                      }}
+                    >
+                      {pad(i + 1)}
+                    </span>
+                    <span
+                      data-dot-track
+                      className="relative block w-[3px] overflow-hidden rounded-full bg-white/20"
+                      style={{ height: i === index ? 32 : 16 }}
+                    >
+                      {i === index && reducedMotion && (
+                        <span
+                          className="absolute inset-0 rounded-full bg-[rgb(110,201,0)]"
+                          style={{ boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)" }}
+                        />
+                      )}
+                      {i === index && !reducedMotion && (
+                        <span
+                          key={index}
+                          className="absolute inset-0 origin-top rounded-full bg-[rgb(110,201,0)]"
+                          style={{
+                            animation: `homepage-slider-timeline-fill ${AUTO_ADVANCE_MS}ms linear forwards`,
+                            boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)",
+                          }}
+                        />
+                      )}
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {products.length > 1 && (
-        <>
-          {/* Arrow navigation - bottom right, appears on hover */}
-          <div className="absolute bottom-6 right-16 z-40 flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/slider:opacity-100 md:bottom-8 md:right-20">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                goTo(index - 1);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-all duration-200 hover:bg-gray-900 hover:text-white hover:border-gray-900 active:scale-95"
-              aria-label={t("slider.prevSlide")}
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden strokeWidth={2.5} />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                goTo(index + 1);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 shadow-sm transition-all duration-200 hover:bg-gray-900 hover:text-white hover:border-gray-900 active:scale-95"
-              aria-label={t("slider.nextSlide")}
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden strokeWidth={2.5} />
-            </button>
-          </div>
-          {/* Vertical timeline + slide indicators */}
-          <div className="absolute right-4 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center md:right-6">
-            {products.map((_, i) => (
-              <div key={i} className="flex flex-col items-center">
-                {i > 0 && (
-                  <div
-                    className="h-3 w-px bg-gradient-to-b from-gray-300/50 to-gray-300/80"
-                    aria-hidden
-                  />
-                )}
-                <button
-                  ref={(el) => { dotRefs.current[i] = el; }}
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    goTo(i);
-                  }}
-                  className="group/dot flex items-center gap-2 py-0.5"
-                  aria-label={t("slider.goToSlide", { n: i + 1 })}
-                  aria-current={i === index ? "true" : undefined}
-                >
-                  <span
-                    className="text-xs font-medium tabular-nums transition-all duration-300"
-                    style={{
-                      color: i === index ? "rgb(110, 201, 0)" : "rgba(0,0,0,0.25)",
-                    }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span
-                    data-dot-track
-                    className="relative block w-[3px] overflow-hidden rounded-full bg-black/12"
-                    style={{ height: i === index ? 32 : 16 }}
-                  >
-                    {i === index && reducedMotion && (
-                      <span
-                        className="absolute inset-0 rounded-full bg-[rgb(110,201,0)]"
-                        style={{ boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)" }}
-                      />
-                    )}
-                    {i === index && !reducedMotion && (
-                      <span
-                        key={index}
-                        className="absolute inset-0 origin-top rounded-full bg-[rgb(110,201,0)]"
-                        style={{
-                          animation: `homepage-slider-timeline-fill ${AUTO_ADVANCE_MS}ms linear forwards`,
-                          boxShadow: "0 2px 8px rgba(110, 201, 0, 0.4)",
-                        }}
-                      />
-                    )}
-                  </span>
-                </button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
+      {/* Ticker. Every claim here is one the TrustBar directly below already
+          makes, so the two can't drift apart. The list is rendered twice and
+          translated by exactly -50%, which is what makes the loop seamless. */}
+      <div className="absolute inset-x-0 bottom-0 z-20 flex h-8 items-center overflow-hidden bg-[rgb(110,201,0)]">
+        <div className="homepage-slider-ticker flex gap-10 whitespace-nowrap pl-10 font-mono text-[10.5px] font-medium uppercase tracking-[0.24em] text-[#10230a]">
+          {[...ticker, ...ticker].map((item, i) => (
+            <span key={i} aria-hidden={i >= ticker.length}>
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

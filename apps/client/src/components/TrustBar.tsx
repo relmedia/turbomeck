@@ -12,18 +12,18 @@ import { BRAND } from "@/lib/brand";
  * `tabular-nums` indices echoing the 01/02/03 slide counters — and sits flush
  * against it, forming the hero's plinth.
  *
- * Flush means the two must not both draw an edge there: the hero carries
- * `border-b-0` and this section's top border is the single hairline between
- * them. The elevation lives on the wrapper in `app/page.tsx` so one shadow
- * surrounds the pair instead of each casting onto the other.
+ * The hero draws no border of its own — a grey hairline around a near-black
+ * panel reads as a mistake — so this section's own border is the single edge
+ * between them. The elevation lives on the wrapper in `app/page.tsx` so one
+ * shadow surrounds the pair instead of each casting onto the other.
  *
- * Colour comes from the logo, not from the colour wheel: icons sit in a green
- * tint on white, and the hover rule is the same green. Four unrelated hues read
- * as decoration; one brand colour used consistently reads as a system — and it
- * is the colour customers already associate with the shop.
+ * Colour comes from the logo, not from the colour wheel: the hover rule and
+ * icon accents use the brand green, with the wordmark charcoal reserved for
+ * text.
  *
- * Light palette on purpose — the hero is light in both themes and this sits
- * directly under it.
+ * Light palette on purpose, and now for the opposite reason to before: the hero
+ * above is near-black, so a white strip reads as the lit shelf the dark panel
+ * stands on. It is also the hand-off back to the light page below.
  *
  * Every claim maps to behaviour that exists in the code, so the page can't
  * drift from the product:
@@ -57,7 +57,7 @@ export function TrustBar() {
             className="group/trust relative flex items-start gap-3.5 px-5 py-5 transition-colors duration-300 md:px-6 md:py-6"
             style={{ background: "#ffffff" }}
           >
-            {/* Logo-green rule, wiping in on hover. */}
+            {/* Brand-green rule wiping in on hover. */}
             <span
               className="pointer-events-none absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 ease-out group-hover/trust:scale-x-100"
               style={{ backgroundColor: BRAND.green }}
