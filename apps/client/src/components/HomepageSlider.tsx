@@ -390,23 +390,21 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         const prevCtaEl = prevSlideEl.querySelector("[data-slide-cta]");
         const prevTypeEl = prevSlideEl.querySelector("[data-slide-megatype]");
 
+        // Text leaves the way it arrives: opacity only, no travel.
         gsap.to(prevTextEls, {
           opacity: 0,
-          y: -16,
-          x: -10,
-          scale: 0.98,
-          duration: 0.55,
-          stagger: 0.04,
+          duration: 0.45,
+          stagger: 0.03,
           ease: "power2.inOut",
           overwrite: "auto",
         });
+        // The image continues left, so the outgoing and incoming parts read as
+        // one movement across the frame rather than two unrelated ones.
         gsap.to(prevImgEl, {
           opacity: 0,
-          scale: 0.92,
-          rotateY: -8,
-          x: -22,
+          x: -110,
           duration: 0.6,
-          ease: "power2.inOut",
+          ease: "power2.in",
           overwrite: "auto",
         });
         gsap.to(prevCtaEl, {
@@ -418,8 +416,7 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         });
         gsap.to(prevTypeEl, {
           opacity: 0,
-          x: -60,
-          duration: 0.6,
+          duration: 0.5,
           ease: "power2.inOut",
           overwrite: "auto",
         });
@@ -454,40 +451,47 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       const ctaEl = slideEl.querySelector("[data-slide-cta]");
       const typeEl = slideEl.querySelector("[data-slide-megatype]");
 
-      gsap.set(textEls, { opacity: 0, y: 28, x: -18, scale: 0.98 });
-      gsap.set(imgEl, { opacity: 0, scale: 0.92, rotateY: 10, x: 28 });
+      /**
+       * Text fades, image slides.
+       *
+       * The x/y/scale resets are not decoration: the mouse-parallax effect
+       * writes x and y onto these same elements, so a slide entering without
+       * them would inherit whatever offset the pointer last left behind and
+       * fade in visibly off-centre.
+       */
+      gsap.set(textEls, { opacity: 0, x: 0, y: 0, scale: 1 });
+      gsap.set(typeEl, { opacity: 0, x: 0, y: 0 });
+      gsap.set(imgEl, { opacity: 0, x: 110, y: 0, scale: 1, rotateY: 0 });
       gsap.set(ctaEl, { opacity: 0, y: 18, scale: 0.98 });
-      gsap.set(typeEl, { opacity: 0, x: 70 });
 
       const delay = isTransition ? 0.14 : 0.06;
 
-      // The name settles first and slowest, so the part lands on top of it.
+      // The name comes up first and slowest, so the part lands on top of it.
       gsap.to(typeEl, {
         opacity: 1,
-        x: 0,
-        duration: 1.3,
-        ease: "power3.out",
+        duration: 1.1,
+        ease: "power2.out",
         delay,
         overwrite: "auto",
       });
       gsap.to(textEls, {
         opacity: 1,
-        y: 0,
-        x: 0,
-        scale: 1,
-        duration: 0.88,
+        duration: 0.8,
         stagger: 0.07,
         ease: "power2.out",
         delay,
         overwrite: "auto",
       });
+      /**
+       * "auto" overwrites per PROPERTY, not per target, so this tween taking
+       * over x and opacity leaves the looping float on y alone — the image
+       * keeps breathing while it slides in.
+       */
       gsap.to(imgEl, {
         opacity: 1,
-        scale: 1,
-        rotateY: 0,
         x: 0,
-        duration: 1,
-        ease: "sine.out",
+        duration: 1.05,
+        ease: "power3.out",
         delay: delay + 0.04,
         overwrite: "auto",
       });
