@@ -74,6 +74,10 @@ type OrderDetail = {
   total: number;
   /** Currency the order was charged in; absent on pre-multi-currency orders. */
   currency?: string;
+  /** `domestic` | `eu_b2c` | `export_zero_rated`; null on pre-0026 orders. */
+  vatTreatment?: string | null;
+  vatRate?: number | null;
+  vatAmount?: number | null;
   depositAmount?: number;
   balanceDue?: number;
   commitsCoreReturnWithin14?: boolean | null;
@@ -1499,10 +1503,55 @@ export default function OrderDetailPage() {
                 <span className="text-muted-foreground">Delsumma</span>
                 <span>{formatCurrency(order.subtotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Moms (25%)</span>
-                <span>{formatCurrency((order.subtotal + order.shipping) * 0.2)}</span>
-              </div>
+              {(() => {
+                /**
+                 * VAT as charged, not as assumed.
+                 *
+                 * This was `(subtotal + shipping) * 0.2` with no country
+                 * branch, so a Norwegian order showed Swedish VAT it never
+                 * carried — and staff reconciling against Stripe saw a figure
+                 * that existed nowhere in the payment.
+                 *
+                 * Orders placed before migration 0026 have no stored value, so
+                 * they fall back to the old arithmetic rather than showing a
+                 * blank: for a Swedish order that is exactly what was charged.
+                 */
+                const isExport = order.vatTreatment === "export_zero_rated";
+                const rate = order.vatRate ?? 0.25;
+                const amount =
+                  order.vatAmount ?? (order.subtotal + order.shipping) * 0.2;
+                const label = `Moms (${Math.round(rate * 100)}%)`;
+
+                if (isExport) {
+                  return (
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground">Moms</span>
+                      <span className="text-right">
+                        <span className="font-medium">0 {order.currency ?? "SEK"}</span>
+                        <span className="mt-0.5 block text-[11px] leading-tight text-amber-700 dark:text-amber-500">
+                          Export utanför EU — ingen svensk moms.
+                          <br />
+                          Mottagaren betalar importmoms och tull vid leverans.
+                        </span>
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {label}
+                      {order.vatAmount == null && (
+                        <span className="ml-1 text-[10px] text-muted-foreground/70">
+                          (beräknad)
+                        </span>
+                      )}
+                    </span>
+                    <span>{formatCurrency(amount)}</span>
+                  </div>
+                );
+              })()}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Frakt</span>
                 <span>{formatCurrency(order.shipping)}</span>

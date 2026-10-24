@@ -244,6 +244,20 @@ export async function GET(
       currency: normalizeCurrency(
         (order as { currency?: string | null }).currency,
       ),
+      /**
+       * VAT as it was charged, read from the order rather than recomputed.
+       * The summary used to derive it as `(subtotal + shipping) * 0.2`, which
+       * invents Swedish VAT on an export to outside the EU.
+       */
+      vatTreatment: (order as { vatTreatment?: string | null }).vatTreatment ?? null,
+      vatRate:
+        (order as { vatRate?: string | null }).vatRate != null
+          ? Number((order as { vatRate?: string | null }).vatRate)
+          : null,
+      vatAmount:
+        (order as { vatAmount?: string | null }).vatAmount != null
+          ? Number((order as { vatAmount?: string | null }).vatAmount)
+          : null,
       depositAmount:
         order.depositAmount != null ? Number(order.depositAmount) : undefined,
       balanceDue: order.balanceDue != null ? Number(order.balanceDue) : undefined,
