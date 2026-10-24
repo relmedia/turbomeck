@@ -556,21 +556,27 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             at 1 spreads the near and far particles furthest apart, which is
             what actually sells them as being *behind* something.
 
-            0.36/1.9 rather than lower: at 0.26/1.7 they receded so far they
-            stopped being atmosphere and became invisible, which is a different
-            mistake from the one being fixed.
-
             drift is positive = upward (the component subtracts it from y) and
             goes from 0.22, which was almost static, to a rise you can see.
             Particles leaving the top respawn at the bottom, so the field reads
-            as rising from below rather than drifting in place. */}
+            as rising from below rather than drifting in place.
+
+            The canvas is narrowed to the right 62% from md up, so the field
+            sits behind the product rather than spread across the whole hero —
+            it draws radially from the canvas centre, so shrinking the canvas
+            is what re-centres the field on the part. Only from md: below that
+            the layout stacks the image under the text and a right-biased
+            field would sit nowhere near it.
+
+            Note `depth` is clamped to 0–1 by the component, so values above 1
+            behave exactly as 1. */}
         <Floating3DParticles
-          className="z-[2]"
-          quantity={260}
+          className="z-[2] md:left-auto md:right-0 md:w-[62%]"
+          quantity={360}
           color={PARTICLE_COLOR}
-          size={2.5}
+          size={3.5}
           opacity={0.36}
-          drift={0.75}
+          drift={0.9}
           depth={1}
         />
 
