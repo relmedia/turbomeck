@@ -248,6 +248,22 @@ export const orders = pgTable("orders", {
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0").notNull(),
   total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+  /**
+   * How this sale was treated for VAT: `domestic` | `eu_b2c` |
+   * `export_zero_rated`.
+   *
+   * Stored because it is a fact about the sale, not something to re-derive.
+   * Every VAT figure shown to a customer or to staff used to be recomputed as
+   * `total * 0.2` — correct only for a 25%-inclusive Swedish price, and it
+   * invented Swedish VAT on a Norwegian export that carries none. The
+   * confirmation email for the one real Norwegian order printed
+   * "Varav moms (25%)" in NOK.
+   */
+  vatTreatment: text("vat_treatment").default("domestic").notNull(),
+  /** Rate actually charged: 0.25 domestic and EU B2C, 0 on a zero-rated export. */
+  vatRate: decimal("vat_rate", { precision: 5, scale: 4 }).default("0.2500").notNull(),
+  /** VAT contained in `total`, in `currency`. Zero on an export. */
+  vatAmount: decimal("vat_amount", { precision: 12, scale: 2 }).default("0").notNull(),
   status: text("status").default("confirmed").notNull(), // confirmed, deposit_paid, shipped, delivered, cancelled, completed, partially_refunded, refunded
   /** Deposit flow: amount paid upfront (SEK); null for full-payment orders */
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),

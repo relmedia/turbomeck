@@ -171,6 +171,14 @@ const CartPage: React.FC = () => {
     shipping: number;
     discount: number;
     coreKeepFeeSek: number;
+    /**
+     * VAT as the server actually priced it. The cart used to derive this as
+     * `total * 0.2`, which invents Swedish VAT on an export to outside the EU
+     * — a Norwegian customer saw "Moms (25%)" on a sale that carries none and
+     * then paid Norwegian import VAT on top.
+     */
+    vatAmount?: number;
+    vatTreatment?: string;
     total: number;
   } | null>(null);
 
@@ -621,18 +629,28 @@ const CartPage: React.FC = () => {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("cart.vat")}</span>
-                <span className="font-medium">
-                  {money(
-                    Math.round(
-                      ((quote?.total ?? amountToCharge) -
-                        (quote?.coreKeepFeeSek ?? coreKeepFeeApplied)) *
-                        0.2,
-                    ),
-                  )}
-                </span>
-              </div>
+              {quote?.vatTreatment === "export_zero_rated" ? (
+                /* An export shows no VAT row and says why. A "0 kr" row reads
+                   as a bug, and saying nothing at all leaves the customer to
+                   discover the import charges at the door. */
+                <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-500">
+                  {t("cart.exportVatNotice")}
+                </p>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t("cart.vat")}</span>
+                  <span className="font-medium">
+                    {money(
+                      quote?.vatAmount ??
+                        Math.round(
+                          ((quote?.total ?? amountToCharge) -
+                            (quote?.coreKeepFeeSek ?? coreKeepFeeApplied)) *
+                            0.2,
+                        ),
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between font-semibold text-base pt-1">
                 <span>{t("cart.total")}</span>
                 <span>{money(quote?.total ?? amountToCharge)}</span>

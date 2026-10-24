@@ -487,7 +487,8 @@
     "sizeLabel": "Storlek",
     "createAccountOffer": "Skapa ett konto åt mig",
     "createAccountOfferDesc": "Vi mailar en inloggningslänk. Då sparas din adress och dina ordrar.",
-    "createAccountTerms": "Jag godkänner köpvillkoren och integritetspolicyn"
+    "createAccountTerms": "Jag godkänner köpvillkoren och integritetspolicyn",
+    "exportVatNotice": "Priset är utan svensk moms eftersom varan exporteras. Tull, moms och PostNords förtullningsavgift tillkommer och betalas vid leverans."
   },
   "slider": {
     "regionLabel": "Utvalda produkter",

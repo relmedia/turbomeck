@@ -1587,6 +1587,9 @@ app.post("/api/checkout-quote", async (req, res) => {
       discount: priced.discount,
       shipping: priced.shipping,
       coreKeepFeeSek: priced.coreKeepFeeSek,
+      vatTreatment: priced.vatTreatment,
+      vatRate: priced.vatRate,
+      vatAmount: priced.vatAmount,
       total: priced.total,
     });
   } catch (error) {
@@ -1738,6 +1741,11 @@ async function persistOrder({
         shippingCost: String(priced.shipping),
         discount: String(priced.discount),
         total: String(priced.total),
+        // Stored with the money it describes, so no later screen has to guess
+        // whether this sale carried Swedish VAT.
+        vatTreatment: priced.vatTreatment,
+        vatRate: String(priced.vatRate),
+        vatAmount: String(priced.vatAmount),
         depositAmount: null,
         balanceDue: null,
         commitsCoreReturnWithin14: priced.commitsCoreReturnWithin14,
@@ -1842,6 +1850,8 @@ async function persistOrder({
     shippingCost: priced.shipping,
     discount: priced.discount,
     total: priced.total,
+    vatAmount: priced.vatAmount,
+    vatTreatment: priced.vatTreatment,
     trackingId: body.postNordTrackingId,
     locale: body.locale,
     paymentMethodDisplay,

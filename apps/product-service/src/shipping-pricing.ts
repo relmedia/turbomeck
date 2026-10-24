@@ -18,4 +18,9 @@ export {
   getPostpaketPrice,
   getShippingPrice,
   isOversize,
+  priceExcludingVat,
+  vatFromGross,
+  vatRateForCountry,
+  vatTreatmentForCountry,
+  type VatTreatment,
 } from "@repo/shipping";

@@ -295,6 +295,16 @@ type OrderEmailData = {
   shippingCost: number;
   discount: number;
   total: number;
+  /**
+   * VAT as charged, taken from the order rather than recomputed.
+   *
+   * This used to be `total * 0.2` unconditionally, which printed
+   * "Varav moms (25%)" in NOK on a Norwegian export that carried no Swedish
+   * VAT at all. Absent (older orders) falls back to the old behaviour so
+   * historic mail still renders what those orders actually charged.
+   */
+  vatAmount?: number | null;
+  vatTreatment?: string | null;
   trackingId?: string | null;
   locale?: "sv" | "en";
   /** Human-readable payment method (e.g. "Visa •••• 4242") or free-order message */
@@ -336,6 +346,10 @@ const translations = {
     free: "Gratis",
     discount: "Rabatt",
     vatIncluded: "Varav moms (25%)",
+    exportVatNotice:
+      "Priset är utan svensk moms eftersom varan exporteras. Tull, moms och " +
+      "PostNords förtullningsavgift tillkommer och betalas till transportören " +
+      "vid leverans enligt mottagarlandets regler.",
     lineVat: "Varav moms (25 %)",
     total: "Totalt",
     shippingAddress: "Leveransadress",
@@ -382,6 +396,10 @@ const translations = {
     free: "Free",
     discount: "Discount",
     vatIncluded: "Incl. VAT (25%)",
+    exportVatNotice:
+      "This price excludes Swedish VAT because the goods are exported. Import " +
+      "duty, VAT and PostNord's customs clearance fee are payable to the " +
+      "carrier on delivery, under the rules of the destination country.",
     lineVat: "Of which VAT (25%)",
     total: "Total",
     shippingAddress: "Shipping Address",
@@ -409,7 +427,7 @@ function getCountryName(code: string, locale: "sv" | "en"): string {
   return code;
 }
 
-function renderOrderConfirmationEmail(data: OrderEmailData): string {
+export function renderOrderConfirmationEmail(data: OrderEmailData): string {
   const locale = data.locale || "sv";
   const t = translations[locale];
   const dateLocale = locale === "en" ? "en-GB" : "sv-SE";
@@ -423,8 +441,14 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
     ? postNordTrackingUrl(data.trackingId)
     : null;
 
-  // 25 % VAT included in prices (Swedish B2C): VAT share of gross = 20 %
-  const vatAmount = vatFromGrossIncl25(data.total);
+  /**
+   * Zero-rated exports show no VAT line at all rather than a "0 kr" one: the
+   * absence is the point, and a zero reads as a bug to a customer.
+   */
+  const isExport = data.vatTreatment === "export_zero_rated";
+  const vatAmount =
+    data.vatAmount != null ? Number(data.vatAmount) : vatFromGrossIncl25(data.total);
+  const showVatLine = !isExport && vatAmount > 0;
 
   // SECURITY: every dynamic field interpolated into the HTML below MUST be
   // escaped. Order data flows in from product names (admin-controlled today
@@ -449,7 +473,9 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
     .map(
       (item) => {
         const lineGross = item.price * item.quantity;
-        const lineVat = vatFromGrossIncl25(lineGross);
+        // Same rule as the order total: an export line carries no Swedish VAT,
+        // so it shows none rather than a zero.
+        const lineVat = isExport ? 0 : vatFromGrossIncl25(lineGross);
         const imgSrc = resolveProductImageUrlForEmail(item.productImage);
         const imgAttr = imgSrc ? escapeHtmlAttr(imgSrc) : "";
         const productName = escapeHtml(item.productName ?? "");
@@ -473,7 +499,7 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
               </td>
               <td style="vertical-align: top; text-align: right; white-space: nowrap;">
                 <p style="margin: 0; font-weight: 600; color: #111827;">${money(lineGross)}</p>
-                <p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.35;">${t.lineVat}<br/>${money(lineVat)}</p>
+                ${isExport ? "" : `<p style="margin: 6px 0 0 0; font-size: 12px; color: #6b7280; line-height: 1.35;">${t.lineVat}<br/>${money(lineVat)}</p>`}
               </td>
             </tr>
           </table>
@@ -664,10 +690,20 @@ function renderOrderConfirmationEmail(data: OrderEmailData): string {
                   <td style="padding: 4px 0; font-weight: 700; font-size: 18px; color: #111827;">${t.total}</td>
                   <td style="padding: 4px 0; text-align: right; font-weight: 700; font-size: 18px; color: #111827;">${money(data.total)}</td>
                 </tr>
-                <tr>
+${
+                  showVatLine
+                    ? `<tr>
                   <td style="padding: 4px 0; color: #6b7280; font-size: 12px;">${t.vatIncluded} (${locale === "en" ? "order total" : "order totalt"})</td>
                   <td style="padding: 4px 0; text-align: right; color: #6b7280; font-size: 12px;">${money(vatAmount)}</td>
-                </tr>
+                </tr>`
+                    : ""
+                }${
+                  isExport
+                    ? `<tr>
+                  <td colspan="2" style="padding: 10px 0 0 0; color: #92400e; font-size: 12px; line-height: 1.5;">${t.exportVatNotice}</td>
+                </tr>`
+                    : ""
+                }
               </table>
             </td>
           </tr>

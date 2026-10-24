@@ -6,7 +6,15 @@ import {
 } from "@repo/currency";
 import { getSekRate } from "@repo/currency/rate";
 import { sql, inArray } from "drizzle-orm";
-import { getShippingPrice, isOversize } from "./shipping-pricing.js";
+import {
+  getShippingPrice,
+  isOversize,
+  priceExcludingVat,
+  vatFromGross,
+  vatRateForCountry,
+  vatTreatmentForCountry,
+  type VatTreatment,
+} from "./shipping-pricing.js";
 
 /** Fixed SEK surcharge when Swedish customer opts not to return the old turbo (charged at checkout). */
 export const CORE_KEEP_FEE_SEK = 1000;
@@ -112,6 +120,17 @@ export type ResolvedCheckout =
       shipping: number;
       coreKeepFeeSek: number;
       commitsCoreReturnWithin14: boolean | null;
+      /**
+       * How this sale is treated for VAT, decided once here and stored on the
+       * order. Every VAT figure shown to a customer or to staff used to be
+       * recomputed as `total * 0.2`, which silently invents Swedish VAT on an
+       * export that carries none.
+       */
+      vatTreatment: VatTreatment;
+      /** 0.25 domestic and EU B2C, 0 on a zero-rated export. */
+      vatRate: number;
+      /** VAT contained in `total`, in `currency`. Zero on an export. */
+      vatAmount: number;
       total: number;
       /** Amount to charge, in `currency`. Named for history; not SEK-specific. */
       stripeChargeSek: number;
@@ -134,6 +153,12 @@ export async function resolveCheckoutOrder(body: {
   commitsCoreReturnWithin14?: boolean;
 }): Promise<ResolvedCheckout> {
   const country = (body.country ?? "SE").toUpperCase().trim();
+  /**
+   * Decided here, before any price is read, because it changes the line
+   * prices themselves — not just a number added at the end.
+   */
+  const vatTreatment: VatTreatment = vatTreatmentForCountry(country);
+  const vatRate = vatRateForCountry(country);
   const deliveryRaw = body.deliveryOption ?? "servicepoint";
   const deliveryOption: "home" | "servicepoint" =
     deliveryRaw === "home" ? "home" : "servicepoint";
@@ -196,10 +221,19 @@ export async function resolveCheckoutOrder(body: {
       cartNeedsCoreReturn = true;
     }
 
-    const unitPrice = Number(p.price);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    const catalogPrice = Number(p.price);
+    if (!Number.isFinite(catalogPrice) || catalogPrice < 0) {
       return { ok: false, status: 500, error: "Invalid catalog price" };
     }
+
+    /**
+     * Catalogue prices are stored VAT-inclusive. On a zero-rated export the
+     * Swedish VAT has to come back OUT of the price — charging the gross price
+     * and calling it zero-rated just hides the 25% inside it, and the buyer
+     * then pays their own import VAT on top of ours.
+     */
+    const unitPrice =
+      vatTreatment === "export_zero_rated" ? priceExcludingVat(catalogPrice) : catalogPrice;
 
     subtotal += Math.round(unitPrice * it.quantity);
 
@@ -302,6 +336,14 @@ export async function resolveCheckoutOrder(body: {
   );
   const stripeChargeSek = total;
 
+  /**
+   * Computed from the final charged total so it reconciles with what Stripe
+   * captured, and stored rather than re-derived later. On an export the rate
+   * is 0 and this is 0 — not "0.2 of the total", which is what every display
+   * site used to assume.
+   */
+  const vatAmount = vatFromGross(total, vatRate);
+
   return {
     ok: true,
     currency,
@@ -311,6 +353,9 @@ export async function resolveCheckoutOrder(body: {
     shipping: convertedShipping,
     coreKeepFeeSek: convertedCoreFee,
     commitsCoreReturnWithin14,
+    vatTreatment,
+    vatRate,
+    vatAmount,
     total,
     stripeChargeSek,
     lines: convertedLines,

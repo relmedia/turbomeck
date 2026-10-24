@@ -170,8 +170,57 @@ export const POSTPAKET_OVERSIZE_FEE = 215;
 /** PostNord's oversize threshold: 1.2 m on the longest side. */
 export const OVERSIZE_LENGTH_CM = 120;
 
-/** Swedish VAT rate applied to the displayed shipping price. */
-const VAT_RATE = 0.25;
+/** Swedish VAT rate. */
+export const VAT_RATE = 0.25;
+
+/**
+ * How a sale is treated for VAT.
+ *
+ * `export_zero_rated` is the one that matters: a sale to outside the EU is a
+ * zero-rated export in Sweden, and the buyer pays their own country's import
+ * VAT at the border instead. Charging Swedish VAT as well taxes them twice and
+ * over-collects output VAT on a sale that owes none.
+ */
+export type VatTreatment = "domestic" | "eu_b2c" | "export_zero_rated";
+
+export function vatTreatmentForCountry(countryCode: string): VatTreatment {
+  switch (shippingZone(countryCode)) {
+    case "domestic":
+      return "domestic";
+    case "eu":
+      // B2C distance selling still carries Swedish VAT at this volume. If the
+      // shop ever crosses the EU-wide OSS threshold this is where that lands.
+      return "eu_b2c";
+    case "non-eu":
+      return "export_zero_rated";
+  }
+}
+
+/** The VAT rate actually chargeable on a sale to this country. */
+export function vatRateForCountry(countryCode: string): number {
+  return vatTreatmentForCountry(countryCode) === "export_zero_rated" ? 0 : VAT_RATE;
+}
+
+/**
+ * Strip VAT from a price that already includes it.
+ *
+ * Product prices are stored VAT-inclusive, so an export price is the stored
+ * price with the Swedish VAT taken back out — not the stored price with no VAT
+ * added, which would leave the 25% silently inside it.
+ */
+export function priceExcludingVat(grossIncVat: number): number {
+  return Math.round(grossIncVat / (1 + VAT_RATE));
+}
+
+/**
+ * The VAT contained in a gross, VAT-inclusive amount. At 25% that is a fifth
+ * of the gross, not a quarter — the arithmetic four separate call sites in
+ * this repo each reimplemented as `total * 0.2`.
+ */
+export function vatFromGross(grossIncVat: number, rate: number = VAT_RATE): number {
+  if (rate <= 0) return 0;
+  return Math.round(grossIncVat * (rate / (1 + rate)));
+}
 
 function tierPrice(tiers: PriceTier[], weightKg: number, fallback: number): number {
   const w = Math.max(0.1, Math.ceil(weightKg));
@@ -242,7 +291,13 @@ export function getHomeDeliveryInternationalPrice(
 }
 
 /**
- * Shipping cost in SEK **including 25% VAT** — what the customer sees and pays.
+ * Shipping cost in SEK as the customer pays it — VAT included where VAT is
+ * due, and excluded where it is not.
+ *
+ * This used to end in an unconditional `* 1.25`, which meant a Norwegian buyer
+ * was charged Swedish VAT on the freight and then Norwegian import VAT and a
+ * clearance fee on arrival. `shippingZone()` already knew the destination was
+ * outside the EU; only this last step ignored it.
  *
  * `oversize` defaults to false so existing callers keep their current prices;
  * pass `isOversize(items)` to apply the surcharge where it is due.
@@ -265,7 +320,7 @@ export function getShippingPrice(
         ? getPostpaketInternationalPrice(weightKg, cc, oversize)
         : getHomeDeliveryInternationalPrice(weightKg, cc, oversize);
 
-  return Math.round(basePrice * (1 + VAT_RATE));
+  return Math.round(basePrice * (1 + vatRateForCountry(cc)));
 }
 
 /**

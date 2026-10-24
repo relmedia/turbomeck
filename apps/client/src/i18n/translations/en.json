@@ -487,7 +487,8 @@
     "sizeLabel": "Size",
     "createAccountOffer": "Create an account for me",
     "createAccountOfferDesc": "We'll email you a login link. It saves your address and your orders.",
-    "createAccountTerms": "I accept the terms and the privacy policy"
+    "createAccountTerms": "I accept the terms and the privacy policy",
+    "exportVatNotice": "Price excludes Swedish VAT as the goods are exported. Import duty, VAT and PostNord's clearance fee are payable on delivery."
   },
   "slider": {
     "regionLabel": "Featured products",
