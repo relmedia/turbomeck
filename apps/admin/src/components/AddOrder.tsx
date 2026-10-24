@@ -213,7 +213,14 @@ export function AddOrder({ open, onOpenChange, onCreated }: AddOrderProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      {/* A stray click on the backdrop must not discard the form. This is a
+          long dialog — customer, address, products, service point — and
+          losing it halfway through is a real cost, where closing it is one
+          click away via Avbryt, Escape or the X. */}
+      <DialogContent
+        className="max-h-[90vh] max-w-2xl overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Lägg till order</DialogTitle>
           <DialogDescription>
