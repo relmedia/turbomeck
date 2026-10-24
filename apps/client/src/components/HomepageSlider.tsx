@@ -561,25 +561,26 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             Particles leaving the top respawn at the bottom, so the field reads
             as rising from below rather than drifting in place.
 
-            The canvas is the right 76% from md up, so the field runs from
-            about the middle of the hero to the right edge. Width is the only
-            dial that matters here: particles are placed at
-            `random() * max(width, height) * 1.2` from the canvas centre, so
-            widening both pushes the centre leftwards and extends the reach.
-            Narrower than this and it tightens into a clump around the part;
-            full-width and it drifts through the copy on the left.
+            The canvas spans the full hero. It was briefly narrowed to the
+            right 62%/76% to sit it behind the product, but particles are
+            placed at `random() * max(width, height) * 1.2` from the canvas
+            centre — so a narrower canvas does not crop the field, it shrinks
+            its reach and clumps it around the part. Full width is what gives
+            the loose, even spread; the z-index above is what puts it behind
+            the product, and that does the job on its own.
 
-            Only from md: below that the layout stacks the image under the
-            text, where a right-biased field would sit nowhere near it.
+            To bias it right again without the clumping, add
+            `md:left-auto md:right-0 md:w-[76%]` — md-only, because below that
+            the layout stacks the image under the text.
 
             Note `depth` is clamped to 0–1 by the component, so values above 1
             behave exactly as 1. */}
         <Floating3DParticles
-          className="z-[2] md:left-auto md:right-0 md:w-[76%]"
-          quantity={360}
+          className="z-[2]"
+          quantity={460}
           color={PARTICLE_COLOR}
-          size={3.5}
-          opacity={0.36}
+          size={2}
+          opacity={0.26}
           drift={0.9}
           depth={1}
         />
