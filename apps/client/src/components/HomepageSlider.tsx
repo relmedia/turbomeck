@@ -577,12 +577,12 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             behave exactly as 1. */}
         <Floating3DParticles
           className="z-[2]"
-          quantity={460}
+          quantity={160}
           color={PARTICLE_COLOR}
-          size={2}
+          size={3}
           opacity={0.26}
-          drift={0.9}
-          depth={1}
+          drift={0.5}
+          depth={0.8}
         />
 
 
