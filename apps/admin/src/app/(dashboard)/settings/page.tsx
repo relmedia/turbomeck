@@ -2,6 +2,7 @@ import { auth } from "@repo/auth";
 import { redirect } from "next/navigation";
 import AdminOrderNotificationsForm from "@/components/AdminOrderNotificationsForm";
 import MailAccountSettingsForm from "@/components/MailAccountSettingsForm";
+import CustomerNotificationsForm from "@/components/CustomerNotificationsForm";
 
 export const metadata = {
   title: "Inställningar",
@@ -35,6 +36,16 @@ export default async function SettingsPage() {
           köp.
         </p>
         <AdminOrderNotificationsForm />
+      </section>
+
+      <section className="rounded-xl border bg-card p-4 md:p-6 lg:col-span-2">
+        <h2 className="text-lg font-semibold mb-2">Automatiska kundutskick</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Mejl som går ut automatiskt till kunden när PostNord rapporterar att
+          något hänt med paketet. De skickas utan att någon granskar dem först —
+          här stänger du av ett utskick.
+        </p>
+        <CustomerNotificationsForm />
       </section>
     </div>
   );

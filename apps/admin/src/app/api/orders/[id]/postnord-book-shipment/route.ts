@@ -30,7 +30,13 @@ import { requireAdmin } from "@/lib/require-admin";
 type OrderRow = typeof orders.$inferSelect;
 
 type Ineligible = {
-  code: "cancelled" | "refunded" | "country" | "home_delivery" | "no_service_point";
+  code:
+    | "cancelled"
+    | "refunded"
+    | "country"
+    | "home_delivery"
+    | "no_service_point"
+    | "no_service_point_address";
   /** Swedish, shown verbatim in the admin. */
   message: string;
 };
@@ -71,6 +77,26 @@ function checkBookingEligibility(order: OrderRow): Ineligible | null {
     };
   }
 
+  /**
+   * PostNord rejects a booking whose deliveryParty has no address
+   * ("address is a required field", subType ADDRESS), and the address cannot
+   * be fetched at booking time: every by-id service point endpoint answers
+   * 410 Gone. Orders created before the address was stored therefore cannot be
+   * booked, and saying so here beats letting PostNord answer with a fault the
+   * admin has no way to act on.
+   */
+  if (
+    !(order.servicePointStreet ?? "").trim() ||
+    !(order.servicePointPostalCode ?? "").trim() ||
+    !(order.servicePointCity ?? "").trim()
+  ) {
+    return {
+      code: "no_service_point_address",
+      message:
+        "Ordern saknar ombudets adress, som PostNord kräver vid bokning. Adressen sparas först från och med att ombudet väljs i nya ordrar — äldre ordrar går inte att boka. Skapa en ny order via Lägg till order.",
+    };
+  }
+
   return null;
 }
 
@@ -90,11 +116,23 @@ function describeBooking(order: OrderRow) {
   const weightValue = typeof grossWeight?.value === "number" ? grossWeight.value : null;
 
   const trackingId = (order.postNordTrackingId ?? "").trim();
+  /**
+   * A cancelled booking is not "booked". PostNord has no cancel API, so this
+   * flag is set by staff after cancelling in PostNord's portal — without it
+   * admin kept claiming "Frakt bokad" for parcels that were already Avbruten
+   * there. The tracking id and label stay as history of a parcel that existed.
+   */
+  const cancelledAt = order.postNordBookingCancelledAt ?? null;
+
   return {
-    isBooked: trackingId !== "" || snapshot != null,
+    isBooked: (trackingId !== "" || snapshot != null) && cancelledAt == null,
+    cancelledAt: cancelledAt ? cancelledAt.toISOString() : null,
     trackingId: trackingId || null,
     printId: snapshot ? extractPostNordPrintId(snapshot) : null,
-    hasLabel: snapshot != null,
+    // The stored PDF is what makes a label printable; a snapshot alone is a
+    // booking made before labels were stored and can no longer be printed.
+    hasLabel: (order.postNordLabelPdf ?? "").trim() !== "",
+    labelPaperSize: order.postNordLabelPaperSize ?? null,
     bookedAt: typeof snapshot?.messageDate === "string" ? snapshot.messageDate : null,
     /** A booking made against the test API must never look like a real parcel. */
     testBooking: snapshot?.testIndicator === true,
@@ -232,6 +270,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         consigneeEmail: order.email,
         servicePointId: (order.servicePointId ?? "").trim(),
         servicePointName: order.servicePointName,
+        servicePointStreet: order.servicePointStreet,
+        servicePointPostalCode: order.servicePointPostalCode,
+        servicePointCity: order.servicePointCity,
+        servicePointCountryCode: order.servicePointCountryCode,
         weightKg,
       });
     } catch (e) {
@@ -261,6 +303,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .set({
         postNordTrackingId: booked.trackableId,
         postNordLabelSnapshot: labelSnapshot ?? null,
+        // The label from this same call. Stored now because asking for it
+        // again would book another parcel.
+        postNordLabelPdf: booked.labelPdfBase64,
+        postNordLabelPaperSize: booked.labelPaperSize,
+        // A fresh booking supersedes any earlier cancellation.
+        postNordBookingCancelledAt: null,
       })
       .where(eq(orders.id, order.id));
 
@@ -281,7 +329,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       /** PostNord accepted it but returned no id — the parcel still exists. */
       needsManualId: booked.needsManualId,
       postNordPrintId: booked.printId,
-      postNordLabelAvailable: labelSnapshot != null,
+      /**
+       * Whether a label can actually be printed, which now means "we stored
+       * the PDF". It used to mean "a snapshot exists", from when printing
+       * re-posted that snapshot and booked another parcel each time.
+       */
+      postNordLabelAvailable: booked.labelPdfBase64 != null,
       weightKg,
       testBooking: config.testIndicator,
     });
@@ -292,4 +345,65 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       { status: 500 },
     );
   }
+}
+
+/**
+ * PATCH /api/orders/[id]/postnord-book-shipment
+ *
+ * Marks the PostNord booking cancelled, or undoes that mark.
+ * Body: `{ cancelled: boolean }`.
+ *
+ * This records a cancellation; it does not perform one. PostNord exposes no
+ * cancellation endpoint — the delete operation is absent from the Booking API
+ * specification, and `updateIndicator: "Deletion"` is ignored and books a new
+ * shipment instead — so the parcel has to be cancelled in PostNord's portal and
+ * this is how admin is told that happened.
+ *
+ * The tracking id, snapshot and label are left untouched. A cancelled parcel
+ * still existed and may already have been printed or billed, and throwing that
+ * away would leave no trace of it.
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+
+  const { id } = await params;
+  const order = await loadOrder(id);
+  if (!order) {
+    return NextResponse.json({ error: "Order hittades inte" }, { status: 404 });
+  }
+
+  let cancelled: boolean;
+  try {
+    const body = (await req.json()) as { cancelled?: unknown };
+    if (typeof body.cancelled !== "boolean") {
+      return NextResponse.json(
+        { error: "Fältet 'cancelled' måste vara true eller false." },
+        { status: 400 },
+      );
+    }
+    cancelled = body.cancelled;
+  } catch {
+    return NextResponse.json({ error: "Ogiltig begäran" }, { status: 400 });
+  }
+
+  const hasBooking =
+    (order.postNordTrackingId ?? "").trim() !== "" || order.postNordLabelSnapshot != null;
+  if (cancelled && !hasBooking) {
+    return NextResponse.json(
+      { error: "Ordern har ingen bokning att avboka." },
+      { status: 409 },
+    );
+  }
+
+  await db
+    .update(orders)
+    .set({ postNordBookingCancelledAt: cancelled ? new Date() : null })
+    .where(eq(orders.id, order.id));
+
+  const updated = await loadOrder(id);
+  return NextResponse.json({
+    ok: true,
+    booked: updated ? describeBooking(updated) : null,
+  });
 }

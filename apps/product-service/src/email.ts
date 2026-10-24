@@ -9,7 +9,7 @@ export const SHOP_CONTACT_EMAIL = "shop@turbomeck.se";
 /**
  * Identical to @repo/auth `email-templates.ts` (magic link) LOGO_URL resolution.
  */
-function getOrderEmailLogoUrl(): string {
+export function getOrderEmailLogoUrl(): string {
   const env = process.env;
   if (env.EMAIL_LOGO_URL) return env.EMAIL_LOGO_URL;
   const r2Base = (env.R2_PUBLIC_URL || env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
@@ -22,7 +22,7 @@ function getOrderEmailLogoUrl(): string {
 /**
  * Order confirmation email header: logo + wordmark (or “T” fallback), horizontally centered (email-safe tables).
  */
-function orderEmailHeaderBrandInner(logoUrl: string): string {
+export function orderEmailHeaderBrandInner(logoUrl: string): string {
   return logoUrl
     ? `
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
@@ -97,7 +97,7 @@ function vatFromGrossIncl25(grossSek: number): number {
   return Math.round(Number(grossSek) * 0.2);
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -171,6 +171,34 @@ type MailConfig = {
   adminNotificationsEnabled?: boolean;
   /** Per-event toggles. Each key defaults to true if absent. */
   adminNotifications?: Partial<Record<AdminEventKey, boolean>>;
+  /**
+   * Per-event toggles for CUSTOMER mail. Each defaults to true if absent.
+   *
+   * These exist because the shipping poller sends on PostNord's signal without
+   * a human in the loop. Staff notices have had an off switch since they were
+   * built; until now customer mail had none at all, which is not an acceptable
+   * place to start automating.
+   */
+  customerNotifications?: Partial<Record<CustomerEventKey, boolean>>;
+};
+
+/** Automated customer mails that can be switched off individually. */
+export type CustomerEventKey =
+  | "shipmentDispatched"
+  | "readyForPickup"
+  | "pickupReminder"
+  | "delivered"
+  | "coreReturn";
+
+/** Which toggle governs which ledger kind. */
+const CUSTOMER_EVENT_FOR_KIND: Record<string, CustomerEventKey> = {
+  shipment_dispatched: "shipmentDispatched",
+  ready_for_pickup: "readyForPickup",
+  pickup_reminder_1: "pickupReminder",
+  pickup_reminder_2: "pickupReminder",
+  order_delivered: "delivered",
+  core_return_reminder: "coreReturn",
+  core_return_overdue: "coreReturn",
 };
 
 /**
@@ -182,6 +210,22 @@ function isAdminEventEnabled(config: MailConfig, key: AdminEventKey): boolean {
   if (config.adminNotificationsEnabled === false) return false;
   const flag = config.adminNotifications?.[key];
   return flag !== false;
+}
+
+/**
+ * Whether an automated customer mail may be sent.
+ *
+ * Defaults to true when the key is absent, so an existing settings row keeps
+ * today's behaviour. Unlike the admin side there is no master switch: turning
+ * off *all* customer mail is not something staff should be able to do by
+ * accident, and each kind is individually meaningful.
+ */
+export async function isCustomerEmailEnabled(kind: string): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) return false;
+  const key = CUSTOMER_EVENT_FOR_KIND[kind];
+  if (!key) return true;
+  return config.customerNotifications?.[key] !== false;
 }
 
 /**
@@ -212,7 +256,7 @@ function getMailConfigFromEnv(): MailConfig | null {
   return { host, port: Number.isFinite(port) ? port : 587, secure, user, password, from };
 }
 
-async function getMailConfig(): Promise<MailConfig | null> {
+export async function getMailConfig(): Promise<MailConfig | null> {
   try {
     const [row] = await db
       .select()
@@ -1702,6 +1746,86 @@ function renderAdminShipmentBookedEmail(data: AdminShipmentBookedEmailData): str
     ],
     cta: { label: "Öppna ordern i Turbomeck Studio", url: orderUrl },
   });
+}
+
+export type AdminCoreReturnOverdueEmailData = {
+  orderId: number | string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail?: string | null;
+  deadline: Date;
+  coreKeepFeeSek?: number | null;
+};
+
+/**
+ * Tells staff a kärnretur deadline passed without the old turbo arriving.
+ *
+ * This is the one automated mail that exists to prompt a HUMAN decision rather
+ * than to inform a customer. Invoicing the 1 000 kr is a money call the shop
+ * may well choose not to make — a regular who is a week late is not the same
+ * as someone who never intended to return it — so the automation stops at
+ * "this one lapsed, look at it".
+ */
+function renderAdminCoreReturnOverdueEmail(data: AdminCoreReturnOverdueEmailData): string {
+  const orderUrl = `${getAdminBaseUrl()}/payments/${data.orderId}`;
+  const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
+  const deadline = data.deadline.toISOString().slice(0, 10);
+  const daysLate = Math.max(
+    0,
+    Math.floor((Date.now() - data.deadline.getTime()) / 86_400_000),
+  );
+
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Ordernummer", value: `<strong>#${escapeHtml(orderRef)}</strong>` },
+    { label: "Kund", value: escapeHtml(data.customerName) },
+  ];
+  if (data.customerEmail) {
+    rows.push({
+      label: "Kund-e-post",
+      value: `<a href="mailto:${escapeHtmlAttr(data.customerEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(data.customerEmail)}</a>`,
+    });
+  }
+  rows.push({ label: "Deadline", value: escapeHtml(deadline) });
+  rows.push({ label: "Dagar sedan deadline", value: String(daysLate) });
+
+  return renderAdminEmailLayout({
+    eyebrow: "Kärnretur försenad",
+    heading: `Ingen kärnretur mottagen för order #${orderRef}`,
+    sections: [
+      adminInfoSection(rows),
+      adminBlockSection(
+        "Att ta ställning till",
+        "Kunden åtog sig att returnera den gamla turbon inom 14 dagar. Enligt köpvillkoren kan 1&nbsp;000 kr faktureras när returen uteblir. Kunden har redan fått en påminnelse före deadline — inget har skickats om fakturering.",
+      ),
+    ],
+    cta: { label: "Öppna ordern i Turbomeck Studio", url: orderUrl },
+  });
+}
+
+export async function sendAdminCoreReturnOverdueEmail(
+  data: AdminCoreReturnOverdueEmailData,
+): Promise<boolean> {
+  const config = await getMailConfig();
+  if (!config) return false;
+  const recipients = parseAdminNotificationRecipients(config.adminNotificationEmails);
+  if (recipients.length === 0) return false;
+
+  const transporter = await buildAdminTransport(config);
+  const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
+
+  try {
+    await transporter.sendMail({
+      from: `"Turbomeck Admin" <${config.from}>`,
+      to: recipients.join(", "),
+      subject: `Kärnretur försenad #${orderRef} – ${data.customerName}`,
+      html: renderAdminCoreReturnOverdueEmail(data),
+    });
+    console.log(`[email] Core-return overdue notice sent for order ${data.orderNumber}`);
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send core-return overdue notice:", error);
+    return false;
+  }
 }
 
 export async function sendAdminShipmentBookedEmail(

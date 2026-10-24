@@ -10,6 +10,8 @@ const VALID_STATUSES = [
   "confirmed",
   "shipped",
   "delivered",
+  /** Came back to us: PostNord returned it, usually uncollected. */
+  "returned",
   "cancelled",
   "completed",
   /** Money partly returned. The order still stands; the refund rows say how much. */
@@ -98,9 +100,20 @@ export async function PATCH(
     let shipmentEmailError: string | null = null;
     if (shouldSendShipmentEmail) {
       try {
-        await triggerShipmentDispatchedEmail(orderId);
-        shipmentEmailSent = true;
-        console.log(`[orders PATCH] shipment email triggered for order ${orderId}`);
+        /**
+         * No `force`: this is a heuristic firing off a status edit, not an
+         * explicit request to mail the customer. The shipping poller now sends
+         * the same mail when PostNord reports EN_ROUTE, so without deferring to
+         * the ledger a staff member setting the status to "shipped" shortly
+         * after the parcel was scanned would send a second copy.
+         */
+        const outcome = await triggerShipmentDispatchedEmail(orderId);
+        shipmentEmailSent = outcome.sent;
+        console.log(
+          outcome.sent
+            ? `[orders PATCH] shipment email triggered for order ${orderId}`
+            : `[orders PATCH] shipment email already recorded for order ${orderId}; not resending`,
+        );
       } catch (err) {
         shipmentEmailSent = false;
         shipmentEmailError = err instanceof Error ? err.message : String(err);

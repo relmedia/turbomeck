@@ -45,6 +45,16 @@ export type PostnordBookToServicePointInput = {
   consigneeEmail?: string | null;
   servicePointId: string;
   servicePointName?: string | null;
+  /**
+   * The service point's own address. PostNord rejects the booking without it
+   * ("address is a required field", subType ADDRESS) and it cannot be looked
+   * up at booking time — every by-id service point endpoint returns 410 Gone.
+   * Stored on the order when the point is chosen.
+   */
+  servicePointStreet?: string | null;
+  servicePointPostalCode?: string | null;
+  servicePointCity?: string | null;
+  servicePointCountryCode?: string | null;
   weightKg: number;
 };
 
@@ -78,8 +88,20 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
   const partyIdType = process.env.POSTNORD_EDI_PARTY_ID_TYPE?.trim() || "160";
   const basicService = process.env.POSTNORD_EDI_BASIC_SERVICE_CODE?.trim() || "52";
   const additional = parseAdditionalCodes();
+  /**
+   * Service points are identified with partyIdType "156", not "17".
+   *
+   * PostNord rejects "17" outright:
+   *   SAE-BR-25020309 "Invalid partyIdType", party=deliveryParty,
+   *   partyIdType=17, DELIVERY_PARTY_FAULTY
+   *
+   * "160" stays correct for consignor and freightPayer — only the delivery
+   * party differs. Confirmed against the working connector at
+   * github.com/PrimePack-AB/karrio-postnord, whose `_delivery_party` is
+   * documented as partyIdType "156".
+   */
   const deliveryPartyIdType =
-    process.env.POSTNORD_EDI_SERVICEPOINT_PARTY_ID_TYPE?.trim() || "17";
+    process.env.POSTNORD_EDI_SERVICEPOINT_PARTY_ID_TYPE?.trim() || "156";
 
   const company = process.env.POSTNORD_CONSIGNOR_COMPANY_NAME?.trim() || "Sender";
   const cStreet = process.env.POSTNORD_CONSIGNOR_STREET?.trim() || "";
@@ -127,6 +149,11 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
 
   const consigneeName = `${input.consigneeFirstName} ${input.consigneeLastName}`.trim();
   const cc = (input.consigneeCountry || "SE").toUpperCase();
+
+  const spStreet = input.servicePointStreet?.trim() ?? "";
+  const spPostal = input.servicePointPostalCode?.trim() ?? "";
+  const spCity = input.servicePointCity?.trim() ?? "";
+  const spCountry = (input.servicePointCountryCode?.trim() || cc).toUpperCase();
 
   const consignorBlock = buildFreightRelatedParty();
   const freightPayerBlock = buildFreightRelatedParty();
@@ -189,6 +216,20 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
               nameIdentification: {
                 name: (input.servicePointName ?? "PostNord ombud").slice(0, 70),
               },
+              // Only sent when complete: a half address (street but no city)
+              // is rejected the same way a missing one is, and sending nothing
+              // at least produces PostNord's own clear error rather than a
+              // confusing partial-address fault.
+              ...(spStreet && spPostal && spCity
+                ? {
+                    address: {
+                      streets: [spStreet],
+                      postalCode: spPostal.replace(/\s/g, ""),
+                      city: spCity,
+                      countryCode: spCountry,
+                    },
+                  }
+                : {}),
             },
           },
         },
@@ -198,6 +239,20 @@ export function buildEdiInstructionToServicePoint(input: PostnordBookToServicePo
             numberOfPackageTypeCodeItems: { value: 1 },
             items: [
               {
+                /**
+                 * `"0"` asks PostNord to allocate the parcel id itself, and it
+                 * comes back as the tracking number in `idInformation` — which
+                 * is exactly what `extractPostNordTrackingId` already reads.
+                 *
+                 * The field is mandatory: omitting it fails validation with
+                 * "itemIdentification is a required field". But it must not be
+                 * an arbitrary string either — PostNord infers the id scheme
+                 * (SSCC, S10, …) from the value, so anything that is not a real
+                 * id in a series allocated to this customer number fails with
+                 * "unable to determine id type". `"0"` is the documented way to
+                 * say "you pick".
+                 */
+                itemIdentification: { itemId: "0" },
                 grossWeight: { value: w, unit: "KGM" },
               },
             ],
@@ -222,24 +277,46 @@ export type PostnordEdiBookResult =
       needsManualId: boolean;
       printId: string | null;
       rawBookingJson: unknown;
+      /**
+       * The label, base64 PDF, from the very same call that booked the parcel.
+       *
+       * Captured here because asking for it again is destructive — the label
+       * endpoint books another parcel each time. Null if PostNord returned no
+       * printout, which is not a failure: the parcel still exists.
+       */
+      labelPdfBase64: string | null;
+      labelPaperSize: string | null;
     }
   | { ok: false; status: number; message: string; details?: string };
 
 /**
- * Merge the outbound EDI instruction with `idInformation` from the booking response
- * so PostNord can render the label PDF (see POST /rest/shipment/v3/edi/labels/pdf).
+ * A record of the booking: what was sent, plus the ids that came back.
+ *
+ * It used to be a *payload* — re-posted to `/v3/edi/labels/pdf` to re-render
+ * the label — which is precisely how printing came to book extra parcels. That
+ * use is gone; the label is stored on the order instead. What remains is
+ * history, and the source of the booked weight, date and test flag the admin
+ * shows, so it is still written even when no ids come back.
  */
 export function buildEdiInstructionForLabelPdf(
   shipmentInformation: Record<string, unknown>,
   bookingResponse: unknown
 ): Record<string, unknown> | null {
-  if (bookingResponse == null || typeof bookingResponse !== "object") return null;
-  const idInformation = (bookingResponse as Record<string, unknown>).idInformation;
-  if (!Array.isArray(idInformation) || idInformation.length === 0) return null;
-  return {
-    ...shipmentInformation,
-    idInformation,
-  };
+  if (bookingResponse == null || typeof bookingResponse !== "object") {
+    // Still worth keeping what we sent.
+    return { ...shipmentInformation };
+  }
+  const root = bookingResponse as Record<string, unknown>;
+  // Booking via the label endpoint nests the response under `bookingResponse`.
+  const nested = root.bookingResponse;
+  const idSource =
+    nested != null && typeof nested === "object" && !Array.isArray(nested)
+      ? (nested as Record<string, unknown>)
+      : root;
+  const idInformation = idSource.idInformation;
+  return Array.isArray(idInformation) && idInformation.length > 0
+    ? { ...shipmentInformation, idInformation }
+    : { ...shipmentInformation };
 }
 
 export type PostnordEdiLabelPdfResult =
@@ -256,7 +333,101 @@ function isLikelyPdf(buf: ArrayBuffer): boolean {
   return u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46; // %PDF
 }
 
-export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise<PostnordEdiLabelPdfResult> {
+/**
+ * Pull the label out of a JSON label response.
+ *
+ * PostNord answers `/v3/edi/labels/pdf` with `200 application/json`, not raw
+ * PDF bytes: the document arrives base64-encoded at
+ * `labelPrintout[].printout.data`. Treating that as a failure is what produced
+ * "PostNord label API did not return a PDF" on a booking that had in fact
+ * succeeded.
+ *
+ * `encoding` is documented only as `"base64"`, but ZPL printouts come back as
+ * raw text with `encoding: "none"`, so anything that is not base64 is taken
+ * verbatim.
+ */
+function pdfFromJsonLabelResponse(
+  json: unknown,
+): { body: ArrayBuffer; contentType: string } | null {
+  if (!json || typeof json !== "object") return null;
+  const printouts = (json as { labelPrintout?: unknown }).labelPrintout;
+  if (!Array.isArray(printouts)) return null;
+
+  for (const entry of printouts) {
+    const printout = (entry as { printout?: unknown } | null)?.printout as
+      | Record<string, unknown>
+      | undefined;
+    const data = printout?.data;
+    if (typeof data !== "string" || data.length === 0) continue;
+
+    const encoding = String(printout?.encoding ?? "base64").toLowerCase();
+    const bytes =
+      encoding === "base64"
+        ? Buffer.from(data, "base64")
+        : Buffer.from(data, "utf8");
+
+    // Copy into a standalone ArrayBuffer: Buffer views share a pooled
+    // allocation, so handing `.buffer` straight out can expose unrelated bytes.
+    const body = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+
+    const format = String(printout?.labelFormat ?? "").toUpperCase();
+    if (format === "PDF" || isLikelyPdf(body)) {
+      return { body, contentType: "application/pdf" };
+    }
+    // ZPL and friends: still the label, just not a PDF.
+    return { body, contentType: "application/octet-stream" };
+  }
+  return null;
+}
+
+/**
+ * Print options, as offered by `/v3/labels/printoptions/ids` for the parcel.
+ *
+ * Passed to PostNord as query parameters. Omitted keys simply fall back to
+ * PostNord's defaults, which is what the plain "Fraktetikett PDF" button uses.
+ */
+export type PostNordLabelPrintSettings = {
+  /** A4, A5, A6, LETTER, LABEL */
+  paperSize?: string;
+  /** e.g. "standard", "ps1", "ste" — valid values differ per parcel. */
+  labelType?: string;
+  rotate?: "0" | "90" | "180" | "270";
+};
+
+/**
+ * NOTE: there is deliberately no "post an EDI instruction to get a label"
+ * helper here any more.
+ *
+ * `/v3/edi/labels/pdf` is book-and-print: each POST registers a new parcel.
+ * The only call to it is inside `postEdiBooking`, once, when the parcel is
+ * created. Printing an existing label reads the PDF stored on the order, or
+ * goes through `fetchStoredLabelById` (`/v3/labels/ids/pdf`), which books
+ * nothing. Re-adding a general-purpose label poster here is how this turned
+ * into ~30 unintended parcels the first time.
+ */
+
+/** Paper size a booking's label is rendered at when nothing else is chosen. */
+export const DEFAULT_LABEL_PAPER_SIZE = "A5";
+
+/**
+ * Book the shipment AND take its label in one call.
+ *
+ * Deliberately posts to `/v3/edi/labels/pdf` rather than `/v3/edi`. That
+ * endpoint is book-and-print: it registers the parcel and returns the label
+ * together. Booking through it is the only way to obtain a label for the parcel
+ * actually booked — calling it afterwards books a *different* parcel and prints
+ * that one's label instead (two identical calls returned …512511 and …512528).
+ *
+ * `storeLabel=true` additionally asks PostNord to keep the label, which is what
+ * makes a later reprint by id possible at all.
+ */
+export async function postEdiBooking(
+  shipmentInformation: Record<string, unknown>,
+  paperSize: string = DEFAULT_LABEL_PAPER_SIZE,
+): Promise<PostnordEdiBookResult> {
   const apiKey = process.env.POSTNORD_API_KEY?.trim();
   if (!apiKey) {
     return { ok: false, status: 503, message: "POSTNORD_API_KEY is not set" };
@@ -265,72 +436,8 @@ export async function postEdiLabelPdf(ediBody: Record<string, unknown>): Promise
   const host = ediHost();
   const url = new URL(`https://${host}/rest/shipment/v3/edi/labels/pdf`);
   url.searchParams.set("apikey", apiKey);
-
-  const headers: Record<string, string> = {
-    Accept: "application/pdf,*/*",
-    "Content-Type": "application/json",
-  };
-
-  try {
-    const bearer = await getPostNordBearerTokenNullable();
-    if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  } catch (e) {
-    return {
-      ok: false,
-      status: 503,
-      message: e instanceof Error ? e.message : "PostNord OAuth misslyckades",
-    };
-  }
-
-  let res: Response;
-  try {
-    res = await postnordFetch(url.toString(), {
-      method: "POST",
-      headers,
-      body: JSON.stringify(ediBody),
-    });
-  } catch (e) {
-    return {
-      ok: false,
-      status: 503,
-      message: describePostNordNetworkError("Etikett-PDF API", e),
-    };
-  }
-
-  const body = await res.arrayBuffer();
-  const ct = (res.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() || "";
-
-  if (res.ok && body.byteLength > 0 && (ct.includes("pdf") || isLikelyPdf(body))) {
-    return { ok: true, body, contentType: "application/pdf" };
-  }
-
-  const details =
-    body.byteLength > 0 && body.byteLength < 12000
-      ? new TextDecoder().decode(body)
-      : undefined;
-  console.error("[postnord-edi] label API did not return a PDF", {
-    status: res.status,
-    contentType: res.headers.get("content-type"),
-    bytes: body.byteLength,
-    body: details?.slice(0, 2000),
-  });
-  return {
-    ok: false,
-    status: res.status,
-    message: "PostNord label API did not return a PDF",
-    details: details?.slice(0, 4000),
-  };
-}
-
-export async function postEdiBooking(shipmentInformation: Record<string, unknown>): Promise<PostnordEdiBookResult> {
-  const apiKey = process.env.POSTNORD_API_KEY?.trim();
-  if (!apiKey) {
-    return { ok: false, status: 503, message: "POSTNORD_API_KEY is not set" };
-  }
-
-  const host = ediHost();
-  const url = new URL(`https://${host}/rest/shipment/v3/edi`);
-  url.searchParams.set("apikey", apiKey);
+  url.searchParams.set("paperSize", paperSize);
+  url.searchParams.set("storeLabel", "true");
 
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -396,7 +503,7 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     console.error("[postnord-edi] booking rejected", {
       status: res.status,
       host,
-      path: "/rest/shipment/v3/edi",
+      path: "/rest/shipment/v3/edi/labels/pdf",
       bearerAttached,
       messageId,
       body: text.slice(0, 2000),
@@ -425,6 +532,22 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     });
   }
 
+  /**
+   * Keep the label that came back with the booking. If PostNord returned none,
+   * that is not a failure — the parcel exists — but the order then has no label
+   * to reprint, and asking for one later would book another parcel.
+   */
+  const printout = pdfFromJsonLabelResponse(data);
+  const labelPdfBase64 = printout
+    ? Buffer.from(printout.body).toString("base64")
+    : null;
+  if (!labelPdfBase64) {
+    console.warn("[postnord-edi] booking accepted but carried no label printout", {
+      messageId,
+      trackableId,
+    });
+  }
+
   return {
     ok: true,
     data,
@@ -432,5 +555,7 @@ export async function postEdiBooking(shipmentInformation: Record<string, unknown
     needsManualId: !trackableId,
     printId,
     rawBookingJson: data,
+    labelPdfBase64,
+    labelPaperSize: labelPdfBase64 ? paperSize : null,
   };
 }

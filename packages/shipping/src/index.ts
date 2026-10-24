@@ -267,3 +267,24 @@ export function getShippingPrice(
 
   return Math.round(basePrice * (1 + VAT_RATE));
 }
+
+/**
+ * PostNord Track & Trace status model. Re-exported so consumers keep importing
+ * from "@repo/shipping" — the package exposes a single entry point.
+ */
+export {
+  POST_NORD_ITEM_STATUSES,
+  TERMINAL_STATUSES,
+  EXCEPTION_STATUSES,
+  ORDER_STATUSES,
+  isTerminal,
+  isException,
+  isAwaitingPickup,
+  mapToOrderStatus,
+  parseTrackingResponse,
+  extractTrackingEvents,
+  type PostNordItemStatus,
+  type OrderStatus,
+  type TrackingEvent,
+  type ParsedTracking,
+} from "./postnord-status";

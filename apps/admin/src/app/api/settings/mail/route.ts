@@ -37,6 +37,25 @@ export type MailSettings = {
    * to true so older docs keep their current behavior after upgrade.
    */
   adminNotifications?: AdminNotificationFlags;
+  /**
+   * Per-event toggles for the AUTOMATED CUSTOMER mail that the shipping poller
+   * sends off PostNord's status, with no human in the loop.
+   *
+   * There is deliberately no master switch here, unlike the admin side. Each of
+   * these is individually meaningful and the failure modes differ — silencing
+   * every customer mail at once is not something that should be one click away.
+   * Absent keys default to true.
+   */
+  customerNotifications?: CustomerNotificationFlags;
+};
+
+/** Automated mail to the customer. Mirrors CUSTOMER_EVENT_FOR_KIND in email.ts. */
+export type CustomerNotificationFlags = {
+  shipmentDispatched?: boolean;
+  readyForPickup?: boolean;
+  pickupReminder?: boolean;
+  delivered?: boolean;
+  coreReturn?: boolean;
 };
 
 export type AdminNotificationFlags = {
@@ -53,6 +72,14 @@ const DEFAULT_FLAGS: Required<AdminNotificationFlags> = {
   shipmentBooked: true,
 };
 
+const DEFAULT_CUSTOMER_FLAGS: Required<CustomerNotificationFlags> = {
+  shipmentDispatched: true,
+  readyForPickup: true,
+  pickupReminder: true,
+  delivered: true,
+  coreReturn: true,
+};
+
 const DEFAULTS: MailSettings = {
   host: "",
   port: 587,
@@ -64,6 +91,7 @@ const DEFAULTS: MailSettings = {
   adminNotificationEmails: "",
   adminNotificationsEnabled: true,
   adminNotifications: DEFAULT_FLAGS,
+  customerNotifications: DEFAULT_CUSTOMER_FLAGS,
 };
 
 function normalizeAdminEmails(raw: unknown): string {
@@ -136,6 +164,19 @@ export async function POST(req: Request) {
       return next;
     })();
 
+    const mergedCustomerFlags: Required<CustomerNotificationFlags> = (() => {
+      const current = { ...DEFAULT_CUSTOMER_FLAGS, ...(existing.customerNotifications ?? {}) };
+      const incoming = body.customerNotifications;
+      if (!incoming || typeof incoming !== "object") return current;
+      const next: Required<CustomerNotificationFlags> = { ...current };
+      for (const k of Object.keys(DEFAULT_CUSTOMER_FLAGS) as Array<keyof CustomerNotificationFlags>) {
+        if (Object.prototype.hasOwnProperty.call(incoming, k)) {
+          next[k] = Boolean((incoming as CustomerNotificationFlags)[k]);
+        }
+      }
+      return next;
+    })();
+
     const merged: MailSettings = {
       host: has("host") ? String(body.host ?? "") : existing.host,
       port: has("port") ? Number(body.port) || 587 : existing.port,
@@ -153,6 +194,7 @@ export async function POST(req: Request) {
         ? Boolean(body.adminNotificationsEnabled)
         : (existing.adminNotificationsEnabled ?? true),
       adminNotifications: mergedFlags,
+      customerNotifications: mergedCustomerFlags,
     };
 
     const value = JSON.stringify(merged);

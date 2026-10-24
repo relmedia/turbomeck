@@ -72,7 +72,18 @@ function extractFromShipmentBlock(shipment: Record<string, unknown>): string | n
 
 export function extractPostNordTrackableShipmentId(data: unknown): string | null {
   if (data == null || typeof data !== "object") return null;
-  const o = data as Record<string, unknown>;
+  let o = data as Record<string, unknown>;
+
+  /**
+   * Booking through `/v3/edi/labels/pdf` nests everything one level deeper than
+   * `/v3/edi` did: `{ bookingResponse: { bookingId, idInformation }, labelPrintout }`.
+   * Without unwrapping, `idInformation` is invisible and a perfectly good
+   * booking reports "no tracking number" while the parcel exists.
+   */
+  const nested = o.bookingResponse;
+  if (nested != null && typeof nested === "object" && !Array.isArray(nested)) {
+    o = nested as Record<string, unknown>;
+  }
 
   const fromBooking = extractFromIdInformation(o);
   if (fromBooking) return fromBooking;
@@ -143,7 +154,13 @@ export function extractPostNordTrackableShipmentId(data: unknown): string | null
 /** First `printId` from Booking API 201 response (for PDF/ZPL label endpoints). */
 export function extractPostNordPrintId(data: unknown): string | null {
   if (data == null || typeof data !== "object") return null;
-  const root = data as Record<string, unknown>;
+  let root = data as Record<string, unknown>;
+  // Same wrapper as above: booking via the label endpoint nests the ids under
+  // `bookingResponse`.
+  const nested = root.bookingResponse;
+  if (nested != null && typeof nested === "object" && !Array.isArray(nested)) {
+    root = nested as Record<string, unknown>;
+  }
   const infos = root.idInformation;
   if (!Array.isArray(infos)) return null;
   for (const info of infos) {

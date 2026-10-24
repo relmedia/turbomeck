@@ -23,7 +23,10 @@ import {
   sendOrderConfirmationEmail,
   sendShipmentDispatchedEmail,
   sendRefundIssuedEmail,
+  isCustomerEmailEnabled,
+  sendAdminCoreReturnOverdueEmail,
 } from "./email.js";
+import { sendShippingNoticeEmail } from "./email-shipping-notices.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { stripeClient } from "./stripe-client.js";
 import {
@@ -1606,6 +1609,15 @@ type CheckoutOrderBody = {
   country?: string;
   servicePointName?: string;
   servicePointId?: string;
+  /**
+   * The service point's own address. PostNord's EDI booking requires it on
+   * `deliveryParty`, and no by-id lookup survives to recover it later, so the
+   * caller must pass what the customer saw when they picked the point.
+   */
+  servicePointStreet?: string;
+  servicePointPostalCode?: string;
+  servicePointCity?: string;
+  servicePointCountryCode?: string;
   deliveryOption?: string;
   couponCode?: string;
   stripePaymentId?: string;
@@ -1627,11 +1639,19 @@ async function persistOrder({
   priced,
   stripePaymentId,
   paymentMethodLabel,
+  origin = "storefront",
 }: {
   body: CheckoutOrderBody;
   priced: Extract<Awaited<ReturnType<typeof resolveCheckoutOrder>>, { ok: true }>;
   stripePaymentId: string;
   paymentMethodLabel: string | null;
+  /**
+   * `admin` means staff created this order by hand: no checkout, no payment.
+   * It is recorded on the row and it suppresses the customer confirmation —
+   * telling someone their order is confirmed when nobody has paid, and when
+   * the address may be a placeholder, is worse than sending nothing.
+   */
+  origin?: "storefront" | "admin";
 }): Promise<PersistedOrder> {
   const locale: "sv" | "en" = body.locale === "en" ? "en" : "sv";
   const paymentMethodDisplay =
@@ -1707,6 +1727,10 @@ async function persistOrder({
         country: body.country ?? "SE",
         servicePointName: body.servicePointName ?? null,
         servicePointId: body.servicePointId ?? null,
+        servicePointStreet: body.servicePointStreet ?? null,
+        servicePointPostalCode: body.servicePointPostalCode ?? null,
+        servicePointCity: body.servicePointCity ?? null,
+        servicePointCountryCode: body.servicePointCountryCode ?? null,
         deliveryOption: body.deliveryOption ?? "servicepoint",
         currency: priced.currency,
         fxRateFromSek: String(priced.fxRate),
@@ -1722,6 +1746,7 @@ async function persistOrder({
         stripePaymentId: paymentKey || null,
         postNordTrackingId: body.postNordTrackingId ?? null,
         status: initialStatus,
+        createdVia: origin,
       })
       .onConflictDoNothing({ target: orders.stripePaymentId })
       .returning(persistedOrderColumns);
@@ -1788,7 +1813,19 @@ async function persistOrder({
    * holding a confirmation for an order that does not exist; without the
    * `created` check, a duplicate POST sent the customer and the shop a second
    * copy of everything.
+   *
+   * Staff-created orders tell nobody. The customer has not bought anything, so
+   * a confirmation would be a lie; the shop already knows, because a human in
+   * admin is the one who just made it.
    */
+  if (origin === "admin") {
+    console.log("[order] created in admin — no emails sent", {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+    });
+    return { ...order, created: true };
+  }
+
   sendOrderConfirmationEmail({
     orderNumber: order.orderNumber,
     currency: priced.currency,
@@ -2054,6 +2091,10 @@ app.post("/api/orders", async (req, res) => {
       country?: string;
       servicePointName?: string;
       servicePointId?: string;
+      servicePointStreet?: string;
+      servicePointPostalCode?: string;
+      servicePointCity?: string;
+      servicePointCountryCode?: string;
       deliveryOption?: string;
       couponCode?: string;
       stripePaymentId?: string;
@@ -2172,6 +2213,89 @@ app.post("/api/orders", async (req, res) => {
     res.status(order.created ? 201 : 200).json(order);
   } catch (error) {
     console.error("Error creating order:", error);
+    res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
+/**
+ * POST /api/orders/manual
+ *
+ * Creates an order the way staff would write one out by hand: no checkout, no
+ * PaymentIntent, no money. Used by the admin "Lägg till Order" modal, mainly to
+ * get a real order to exercise PostNord booking against without buying
+ * something in the shop.
+ *
+ * It reuses `resolveCheckoutOrder` and `persistOrder` rather than inserting
+ * directly, so a manual order is priced, numbered and shaped exactly like a
+ * real one — the single thing it skips is `verifyCheckoutPaymentIntent`.
+ * Anything else would drift from the real path the first time pricing changed.
+ *
+ * Gated by its own secret, NOT the shared internal one. The storefront holds
+ * `INTERNAL_PRODUCT_API_SECRET`, so if that were the only gate, anything able
+ * to reach product-service as the shop could mint unpaid orders — a capability
+ * no amount of payment verification elsewhere would claw back. Admin is the
+ * only holder of `INTERNAL_ADMIN_API_SECRET`.
+ */
+app.post("/api/orders/manual", async (req, res) => {
+  const adminSecret = process.env.INTERNAL_ADMIN_API_SECRET?.trim();
+  if (!adminSecret) {
+    console.error(
+      "[order] INTERNAL_ADMIN_API_SECRET is not set; refusing manual order creation.",
+    );
+    return res.status(503).json({ error: "Manual orders are not configured" });
+  }
+
+  const presented =
+    typeof req.headers["x-internal-admin-secret"] === "string"
+      ? req.headers["x-internal-admin-secret"].trim()
+      : "";
+  const a = Buffer.from(presented, "utf8");
+  const b = Buffer.from(adminSecret, "utf8");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const body = req.body as CheckoutOrderBody;
+
+    if (
+      !body.email ||
+      !body.firstName ||
+      !body.lastName ||
+      !body.address ||
+      !body.city ||
+      !body.postalCode
+    ) {
+      return res.status(400).json({ error: "Missing required shipping fields" });
+    }
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      return res.status(400).json({ error: "An order needs at least one item" });
+    }
+
+    const priced = await resolveCheckoutOrder({
+      items: body.items,
+      couponCode: body.couponCode,
+      country: body.country,
+      deliveryOption: body.deliveryOption,
+      commitsCoreReturnWithin14: body.commitsCoreReturnWithin14,
+    });
+    if (!priced.ok) {
+      return res.status(priced.status).json({ error: priced.error });
+    }
+
+    const order = await persistOrder({
+      body,
+      priced,
+      // No payment exists, so no key to deduplicate on. Postgres treats NULLs
+      // as distinct, so the unique index never collides these with each other.
+      stripePaymentId: "",
+      paymentMethodLabel: null,
+      origin: "admin",
+    });
+
+    res.status(201).json(order);
+  } catch (error) {
+    console.error("Error creating manual order:", error);
     res.status(500).json({ error: "Failed to create order" });
   }
 });
@@ -2338,6 +2462,145 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
   } catch (error) {
     console.error("send-shipment-notification:", error);
     res.status(500).json({ error: "Failed to send shipment notification" });
+  }
+});
+
+/**
+ * POST /api/orders/:id/notifications/:kind
+ *
+ * One endpoint for every automated order mail, parameterised by kind, rather
+ * than a route per template. Called by the admin shipping poller, which holds a
+ * ledger claim for this (order, kind) and confirms it only if this returns
+ * `sent: true`.
+ *
+ * The three outcomes are deliberately distinct:
+ *   200 { sent: true }                 — delivered to the transport
+ *   200 { sent: false, skipped: "…" }  — declined by configuration; the caller
+ *                                        releases its claim so the mail can
+ *                                        still go if the toggle is turned on
+ *   5xx { error }                      — failed; the claim ages out and retries
+ *
+ * Collapsing "switched off" into "failed" would retry a mail the shop has
+ * deliberately disabled, forever. Collapsing it into "sent" would mean turning
+ * the toggle back on never delivers it.
+ *
+ * Gated by the internal bearer like every other /api route (app.use at the top).
+ */
+app.post("/api/orders/:id/notifications/:kind", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const kind = String(req.params.kind ?? "");
+    const body = (req.body ?? {}) as { locale?: string };
+    const locale = body.locale === "en" ? "en" : "sv";
+
+    const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    /**
+     * Only the parcel mails need a tracking number. The core-return pair is
+     * about a shipment going the other way and is checked after, not here —
+     * guarding globally would have made them impossible to send.
+     */
+    const tid = order.postNordTrackingId?.trim();
+    const needsTracking =
+      kind === "shipment_dispatched" ||
+      kind === "ready_for_pickup" ||
+      kind === "pickup_reminder_1" ||
+      kind === "pickup_reminder_2" ||
+      kind === "order_delivered";
+    if (needsTracking && !tid) {
+      return res.status(400).json({ error: "Order has no PostNord tracking number" });
+    }
+
+    // The existing dispatch mail keeps its own template and sender.
+    if (kind === "shipment_dispatched") {
+      if (!(await isCustomerEmailEnabled(kind))) {
+        return res.json({ sent: false, skipped: "shipment_dispatched is disabled in mail settings" });
+      }
+      const ok = await sendShipmentDispatchedEmail({
+        firstName: order.firstName,
+        email: order.email,
+        orderNumber: order.orderNumber,
+        trackingId: tid!,
+        locale,
+      });
+      if (!ok) {
+        return res.status(503).json({ error: "E-post kunde inte skickas (SMTP ej konfigurerat)" });
+      }
+      return res.json({ sent: true, recipient: order.email });
+    }
+
+    /**
+     * The overdue notice goes to STAFF, not the customer — it asks a human to
+     * decide about invoicing, which is not something to automate.
+     */
+    if (kind === "core_return_overdue") {
+      if (!order.coreReturnDeadline) {
+        return res.status(400).json({ error: "Order has no core return deadline" });
+      }
+      const ok = await sendAdminCoreReturnOverdueEmail({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: `${order.firstName} ${order.lastName}`.trim(),
+        customerEmail: order.email,
+        deadline: order.coreReturnDeadline,
+        coreKeepFeeSek: order.coreKeepFeeSek,
+      });
+      return ok
+        ? res.json({ sent: true })
+        : res.json({ sent: false, skipped: "no admin recipients or mail not configured" });
+    }
+
+    if (kind === "core_return_reminder") {
+      if (!order.coreReturnDeadline) {
+        return res.status(400).json({ error: "Order has no core return deadline" });
+      }
+      const result = await sendShippingNoticeEmail("core_return_reminder", {
+        firstName: order.firstName,
+        email: order.email,
+        orderNumber: order.orderNumber,
+        coreReturnDeadline: order.coreReturnDeadline,
+        locale,
+      });
+      return res.json(result);
+    }
+
+    if (
+      kind === "ready_for_pickup" ||
+      kind === "pickup_reminder_1" ||
+      kind === "pickup_reminder_2" ||
+      kind === "order_delivered"
+    ) {
+      const result = await sendShippingNoticeEmail(kind, {
+        firstName: order.firstName,
+        email: order.email,
+        orderNumber: order.orderNumber,
+        trackingId: tid!,
+        servicePointName: order.servicePointName,
+        servicePointStreet: order.servicePointStreet,
+        servicePointPostalCode: order.servicePointPostalCode,
+        servicePointCity: order.servicePointCity,
+        // Only mention the core return while one is actually outstanding.
+        coreReturnDeadline:
+          order.commitsCoreReturnWithin14 === true && !order.coreReceivedAt
+            ? order.coreReturnDeadline
+            : null,
+        locale,
+      });
+      return res.json(result);
+    }
+
+    return res.status(400).json({ error: `Unknown notification kind: ${kind}` });
+  } catch (error) {
+    console.error("order notification:", error);
+    const message = error instanceof Error ? error.message : "Failed to send notification";
+    res.status(500).json({ error: message });
   }
 });
 

@@ -7,6 +7,7 @@ import { Button } from "@repo/ui/components/button";
 import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
 import { Plus } from "lucide-react";
 import { toast } from "react-toastify";
+import { AddOrder } from "@/components/AddOrder";
 
 type StatusTab = "all" | "completed" | "processed" | "returned" | "canceled";
 
@@ -14,6 +15,7 @@ const PaymentsPage = () => {
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
   const [data, setData] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addOrderOpen, setAddOrderOpen] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -106,7 +108,14 @@ const PaymentsPage = () => {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Ordrar</h1>
-          <Button size="sm" className="bg-foreground text-background hover:bg-foreground/90">
+          {/* Was a button wired to nothing at all. Opens the same modal as
+              the sidebar's "Lägg till Order" so there is one order form, not
+              two that drift apart. */}
+          <Button
+            size="sm"
+            className="bg-foreground text-background hover:bg-foreground/90"
+            onClick={() => setAddOrderOpen(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Skapa order
           </Button>
@@ -134,6 +143,13 @@ const PaymentsPage = () => {
           onBulkDelete={handleBulkDelete}
         />
       )}
+      {/* Refreshes the table on success, so a new order appears without a
+          manual reload. */}
+      <AddOrder
+        open={addOrderOpen}
+        onOpenChange={setAddOrderOpen}
+        onCreated={() => void fetchOrders()}
+      />
     </div>
   );
 };

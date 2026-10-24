@@ -29,7 +29,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   try {
-    await triggerShipmentDispatchedEmail(orderId);
+    /**
+     * `force` because this route is only reached by a human pressing "Skicka
+     * fraktmail". The ledger exists to stop the AUTOMATED path double-sending;
+     * it must not stop staff deliberately re-sending to a customer who lost
+     * the mail. The send is still recorded, so the poller will not add another.
+     */
+    await triggerShipmentDispatchedEmail(orderId, { force: true });
     console.log(`[send-shipment-email] sent for order ${orderId}`);
     return NextResponse.json({ success: true });
   } catch (err) {

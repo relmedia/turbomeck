@@ -391,6 +391,13 @@ const CartPage: React.FC = () => {
             country: shippingForm!.country,
             servicePointName: shippingForm!.servicePoint?.name,
             servicePointId: shippingForm!.servicePoint?.servicePointId,
+            // The point's own address travels with the order because PostNord's
+            // EDI booking requires it on `deliveryParty`, and it cannot be
+            // recovered later — every by-id service point lookup is 410 Gone.
+            servicePointStreet: shippingForm!.servicePoint?.address,
+            servicePointPostalCode: shippingForm!.servicePoint?.postalCode,
+            servicePointCity: shippingForm!.servicePoint?.city,
+            servicePointCountryCode: shippingForm!.servicePoint?.countryCode,
             deliveryOption: deliveryOption,
             // Must be here: without it the post-redirect re-price loses the
             // discount and the payment no longer matches the order total.
@@ -432,6 +439,10 @@ const CartPage: React.FC = () => {
                 country: shippingForm!.country,
                 servicePointName: shippingForm!.servicePoint?.name,
                 servicePointId: shippingForm!.servicePoint?.servicePointId,
+                servicePointStreet: shippingForm!.servicePoint?.address,
+                servicePointPostalCode: shippingForm!.servicePoint?.postalCode,
+                servicePointCity: shippingForm!.servicePoint?.city,
+                servicePointCountryCode: shippingForm!.servicePoint?.countryCode,
                 deliveryOption: deliveryOption,
                 couponCode:
                   appliedCoupon && lastValidatedCode

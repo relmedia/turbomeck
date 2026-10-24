@@ -74,6 +74,16 @@ function adminSecurityHeaders(): { key: string; value: string }[] {
     "font-src 'self' data:",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https:",
+    /**
+     * The shipping-label print dialog previews the PDF by fetching it and
+     * framing the resulting `blob:` URL. Without this the frame falls back to
+     * `default-src 'self'`, which excludes blob:, and the preview renders
+     * blank with no network error to explain it.
+     *
+     * This governs what admin may embed. What may embed *admin* is unchanged:
+     * `frame-ancestors 'none'` and X-Frame-Options: DENY still stand.
+     */
+    "frame-src 'self' blob:",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

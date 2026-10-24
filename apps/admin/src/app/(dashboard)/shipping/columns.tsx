@@ -29,9 +29,11 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   confirmed: { label: "Behandlas", className: "bg-blue-50 text-blue-700 border border-blue-200" },
   shipped: { label: "Skickad", className: "bg-sky-50 text-sky-700 border border-sky-200" },
   delivered: { label: "Levererad", className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  returned: { label: "I retur", className: "bg-orange-50 text-orange-700 border border-orange-200" },
   cancelled: { label: "Avbruten", className: "bg-red-50 text-red-700 border border-red-200" },
   partially_refunded: { label: "Delvis återbetald", className: "bg-amber-50 text-amber-700 border border-amber-200" },
   refunded: { label: "Återbetald", className: "bg-slate-100 text-slate-700 border border-slate-300" },
+  completed: { label: "Slutförd", className: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
 };
 
 function toValidTrackingId(val: unknown): string {

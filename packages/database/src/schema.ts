@@ -219,6 +219,23 @@ export const orders = pgTable("orders", {
   country: text("country").notNull().default("SE"),
   servicePointName: text("service_point_name"),
   servicePointId: text("service_point_id"),
+  /**
+   * The service point's own postal address, captured when the customer picks
+   * it.
+   *
+   * PostNord rejects an EDI booking whose `deliveryParty` carries only a
+   * `partyId` — "address is a required field" — and it cannot be looked up
+   * afterwards: every by-id service point endpoint (v1 and v5
+   * `findByServicePointId`, `servicepoints/{id}`) now answers `410 Gone`. So
+   * the address has to be stored at the moment of choosing or it is lost.
+   *
+   * Nullable: orders created before this existed, and home deliveries, have no
+   * service point at all.
+   */
+  servicePointStreet: text("service_point_street"),
+  servicePointPostalCode: text("service_point_postal_code"),
+  servicePointCity: text("service_point_city"),
+  servicePointCountryCode: text("service_point_country_code"),
   deliveryOption: text("delivery_option").default("servicepoint"), // home | servicepoint
   /** ISO code actually charged. SEK is the base; NO deliveries are charged NOK
    *  so Klarna and other local methods are offered (they require the charge
@@ -258,6 +275,68 @@ export const orders = pgTable("orders", {
    * Used to re-fetch the shipping label PDF via POST /rest/shipment/v3/edi/labels/pdf.
    */
   postNordLabelSnapshot: jsonb("post_nord_label_snapshot").$type<Record<string, unknown> | null>(),
+  /**
+   * The booked label itself, base64 PDF, stored at booking time.
+   *
+   * It is kept because re-requesting it is destructive: PostNord's
+   * `/v3/edi/labels/pdf` is book-and-print, so every POST of the instruction
+   * registers a NEW parcel (verified: two identical calls returned parcels
+   * …512511 and …512528, neither being the one the order was booked as).
+   * Booking now asks for the label once and keeps it here, and reprints read
+   * this column instead of touching PostNord.
+   */
+  postNordLabelPdf: text("post_nord_label_pdf"),
+  /** Paper size the stored PDF was rendered at, so the UI can say which it is. */
+  postNordLabelPaperSize: text("post_nord_label_paper_size"),
+  /**
+   * Set when staff mark the booking cancelled.
+   *
+   * PostNord has no cancellation API — its delete endpoint is absent from the
+   * Booking API spec, and `updateIndicator: "Deletion"` is ignored and books a
+   * new shipment instead — so cancelling happens in PostNord's portal and this
+   * records that it was done. The tracking id and label are deliberately kept:
+   * they are the history of a parcel that existed and was paid for.
+   */
+  postNordBookingCancelledAt: timestamp("post_nord_booking_cancelled_at", { mode: "date" }),
+  /**
+   * The last status PostNord reported for this parcel, verbatim — one of the
+   * `ItemDto.status` enum values (`EN_ROUTE`, `AVAILABLE_FOR_DELIVERY`,
+   * `DELIVERED`, …).
+   *
+   * Stored unmapped on purpose. `orders.status` is our own coarse state and
+   * cannot express "sitting at the service point waiting to be collected",
+   * which is precisely the state the pickup reminders key off. Keeping
+   * PostNord's own value means a mapping change never needs a backfill.
+   */
+  postNordStatus: text("post_nord_status"),
+  /** When `postNordStatus` last CHANGED — not when it was last confirmed. */
+  postNordStatusAt: timestamp("post_nord_status_at", { mode: "date" }),
+  /** When the poller last asked PostNord about this parcel, changed or not. */
+  postNordLastPolledAt: timestamp("post_nord_last_polled_at", { mode: "date" }),
+  /** PostNord's own `item.deliveryDate`. The moment of delivery was previously recorded nowhere. */
+  postNordDeliveredAt: timestamp("post_nord_delivered_at", { mode: "date" }),
+  /**
+   * When the parcel became collectable at the service point.
+   *
+   * This is the clock the pickup reminders run on, and PostNord's hold period
+   * is short: it was cut from 7 days to 3 on 1 October 2026 (the recipient can
+   * extend it back to 7 in PostNord's app). After that the parcel is returned
+   * to us at our cost, which is the whole reason the reminders exist.
+   */
+  postNordAvailableAt: timestamp("post_nord_available_at", { mode: "date" }),
+  /** PostNord's `estimatedTimeOfArrival`, when they offer one. */
+  postNordEta: timestamp("post_nord_eta", { mode: "date" }),
+  /**
+   * Where the order came from: `storefront` for a real checkout, `admin` for
+   * one staff created by hand.
+   *
+   * An admin order never passes through Stripe, so it has no PaymentIntent to
+   * verify and no money behind it. Without this column it is indistinguishable
+   * from a genuine zero-total order, and a test order would quietly count
+   * towards revenue and show up as refundable. Defaults to `storefront` so
+   * every existing row keeps its meaning.
+   */
+  createdVia: text("created_via").default("storefront").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   /**
@@ -344,6 +423,51 @@ export const checkoutIntents = pgTable("checkout_intent", {
  * (the webhook handles only payment_intent.*). These rows exist to reserve,
  * to audit, and to show history.
  */
+/**
+ * One row per (order, email kind): the record that an automated mail was sent,
+ * and the lock that stops it being sent twice.
+ *
+ * The shipping poller runs every 30 minutes and re-reads the same orders each
+ * time. Without this table a parcel sitting at `AVAILABLE_FOR_DELIVERY` for two
+ * days would mail the customer ~96 times. No other customer email in this repo
+ * has a sent-record at all — `orderRefunds.emailSentAt` is the closest thing
+ * and it is only a record, nothing reads it to block a resend.
+ *
+ * The unique index IS the guarantee. Senders claim a row first with
+ * `onConflictDoNothing` and only send if the insert won — the same
+ * insert-and-inspect-rowcount pattern `persistOrder` uses for
+ * `stripePaymentId`. `sentAt` stays NULL until the transport confirms, so a
+ * crash mid-send leaves a claim that can be retried rather than a lie that
+ * says the customer was told.
+ */
+export const orderEmails = pgTable("order_emails", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id")
+    .references(() => orders.id, { onDelete: "cascade" })
+    .notNull(),
+  /**
+   * Which mail: `shipment_dispatched`, `ready_for_pickup`,
+   * `pickup_reminder_1`, `pickup_reminder_2`, `order_delivered`,
+   * `core_return_reminder`, `core_return_overdue`.
+   *
+   * Free text rather than an enum so adding a mail does not need a migration;
+   * the values are defined in `@repo/shipping`.
+   */
+  kind: text("kind").notNull(),
+  /** When a sender took ownership of this (order, kind). */
+  claimedAt: timestamp("claimed_at", { mode: "date" }).defaultNow().notNull(),
+  /** Set only once the transport accepted the message. NULL = claimed, not yet sent. */
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  /** Address it went to, kept so staff can see where a mail actually landed. */
+  recipient: text("recipient"),
+  /** Last failure, when the send did not succeed. */
+  error: text("error"),
+  /** Anything worth keeping for support: tracking id, service point, status at send time. */
+  meta: jsonb("meta").$type<Record<string, unknown> | null>(),
+}, (table) => [
+  uniqueIndex("order_emails_order_kind_unique").on(table.orderId, table.kind),
+]);
+
 export const orderRefunds = pgTable("order_refunds", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id")

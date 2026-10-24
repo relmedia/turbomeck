@@ -256,6 +256,16 @@ export async function createOrder(orderData: {
   country?: string;
   servicePointName?: string;
   servicePointId?: string;
+  /**
+   * The service point's own address. PostNord's EDI booking rejects a
+   * `deliveryParty` without one, and it cannot be fetched at booking time —
+   * their by-id service point endpoints all return 410 Gone — so it has to
+   * ride along from the picker.
+   */
+  servicePointStreet?: string;
+  servicePointPostalCode?: string;
+  servicePointCity?: string;
+  servicePointCountryCode?: string;
   deliveryOption?: string;
   /** Applied discount code — server recomputes discount from DB rules; do not trust client totals. */
   couponCode?: string;

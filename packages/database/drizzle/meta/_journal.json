@@ -155,6 +155,34 @@
       "when": 1792523412823,
       "tag": "0021_order_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792523412824,
+      "tag": "0022_order_created_via",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792523412825,
+      "tag": "0023_order_service_point_address",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792523412826,
+      "tag": "0024_order_label_storage_and_cancel",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792609812826,
+      "tag": "0025_shipping_status_and_email_ledger",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,30 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "NodeNext",
+    /**
+     * "Bundler", not "NodeNext".
+     *
+     * Every consumer of this package bundles or transpiles it rather than
+     * running it through Node's own ESM resolver: apps/admin and apps/client
+     * are Next.js, and apps/product-service runs under tsx. NodeNext demanded
+     * explicit ".js" extensions on relative imports, which tsc accepted and
+     * Next's bundler then failed to resolve — a .js specifier pointing at a
+     * .ts file that only exists as source. Bundler resolution matches reality.
+     */
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  /**
+   * __verify-* are tsx-run harnesses, not part of the package surface. They use
+   * `process`, which would mean pulling @types/node into a package that
+   * otherwise has zero dependencies and runs in the browser. Excluding them
+   * lets this package typecheck cleanly for the first time — the pre-existing
+   * __verify.ts had the same unresolved `process` error.
+   */
+  "exclude": ["node_modules", "src/__verify*.ts"]
 }

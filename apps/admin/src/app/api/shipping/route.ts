@@ -23,7 +23,9 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: "Behandlas",
   shipped: "Skickad",
   delivered: "Levererad",
+  returned: "I retur",
   cancelled: "Avbruten",
+  completed: "Slutförd",
   partially_refunded: "Delvis återbetald",
   refunded: "Återbetald",
 };

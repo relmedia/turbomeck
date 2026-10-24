@@ -40,6 +40,7 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { toast } from "react-toastify";
+import { LabelPrintDialog } from "@/components/LabelPrintDialog";
 import { postNordTrackingUrl } from "@repo/shipping";
 import { DashboardOrderDetailSkeleton } from "@/components/dashboard-skeletons";
 import { Skeleton } from "@repo/ui/components/skeleton";
@@ -113,13 +114,7 @@ type PostNordPrintoutOption = {
   customs?: string[];
   format: string;
 };
-type PostNordLabelOptionsResponse = {
-  requestedIds: string[];
-  options: {
-    summaryPrintoutLabelOptions?: PostNordPrintoutOption[];
-    printoutLabelOptions?: { id: string; printoutOptions: PostNordPrintoutOption[] }[];
-  };
-};
+;
 
 function toValidTrackingId(val: unknown): string {
   if (val == null) return "";
@@ -127,6 +122,29 @@ function toValidTrackingId(val: unknown): string {
   return s && s.toLowerCase() !== "null" ? s : "";
 }
 
+
+type OrderEmailRow = {
+  kind: string;
+  sentAt: string | null;
+  claimedAt: string;
+  recipient: string | null;
+  error: string | null;
+};
+
+/**
+ * Swedish names for the ledger kinds. An unknown kind falls back to its raw
+ * value rather than disappearing — a mail that went out should always be
+ * visible here, even one added after this map was written.
+ */
+const ORDER_EMAIL_LABELS: Record<string, string> = {
+  shipment_dispatched: "Skickad + spårlänk",
+  ready_for_pickup: "Klar att hämta",
+  pickup_reminder_1: "Påminnelse 1",
+  pickup_reminder_2: "Påminnelse 2",
+  order_delivered: "Levererad",
+  core_return_reminder: "Kärnretur — påminnelse",
+  core_return_overdue: "Kärnretur — försenad (till er)",
+};
 
 const DELIVERY_STEPS = [
   { id: "processing", label: "Behandlas", icon: Package },
@@ -324,6 +342,7 @@ export default function OrderDetailPage() {
    */
   const [bookWeightKg, setBookWeightKg] = useState("");
   const [preflight, setPreflight] = useState<BookingPreflight | null>(null);
+  const [orderEmails, setOrderEmails] = useState<OrderEmailRow[]>([]);
   const [bookingError, setBookingError] = useState<{
     error: string;
     details?: string;
@@ -331,9 +350,7 @@ export default function OrderDetailPage() {
   } | null>(null);
   const [sendingShipmentEmail, setSendingShipmentEmail] = useState(false);
   const [confirmRebookOpen, setConfirmRebookOpen] = useState(false);
-  const [labelOptions, setLabelOptions] = useState<PostNordLabelOptionsResponse | null>(null);
-  const [labelOptionsLoading, setLabelOptionsLoading] = useState(false);
-  const [labelOptionsError, setLabelOptionsError] = useState<string | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -349,27 +366,6 @@ export default function OrderDetailPage() {
       .catch(() => setOrder(null))
       .finally(() => setLoading(false));
   }, [id]);
-
-  const fetchLabelOptions = async () => {
-    if (!id) return;
-    setLabelOptionsLoading(true);
-    setLabelOptionsError(null);
-    try {
-      const res = await fetch(`/api/orders/${id}/postnord-label-options?format=PDF&rotate=0&definePrintout=ALL`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setLabelOptionsError(typeof data.error === "string" ? data.error : "Kunde inte hämta etikettalternativ");
-        setLabelOptions(null);
-        return;
-      }
-      setLabelOptions(data as PostNordLabelOptionsResponse);
-    } catch {
-      setLabelOptionsError("Kunde inte hämta etikettalternativ");
-      setLabelOptions(null);
-    } finally {
-      setLabelOptionsLoading(false);
-    }
-  };
 
   const fetchTrackingStatus = async () => {
     const tid = toValidTrackingId(order?.postNordTrackingId) || editTrackingId.trim();
@@ -461,9 +457,12 @@ export default function OrderDetailPage() {
     ineligibleReason: { code: string; message: string } | null;
     booked: {
       isBooked: boolean;
+      /** Set when staff marked the booking cancelled in PostNord's portal. */
+      cancelledAt: string | null;
       trackingId: string | null;
       printId: string | null;
       hasLabel: boolean;
+      labelPaperSize: string | null;
       bookedAt: string | null;
       testBooking: boolean;
       weightKg: number | null;
@@ -483,6 +482,33 @@ export default function OrderDetailPage() {
     };
   };
 
+  const [cancelling, setCancelling] = useState(false);
+
+  /**
+   * Records that the booking was cancelled in PostNord's portal, or undoes that
+   * mark. It does not cancel anything at PostNord — they expose no API for it,
+   * so the portal is the only place a parcel can actually be stopped.
+   */
+  const setBookingCancelled = async (cancelled: boolean) => {
+    if (!id) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/postnord-book-shipment`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancelled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast.success(cancelled ? "Bokningen markerad som avbruten" : "Markeringen borttagen");
+      await refreshPreflight();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kunde inte uppdatera bokningen");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const refreshPreflight = useCallback(async () => {
     if (!id) return;
     try {
@@ -493,9 +519,29 @@ export default function OrderDetailPage() {
     }
   }, [id]);
 
+  /**
+   * What the automation has mailed this customer.
+   *
+   * Worth its own request rather than widening the preflight: the preflight is
+   * about whether a parcel CAN be booked, and this is a log of what already
+   * happened. They change at different times and for different reasons.
+   */
+  const refreshOrderEmails = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/orders/${id}/emails`);
+      if (!res.ok) return setOrderEmails([]);
+      const data = (await res.json()) as { emails?: OrderEmailRow[] };
+      setOrderEmails(data.emails ?? []);
+    } catch {
+      setOrderEmails([]);
+    }
+  }, [id]);
+
   useEffect(() => {
     void refreshPreflight();
-  }, [refreshPreflight]);
+    void refreshOrderEmails();
+  }, [refreshPreflight, refreshOrderEmails]);
 
   // Prefill the weight from the products once the preflight lands, unless the
   // admin has already typed something.
@@ -574,7 +620,12 @@ export default function OrderDetailPage() {
         toast.success(`Frakt bokad — spårning: ${data.postNordTrackingId ?? ""}`);
       }
       if (data.postNordLabelAvailable === false) {
-        toast.warn("Ingen etikett-snapshot sparades — PDF kan saknas.");
+        /* The label arrives with the booking and is stored then. If it did not,
+           it cannot be fetched afterwards — asking PostNord for it again books
+           another parcel — so the label has to come from their portal. */
+        toast.warn(
+          "PostNord skickade ingen etikett med bokningen. Hämta den i PostNords portal; den går inte att hämta i efterhand härifrån.",
+        );
       }
 
       const refetch = await fetch(`/api/orders/${id}`);
@@ -745,18 +796,40 @@ export default function OrderDetailPage() {
                   )}
                 </div>
                 <div className="pt-3 space-y-3">
-                  <div className="bg-muted flex items-center gap-3 rounded-md border p-4">
-                    <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-base font-medium">Betalningsmetod</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.paymentLast4 && order.paymentLast4 !== "—"
-                          ? `${order.paymentMethod} slutar på **** ${order.paymentLast4}`
-                          : `${order.paymentMethod}`}
+                  {/* Betalningsmetod.
+                      The glyph used to be vertically centred against a
+                      two-line stack, so it floated at the midpoint attached to
+                      neither line. It now aligns to the top line.
+
+                      The hierarchy was also inverted: "Betalningsmetod" — the
+                      label — was the largest text, and the card itself was
+                      muted beneath it. The label is now a quiet caption and the
+                      card is the headline. */}
+                  <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3">
+                    <CreditCard
+                      className="mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Betalningsmetod
                       </p>
+                      <p className="mt-0.5 text-sm font-medium leading-tight">
+                        {order.paymentMethod}
+                      </p>
+                      {order.paymentLast4 && order.paymentLast4 !== "—" && (
+                        /* Grouped like a card number rather than spelled out as
+                           "slutar på **** 4242" — the shape carries the meaning,
+                           and it stays scannable next to a Stripe dashboard. */
+                        <p className="mt-1 font-mono text-xs tracking-[0.2em] text-muted-foreground">
+                          •••• {order.paymentLast4}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  {(order.commitsCoreReturnWithin14 === true || order.coreKeepFeeSek) && (
+                  {(order.commitsCoreReturnWithin14 === true ||
+                    (order.coreKeepFeeSek ?? 0) > 0) && (
                     <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-1">
                       <p className="font-medium text-sm">Kärnretur (nya flödet)</p>
                       {order.commitsCoreReturnWithin14 === true && order.coreReturnDeadline && (
@@ -828,7 +901,17 @@ export default function OrderDetailPage() {
 
           <Card className="gap-4 py-4">
             <CardHeader className="py-2 px-4">
-              <CardTitle className="text-sm">Leveransstatus</CardTitle>
+              {/* The heading states the current step. The stepper shows *where*
+                  in the sequence it sits; the name of the state should not have
+                  to be inferred from which circle is outlined. */}
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm">Leveransstatus</CardTitle>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {isFullyRefunded
+                    ? "Återbetald"
+                    : (DELIVERY_STEPS[Math.min(Math.max(stepIndex, 0), DELIVERY_STEPS.length - 1)]?.label ?? "")}
+                </span>
+              </div>
             </CardHeader>
             <CardContent className="px-4 pb-3 pt-0">
               <div className="flex flex-col gap-4">
@@ -838,85 +921,131 @@ export default function OrderDetailPage() {
                     refund keeps its stepper: the goods may well still ship,
                     and only the money moved. */}
                 {isFullyRefunded ? (
-                  <div className="rounded-lg border bg-muted/40 px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <RotateCcw className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <p className="text-sm font-medium">Återbetald</p>
+                  <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-border bg-background text-muted-foreground">
+                      <RotateCcw className="h-4 w-4" strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-tight">Återbetald</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Hela beloppet är återbetalt — ingen leverans att följa.
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Hela beloppet är återbetalt — ingen leverans att följa.
-                    </p>
                   </div>
                 ) : (
                 <>
                 {isPartlyRefunded && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/30">
-                    <RotateCcw className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
-                    <p className="text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <p className="text-[11px] leading-tight">
                       Delvis återbetald. Leveransen nedan gäller fortfarande.
                     </p>
                   </div>
                 )}
-                <div
-                  className="mb-2 grid w-full gap-2"
-                  style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
-                >
-                  {DELIVERY_STEPS.map((step, i) => {
-                    const Icon = step.icon;
-                    const isComplete = i < stepIndex;
-                    const isCurrent = i === stepIndex;
-                    const isDone = isComplete || isCurrent;
-                    return (
-                      <div
-                        key={step.id}
-                        className="flex items-center justify-center gap-2"
-                      >
-                        <div
-                          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
-                            isComplete
-                              ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/25"
-                              : isCurrent
-                                ? "bg-sky-500 text-white shadow-md shadow-sky-500/30 ring-4 ring-sky-500/15"
-                                : "border-2 border-muted-foreground/20 bg-background text-muted-foreground/60"
-                          }`}
-                        >
-                          {isComplete ? (
-                            <CheckCircle2 className="h-4 w-4" strokeWidth={2.25} />
-                          ) : (
-                            <Icon className="h-4 w-4" strokeWidth={isCurrent ? 2.25 : 1.75} />
-                          )}
-                          {isCurrent && (
-                            <span
-                              aria-hidden
-                              className="absolute inset-0 rounded-full ring-2 ring-sky-400/50 animate-ping"
-                            />
-                          )}
-                        </div>
-                        <p
-                          className={`text-xs transition-colors ${
-                            isComplete
-                              ? "font-medium text-emerald-700 dark:text-emerald-400"
-                              : isCurrent
-                                ? "font-medium text-sky-700 dark:text-sky-400"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {step.label}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                {/* Connected stepper.
+                    Replaces a grid of unconnected circles plus a separate
+                    gradient bar — two indicators of the same thing, neither
+                    showing how far along the parcel was. The track now runs
+                    centre-to-centre between the first and last step and fills
+                    to the current one, so progress is read from the line
+                    itself. Labels sit under their icon rather than beside it:
+                    "Under leverans" in a quarter-width column had nowhere to
+                    go. */}
+                <div className="relative pt-1">
+                  {/* Track: inset by half a column so it starts and ends at the
+                      circle centres instead of the card edges. */}
                   <div
-                    className="h-full rounded-full bg-linear-to-r from-emerald-500 to-sky-500 transition-all duration-500"
-                    style={{ width: `${((stepIndex + 1) / DELIVERY_STEPS.length) * 100}%` }}
+                    className="absolute top-[22px] h-0.5 rounded-full bg-border"
+                    style={{
+                      left: `${100 / (DELIVERY_STEPS.length * 2)}%`,
+                      right: `${100 / (DELIVERY_STEPS.length * 2)}%`,
+                    }}
+                    aria-hidden
                   />
+                  <div
+                    className="absolute top-[22px] h-0.5 rounded-full bg-emerald-500 transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                    style={{
+                      left: `${100 / (DELIVERY_STEPS.length * 2)}%`,
+                      width: `calc((100% - ${100 / DELIVERY_STEPS.length}%) * ${
+                        DELIVERY_STEPS.length > 1
+                          ? Math.min(Math.max(stepIndex, 0), DELIVERY_STEPS.length - 1) /
+                            (DELIVERY_STEPS.length - 1)
+                          : 0
+                      })`,
+                    }}
+                    aria-hidden
+                  />
+
+                  <ol
+                    className="relative grid w-full"
+                    style={{ gridTemplateColumns: `repeat(${DELIVERY_STEPS.length}, minmax(0, 1fr))` }}
+                  >
+                    {DELIVERY_STEPS.map((step, i) => {
+                      const Icon = step.icon;
+                      const isComplete = i < stepIndex;
+                      const isCurrent = i === stepIndex;
+                      /* One accent colour in three weights — filled for done,
+                         outlined-with-ring for current, muted for pending.
+                         A second hue for "current" read as a different kind of
+                         state rather than a further stage of the same one. */
+                      const dot = isComplete
+                        ? "border-emerald-500 bg-emerald-500 text-white"
+                        : isCurrent
+                          ? "border-emerald-500 bg-background text-emerald-600 ring-4 ring-emerald-500/15 dark:text-emerald-400"
+                          : "border-border bg-background text-muted-foreground/50";
+                      /* Only steps whose date we actually know get one. */
+                      const when =
+                        step.id === "processing"
+                          ? order.placedDate
+                          : step.id === "shipped"
+                            ? preflight?.booked.bookedAt ?? null
+                            : null;
+                      return (
+                        <li
+                          key={step.id}
+                          className="flex flex-col items-center gap-1.5 text-center"
+                          aria-current={isCurrent ? "step" : undefined}
+                        >
+                          <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-200 motion-reduce:transition-none ${dot}`}
+                          >
+                            {isComplete ? (
+                              <CheckCircle2 className="h-4 w-4" strokeWidth={2.5} />
+                            ) : (
+                              <Icon className="h-4 w-4" strokeWidth={isCurrent ? 2.25 : 1.75} />
+                            )}
+                          </span>
+                          <span
+                            className={`px-0.5 text-[11px] leading-tight ${
+                              isComplete || isCurrent
+                                ? "font-medium text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                          {when && (isComplete || isCurrent) && (
+                            <span className="text-[10px] leading-none text-muted-foreground">
+                              {formatDate(when)}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
                 </div>
                 </>
                 )}
                 {/* Fraktbokning. Renders in every state — when booking is not
-                    possible it says why, instead of silently disappearing. */}
+                    possible it says why, instead of silently disappearing.
+
+                    Separated by a rule and given a heading: it is the one part
+                    of this card that *does* something, and it was reading as
+                    another status panel. */}
+                <div className="border-t pt-3">
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Fraktbokning
+                  </p>
                 <div className="rounded-lg border bg-muted/30 px-3 py-3 text-xs space-y-2">
                   {!preflight ? (
                     <Skeleton className="h-9 w-48 rounded" aria-hidden />
@@ -924,6 +1053,39 @@ export default function OrderDetailPage() {
                     <p className="text-[11px] text-muted-foreground">
                       {preflight.ineligibleReason?.message ?? "Frakt kan inte bokas för denna order."}
                     </p>
+                  ) : preflight.booked.cancelledAt ? (
+                    /* Cancelled in PostNord's portal. The tracking id is kept
+                       on purpose — the parcel existed and may have been billed. */
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-muted-foreground/30 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          Bokning avbruten
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatDate(preflight.booked.cancelledAt)}
+                        </span>
+                        {preflight.booked.trackingId && (
+                          <span className="font-mono text-[11px] text-muted-foreground break-all">
+                            {preflight.booked.trackingId}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Avbokningen gjordes hos PostNord. Boka frakt igen om
+                        försändelsen ska skickas ändå.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 bg-white text-xs"
+                          onClick={() => setBookingCancelled(false)}
+                          disabled={cancelling}
+                        >
+                          Ångra markeringen
+                        </Button>
+                      </div>
+                    </div>
                   ) : preflight.booked.isBooked ? (
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -965,31 +1127,14 @@ export default function OrderDetailPage() {
 
                       <div className="flex flex-wrap items-center gap-2 pt-1">
                         {preflight.booked.hasLabel && (
-                          <Button variant="outline" size="sm" className="h-8 gap-1 bg-white text-xs" asChild>
-                            <a
-                              href={`/api/orders/${id}/postnord-label-pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Printer className="h-3.5 w-3.5" aria-hidden />
-                              Fraktetikett PDF
-                            </a>
-                          </Button>
-                        )}
-                        {preflight.booked.trackingId && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-8 gap-1 bg-white text-xs"
-                            onClick={fetchLabelOptions}
-                            disabled={labelOptionsLoading}
+                            onClick={() => setPrintDialogOpen(true)}
                           >
-                            {labelOptionsLoading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                            ) : (
-                              <Printer className="h-3.5 w-3.5" aria-hidden />
-                            )}
-                            Etikettalternativ
+                            <Printer className="h-3.5 w-3.5" aria-hidden />
+                            Fraktetikett PDF
                           </Button>
                         )}
                         {preflight.booked.trackingId && (
@@ -1036,6 +1181,18 @@ export default function OrderDetailPage() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        {/* Records a cancellation already made in PostNord's
+                            portal — they have no cancel API, so admin can only
+                            be told about it, never do it. */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 bg-white text-xs"
+                          onClick={() => setBookingCancelled(true)}
+                          disabled={cancelling}
+                        >
+                          Markera som avbruten
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -1151,6 +1308,57 @@ export default function OrderDetailPage() {
                     </p>
                   )}
                 </div>
+
+                {/* Utskick. Only rendered once something has actually been
+                    sent — an empty log is noise on an order that has not
+                    shipped yet. */}
+                {orderEmails.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Utskick till kund
+                    </p>
+                    <ul className="space-y-1.5">
+                      {orderEmails.map((mail) => {
+                        const label = ORDER_EMAIL_LABELS[mail.kind] ?? mail.kind;
+                        const failed = !mail.sentAt && mail.error;
+                        const pending = !mail.sentAt && !mail.error;
+                        return (
+                          <li
+                            key={mail.kind}
+                            className="flex items-start justify-between gap-2 text-[11px]"
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                className={`mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  failed
+                                    ? "bg-destructive"
+                                    : pending
+                                      ? "bg-muted-foreground/40"
+                                      : "bg-emerald-500"
+                                }`}
+                                aria-hidden
+                              />
+                              <span className="truncate text-foreground">{label}</span>
+                            </span>
+                            <span className="shrink-0 text-muted-foreground">
+                              {mail.sentAt
+                                ? formatDate(mail.sentAt)
+                                : failed
+                                  ? "misslyckades"
+                                  : "skickas…"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {orderEmails.some((m) => m.error) && (
+                      <p className="mt-1.5 text-[10px] text-destructive">
+                        {orderEmails.find((m) => m.error)?.error}
+                      </p>
+                    )}
+                  </div>
+                )}
+                </div>
                 <div className="mt-4 space-y-3 border-t pt-4">
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="space-y-1.5">
@@ -1202,56 +1410,6 @@ export default function OrderDetailPage() {
                     </Button>
                   </div>
                 </div>
-                {(labelOptionsError || labelOptions) && (
-                  <div className="mt-2 rounded-md border bg-muted/40 p-3 text-xs">
-                    {labelOptionsError && (
-                      <p className="text-destructive">{labelOptionsError}</p>
-                    )}
-                    {labelOptions && (
-                      <div className="space-y-2">
-                        <p className="font-medium">
-                          Tillgängliga etikettformat
-                          {labelOptions.requestedIds.length > 0 && (
-                            <span className="ml-1 text-muted-foreground font-normal break-all">
-                              ({labelOptions.requestedIds.join(", ")})
-                            </span>
-                          )}
-                        </p>
-                        {labelOptions.options.summaryPrintoutLabelOptions &&
-                          labelOptions.options.summaryPrintoutLabelOptions.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                                Gemensamma alternativ
-                              </p>
-                              <ul className="space-y-1">
-                                {labelOptions.options.summaryPrintoutLabelOptions.map((opt, i) => (
-                                  <li key={`sum-${i}`} className="font-mono break-all">
-                                    {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        {labelOptions.options.printoutLabelOptions?.map((row) => (
-                          <div key={row.id} className="space-y-1">
-                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                              ID {row.id}
-                            </p>
-                            <ul className="space-y-1">
-                              {row.printoutOptions.map((opt, i) => (
-                                <li key={`row-${row.id}-${i}`} className="font-mono break-all">
-                                  {opt.format} · {opt.labelType} · {opt.paperSize.join(", ")}
-                                  {opt.rotate?.length ? ` · rotate=${opt.rotate.join("|")}` : ""}
-                                  {opt.definePrintout?.length ? ` · ${opt.definePrintout.join("|")}` : ""}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
                 {(editStatus === "shipped" || editStatus === "delivered") && (
                   <div className="mt-4 space-y-2 border-t pt-4">
                     <div className="flex items-center gap-2">
@@ -1395,6 +1553,13 @@ export default function OrderDetailPage() {
           />
         </div>
       </div>
+
+      <LabelPrintDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        orderId={Number(id)}
+        orderNumber={order?.orderNumber}
+      />
     </div>
   );
 }

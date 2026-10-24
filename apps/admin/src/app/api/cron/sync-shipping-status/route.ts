@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { syncShippingStatus } from "@/lib/sync-shipping-status";
+import { syncCoreReturns } from "@/lib/sync-core-returns";
 
 /**
  * GET /api/cron/sync-shipping-status
- * Polls PostNord Track API for shipped orders and auto-updates to "delivered" when PostNord reports delivery.
+ * Runs both automated sweeps: the PostNord status poll (which moves order
+ * status and sends the shipping emails) and the kärnretur chase.
+ *
+ * Intended to be called by an OS crontab as a backstop for the in-process
+ * timer in instrumentation.ts, which dies on every pm2 restart. Running both
+ * at once is safe — each sweep takes an advisory lock and every mail is
+ * guarded by the order_emails unique index.
  * Protect with CRON_SECRET: call with Authorization: Bearer <CRON_SECRET> or x-cron-secret header.
  * Also runs automatically via node-cron every 2 hours when the app is running.
  */
@@ -37,8 +44,21 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { checked, updated } = await syncShippingStatus();
-    return NextResponse.json({ ok: true, checked, updated });
+    /**
+     * Both sweeps run from one heartbeat so a single OS crontab entry covers
+     * everything. Core returns are cheap (one indexed query, usually zero
+     * rows) and each mail is ledger-guarded, so running them on the 30-minute
+     * shipping cadence costs nothing and sends nothing extra.
+     */
+    const shipping = await syncShippingStatus();
+    const coreReturns = await syncCoreReturns();
+    return NextResponse.json({
+      ok: true,
+      checked: shipping.checked,
+      updated: shipping.updated,
+      shipping,
+      coreReturns,
+    });
   } catch (err) {
     console.error("[cron/sync-shipping-status]", err);
     return NextResponse.json(

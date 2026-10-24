@@ -86,6 +86,7 @@ const AppSidebar = ({
   ...props
 }: React.ComponentProps<typeof Sidebar>) => {
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [addOrderOpen, setAddOrderOpen] = useState(false);
   const { data: session } = useSession();
   const initials = getInitials(session?.user?.name) || session?.user?.email?.[0]?.toUpperCase() || "?";
   return (
@@ -236,19 +237,15 @@ const AppSidebar = ({
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {/* A real button, not a Link to "#". It used to be a sheet
+                  wrapped in two nested SidebarMenuButtons, which rendered a
+                  button inside a button and left `asChild` with nothing
+                  sensible to merge into. The dialog is controlled from here
+                  instead, so the trigger is just a menu button. */}
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <SidebarMenuButton asChild>
-                        <Link href="#">
-                          <Plus />
-                          Lägg till Order
-                        </Link>
-                      </SidebarMenuButton>
-                    </SheetTrigger>
-                    <AddOrder />
-                  </Sheet>
+                <SidebarMenuButton onClick={() => setAddOrderOpen(true)}>
+                  <Plus />
+                  Lägg till Order
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -313,6 +310,7 @@ const AppSidebar = ({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <AddOrder open={addOrderOpen} onOpenChange={setAddOrderOpen} />
     </Sidebar>
   );
 };
