@@ -131,9 +131,10 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const prevIndexRef = useRef(0);
   const isFirstRenderRef = useRef(true);
   /** Set when the track has already been placed by hand and must not re-animate. */
-  const silentRef = useRef(false);
   const sliderContainerRef = useRef<HTMLElement>(null);
   const floatTweenRef = useRef<gsap.core.Tween | null>(null);
+  /** The pending "cut the track" call between slides, so it can be cancelled. */
+  const cutCallRef = useRef<gsap.core.Tween | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,30 +172,24 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
     [products.length, index]
   );
 
-  /** One step forward, over the trailing clone when it runs off the end. */
+  /**
+   * One step forward, wrapping directly.
+   *
+   * There used to be a trailing clone of the first slide here so the wrap
+   * could travel forwards instead of sweeping back across everything. The
+   * track no longer travels — slides are cut, not slid — so there is nothing
+   * for the detour to smooth over and the clone is gone.
+   */
   const goNext = useCallback(() => {
     if (products.length <= 1) return;
-    // With motion reduced there is no travel to preserve, so skip the clone
-    // and wrap directly — nothing is animating for the detour to smooth over.
-    setPos((p) => (reducedMotion ? (p + 1) % products.length : p + 1));
-  }, [products.length, reducedMotion]);
+    setPos((p) => (p + 1) % products.length);
+  }, [products.length]);
 
-  /** One step back. Leaving the first slide is the same problem mirrored: the
-   *  track is re-seated on the clone first, so the move is one step leftwards
-   *  rather than a sweep forwards across everything. */
+  /** One step back. No re-seating needed now that the track is cut, not slid. */
   const goPrev = useCallback(() => {
     if (products.length <= 1) return;
-    if (pos !== 0 || reducedMotion) {
-      setPos((p) => (p === 0 ? products.length - 1 : p - 1));
-      return;
-    }
-    const track = trackRef.current;
-    if (!track) return;
-    const slideWidth = 100 / (products.length + 1);
-    gsap.set(track, { xPercent: -products.length * slideWidth });
-    prevIndexRef.current = products.length;
-    setPos(products.length - 1);
-  }, [pos, products.length, reducedMotion]);
+    setPos((p) => (p === 0 ? products.length - 1 : p - 1));
+  }, [products.length]);
 
   useEffect(() => {
     if (products.length <= 1) return;
@@ -329,33 +324,18 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   useEffect(() => {
     if (!trackRef.current || products.length === 0) return;
 
-    // The clone makes the track one slide longer than the product list.
-    const slideCount = products.length > 1 ? products.length + 1 : products.length;
-    const slideWidth = 100 / slideCount;
+    /**
+     * A cut still pending from the previous change would fire after this one
+     * and slam the track back to the old position. Rapid clicking on the
+     * arrows is exactly how a user finds that.
+     */
+    cutCallRef.current?.kill();
+    cutCallRef.current = null;
+
+    const slideWidth = 100 / products.length;
     const xPercent = -pos * slideWidth;
     const prevIndex = prevIndexRef.current;
     const isTransition = prevIndex !== pos;
-    const isClone = products.length > 1 && pos === products.length;
-
-    /** Put a slide's contents straight into their resting state, no tween. */
-    const settle = (el: Element | null | undefined) => {
-      if (!el) return;
-      gsap.set(el.querySelectorAll("[data-slide-text]"), { opacity: 1, y: 0, x: 0, scale: 1 });
-      const img = el.querySelector("[data-slide-image]");
-      const cta = el.querySelector("[data-slide-cta]");
-      const type = el.querySelector("[data-slide-megatype]");
-      if (img) gsap.set(img, { opacity: 1, scale: 1, rotateY: 0, x: 0 });
-      if (cta) gsap.set(cta, { opacity: 1, y: 0, scale: 1 });
-      if (type) gsap.set(type, { opacity: 1, x: 0 });
-    };
-
-    // Re-seating after the wrap already placed everything; animating again
-    // would play the same slide in twice.
-    if (silentRef.current) {
-      silentRef.current = false;
-      prevIndexRef.current = pos;
-      return;
-    }
 
     if (reducedMotion) {
       gsap.set(trackRef.current, { xPercent });
@@ -382,6 +362,70 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
       return;
     }
 
+    /**
+     * The track is CUT between slides, not slid.
+     *
+     * It used to tween xPercent over 0.95s, which meant every change was
+     * dominated by the whole hero sweeping right-to-left. Any per-element
+     * motion underneath that was either invisible or fighting it. Now the
+     * track is repositioned instantly while nothing is on screen, and the
+     * transition is carried entirely by the contents: text fades up from
+     * below, the image travels in from the right.
+     */
+    const EXIT = 0.34;
+
+    const playIn = () => {
+      const slideEl = slideRefs.current[pos];
+      if (!slideEl) return;
+      const textEls = slideEl.querySelectorAll("[data-slide-text]");
+      const imgEl = slideEl.querySelector("[data-slide-image]");
+      const ctaEl = slideEl.querySelector("[data-slide-cta]");
+      const typeEl = slideEl.querySelector("[data-slide-megatype]");
+
+      /**
+       * The x/y resets are load-bearing: mouse parallax writes x and y onto
+       * these same elements, so a slide entering without them would inherit
+       * whatever offset the pointer last left behind.
+       */
+      gsap.set(textEls, { opacity: 0, x: 0, y: 26, scale: 1 });
+      gsap.set(typeEl, { opacity: 0, x: 0, y: 32 });
+      gsap.set(ctaEl, { opacity: 0, x: 0, y: 20, scale: 1 });
+      gsap.set(imgEl, { opacity: 0, x: 130, y: 0, scale: 1, rotateY: 0 });
+
+      // The name leads, so the smaller copy lands on top of it.
+      gsap.to(typeEl, { opacity: 1, y: 0, duration: 0.9, ease: "power2.out", overwrite: "auto" });
+      gsap.to(textEls, {
+        opacity: 1,
+        y: 0,
+        duration: 0.7,
+        stagger: 0.07,
+        ease: "power2.out",
+        delay: 0.08,
+        overwrite: "auto",
+      });
+      gsap.to(ctaEl, {
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "power2.out",
+        delay: 0.24,
+        overwrite: "auto",
+      });
+      /**
+       * "auto" overwrites per PROPERTY, not per target, so taking x and
+       * opacity here leaves the looping float on y alone — the image keeps
+       * breathing while it slides in.
+       */
+      gsap.to(imgEl, {
+        opacity: 1,
+        x: 0,
+        duration: 0.95,
+        ease: "power3.out",
+        delay: 0.06,
+        overwrite: "auto",
+      });
+    };
+
     if (isTransition && !isFirstRenderRef.current) {
       const prevSlideEl = slideRefs.current[prevIndex];
       if (prevSlideEl) {
@@ -390,120 +434,33 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
         const prevCtaEl = prevSlideEl.querySelector("[data-slide-cta]");
         const prevTypeEl = prevSlideEl.querySelector("[data-slide-megatype]");
 
-        // Text leaves the way it arrives: opacity only, no travel.
-        gsap.to(prevTextEls, {
+        // Text drops back the way it came up; the image continues left, so
+        // the pair reads as one pass across the frame.
+        gsap.to([prevTextEls, prevTypeEl, prevCtaEl], {
           opacity: 0,
-          duration: 0.45,
-          stagger: 0.03,
-          ease: "power2.inOut",
-          overwrite: "auto",
-        });
-        // The image continues left, so the outgoing and incoming parts read as
-        // one movement across the frame rather than two unrelated ones.
-        gsap.to(prevImgEl, {
-          opacity: 0,
-          x: -110,
-          duration: 0.6,
+          y: 18,
+          duration: EXIT,
           ease: "power2.in",
           overwrite: "auto",
         });
-        gsap.to(prevCtaEl, {
+        gsap.to(prevImgEl, {
           opacity: 0,
-          y: 12,
-          duration: 0.45,
-          ease: "power2.inOut",
-          overwrite: "auto",
-        });
-        gsap.to(prevTypeEl, {
-          opacity: 0,
-          duration: 0.5,
-          ease: "power2.inOut",
+          x: -120,
+          duration: EXIT,
+          ease: "power2.in",
           overwrite: "auto",
         });
       }
-    }
 
-    gsap.to(trackRef.current, {
-      xPercent,
-      duration: 0.95,
-      ease: "power2.inOut",
-      overwrite: "auto",
-      onComplete: isClone
-        ? () => {
-            // Landed on the clone. The real first slide is identical, so
-            // snapping the track back to it is invisible — and it leaves the
-            // next advance as another ordinary step forward.
-            const track = trackRef.current;
-            if (!track) return;
-            gsap.set(track, { xPercent: 0 });
-            settle(slideRefs.current[0]);
-            silentRef.current = true;
-            prevIndexRef.current = 0;
-            setPos(0);
-          }
-        : undefined,
-    });
-
-    const slideEl = slideRefs.current[pos];
-    if (slideEl) {
-      const textEls = slideEl.querySelectorAll("[data-slide-text]");
-      const imgEl = slideEl.querySelector("[data-slide-image]");
-      const ctaEl = slideEl.querySelector("[data-slide-cta]");
-      const typeEl = slideEl.querySelector("[data-slide-megatype]");
-
-      /**
-       * Text fades, image slides.
-       *
-       * The x/y/scale resets are not decoration: the mouse-parallax effect
-       * writes x and y onto these same elements, so a slide entering without
-       * them would inherit whatever offset the pointer last left behind and
-       * fade in visibly off-centre.
-       */
-      gsap.set(textEls, { opacity: 0, x: 0, y: 0, scale: 1 });
-      gsap.set(typeEl, { opacity: 0, x: 0, y: 0 });
-      gsap.set(imgEl, { opacity: 0, x: 110, y: 0, scale: 1, rotateY: 0 });
-      gsap.set(ctaEl, { opacity: 0, y: 18, scale: 0.98 });
-
-      const delay = isTransition ? 0.14 : 0.06;
-
-      // The name comes up first and slowest, so the part lands on top of it.
-      gsap.to(typeEl, {
-        opacity: 1,
-        duration: 1.1,
-        ease: "power2.out",
-        delay,
-        overwrite: "auto",
+      // Cut once the old slide has cleared, then play the new one in.
+      cutCallRef.current = gsap.delayedCall(EXIT, () => {
+        if (!trackRef.current) return;
+        gsap.set(trackRef.current, { xPercent });
+        playIn();
       });
-      gsap.to(textEls, {
-        opacity: 1,
-        duration: 0.8,
-        stagger: 0.07,
-        ease: "power2.out",
-        delay,
-        overwrite: "auto",
-      });
-      /**
-       * "auto" overwrites per PROPERTY, not per target, so this tween taking
-       * over x and opacity leaves the looping float on y alone — the image
-       * keeps breathing while it slides in.
-       */
-      gsap.to(imgEl, {
-        opacity: 1,
-        x: 0,
-        duration: 1.05,
-        ease: "power3.out",
-        delay: delay + 0.04,
-        overwrite: "auto",
-      });
-      gsap.to(ctaEl, {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.72,
-        ease: "power2.out",
-        delay: delay + 0.22,
-        overwrite: "auto",
-      });
+    } else {
+      gsap.set(trackRef.current, { xPercent });
+      playIn();
     }
 
     dotRefs.current.forEach((dot, i) => {
@@ -519,6 +476,11 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
 
     prevIndexRef.current = pos;
     isFirstRenderRef.current = false;
+
+    return () => {
+      cutCallRef.current?.kill();
+      cutCallRef.current = null;
+    };
   }, [pos, index, products.length, reducedMotion]);
 
   if (loading) {
@@ -554,12 +516,13 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   }
 
   /**
-   * The products as laid out on the track: the real list plus a copy of the
-   * first one at the end, which is what lets the wrap travel forwards. Only
-   * worth it when there is more than one product to loop between.
+   * The products as laid out on the track — just the real list.
+   *
+   * This used to carry a trailing copy of the first product so the wrap could
+   * travel forwards across the track. Nothing travels any more, so the clone
+   * was a wasted slide and a wasted image request.
    */
-  const trackSlides =
-    products.length > 1 && products[0] ? [...products, products[0]] : products;
+  const trackSlides = products;
 
   const ticker = [
     t("slider.tickerBrand"),
