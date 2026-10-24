@@ -561,17 +561,21 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             Particles leaving the top respawn at the bottom, so the field reads
             as rising from below rather than drifting in place.
 
-            The canvas is narrowed to the right 62% from md up, so the field
-            sits behind the product rather than spread across the whole hero —
-            it draws radially from the canvas centre, so shrinking the canvas
-            is what re-centres the field on the part. Only from md: below that
-            the layout stacks the image under the text and a right-biased
-            field would sit nowhere near it.
+            The canvas is the right 76% from md up, so the field runs from
+            about the middle of the hero to the right edge. Width is the only
+            dial that matters here: particles are placed at
+            `random() * max(width, height) * 1.2` from the canvas centre, so
+            widening both pushes the centre leftwards and extends the reach.
+            Narrower than this and it tightens into a clump around the part;
+            full-width and it drifts through the copy on the left.
+
+            Only from md: below that the layout stacks the image under the
+            text, where a right-biased field would sit nowhere near it.
 
             Note `depth` is clamped to 0–1 by the component, so values above 1
             behave exactly as 1. */}
         <Floating3DParticles
-          className="z-[2] md:left-auto md:right-0 md:w-[62%]"
+          className="z-[2] md:left-auto md:right-0 md:w-[76%]"
           quantity={360}
           color={PARTICLE_COLOR}
           size={3.5}
