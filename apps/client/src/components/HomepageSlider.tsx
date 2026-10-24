@@ -111,17 +111,13 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const [loading, setLoading] = useState(initialProducts.length === 0);
   const skipHydrationRefetchRef = useRef(initialProducts.length > 0);
   /**
-   * Position along the track, which is NOT the same as the product index.
+   * Which slide is showing. Runs 0..products.length-1.
    *
-   * The track carries one extra slide: a copy of the first product pinned to
-   * the end. Advancing off the last product moves one step forward onto that
-   * copy and then silently re-seats the track at the real first slide, which
-   * is pixel-identical, so the loop always travels forwards by one. Without it
-   * the wrap animated from the last slide all the way back to the first,
-   * sweeping the whole catalogue past the viewer in under a second.
-   *
-   * `pos` therefore runs 0..products.length, where products.length is the
-   * clone; `index` is the product actually on screen.
+   * This used to be a track position distinct from the product index, because
+   * the track carried a trailing clone of the first slide to make the wrap
+   * travel forwards. The track is cut rather than slid now, so there is no
+   * sweep to hide and `pos` and `index` are the same number — `index` is kept
+   * only because it guards against a zero-length product list.
    */
   const [pos, setPos] = useState(0);
   const index = products.length > 0 ? pos % products.length : 0;
@@ -130,7 +126,6 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
   const dotRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const prevIndexRef = useRef(0);
   const isFirstRenderRef = useRef(true);
-  /** Set when the track has already been placed by hand and must not re-animate. */
   const sliderContainerRef = useRef<HTMLElement>(null);
   const floatTweenRef = useRef<gsap.core.Tween | null>(null);
   /** The pending "cut the track" call between slides, so it can be cancelled. */
@@ -163,9 +158,6 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
     (i: number) => {
       if (products.length === 0) return;
       const next = ((i % products.length) + products.length) % products.length;
-      // Compared against the product on screen rather than the track slot, so
-      // tapping "01" while the trailing clone is showing is correctly a no-op
-      // instead of sweeping the whole track back to the original.
       if (next === index) return;
       setPos(next);
     },
@@ -554,14 +546,32 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
             between near and far motes is the part that does that work.
             The component pauses itself off-screen and when the tab is hidden,
             and paints one static frame under `prefers-reduced-motion`. */}
+        {/* z-[2], under the ghost wordmark at z-[4] as well as the slides at
+            z-10, so the field sits in the depth between the ground and the
+            product rather than hovering in front of it.
+
+            Dimmer and smaller than before for the same reason: DOM order
+            already put these behind the part, but at 0.45 opacity and 2.2px
+            they read as foreground sparkle competing with the product. Depth
+            at 1 spreads the near and far particles furthest apart, which is
+            what actually sells them as being *behind* something.
+
+            0.36/1.9 rather than lower: at 0.26/1.7 they receded so far they
+            stopped being atmosphere and became invisible, which is a different
+            mistake from the one being fixed.
+
+            drift is positive = upward (the component subtracts it from y) and
+            goes from 0.22, which was almost static, to a rise you can see.
+            Particles leaving the top respawn at the bottom, so the field reads
+            as rising from below rather than drifting in place. */}
         <Floating3DParticles
-          className="z-[3]"
+          className="z-[2]"
           quantity={260}
           color={PARTICLE_COLOR}
-          size={2.2}
-          opacity={0.45}
-          drift={0.22}
-          depth={0.85}
+          size={2.5}
+          opacity={0.36}
+          drift={0.75}
+          depth={1}
         />
 
 
