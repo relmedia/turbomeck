@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   Home,
@@ -17,6 +18,11 @@ import {
   LogOut,
   EllipsisVertical,
   RotateCcw,
+  ChevronRight,
+  Mail,
+  BellRing,
+  Send,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,7 +36,16 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  useSidebar,
 } from "@repo/ui/components/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@repo/ui/components/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,7 +59,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Sheet, SheetTrigger } from "@repo/ui/components/sheet";
 import AddOrder from "./AddOrder";
-import AddUser from "./AddUser";
 import AddCategory from "./AddCategory";
 
 const items = [
@@ -63,12 +77,36 @@ const items = [
     url: "/reviews",
     icon: Star,
   },
-  {
-    title: "Inställningar",
-    url: "/settings",
-    icon: Settings,
-  },
 ];
+
+/**
+ * Settings sub-pages. Separate from `items` because this group renders as a
+ * collapsible section rather than flat rows.
+ *
+ * Användare lives here rather than as a top-level group: it is administration,
+ * not day-to-day work. Its "Lägg till användare" action is not lost — the
+ * /users page has its own button (users/page.tsx:140-147), so the sidebar copy
+ * was a duplicate.
+ */
+const settingsItems = [
+  { title: "Mail", url: "/settings/mail", icon: Mail },
+  { title: "Order-notiser", url: "/settings/notiser", icon: BellRing },
+  { title: "Kundutskick", url: "/settings/kundutskick", icon: Send },
+  { title: "Frakt & PostNord", url: "/settings/frakt", icon: Truck },
+  { title: "Användare", url: "/users", icon: Users },
+];
+
+/**
+ * Whether a nav href matches the current path.
+ *
+ * Exact for "/" — every path starts with it. Prefix elsewhere, so a drill-down
+ * like /payments/261 still highlights Ordrar. Mirrors the convention already
+ * used by PageTitle.tsx.
+ */
+function isActivePath(pathname: string, url: string): boolean {
+  if (url === "/") return pathname === "/";
+  return pathname === url || pathname.startsWith(`${url}/`);
+}
 
 const getInitials = (name: string | null | undefined) =>
   name
@@ -88,6 +126,10 @@ const AppSidebar = ({
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [addOrderOpen, setAddOrderOpen] = useState(false);
   const { data: session } = useSession();
+  const pathname = usePathname() ?? "";
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+  const settingsOpen = settingsItems.some((i) => isActivePath(pathname, i.url));
   const initials = getInitials(session?.user?.name) || session?.user?.email?.[0]?.toUpperCase() || "?";
   return (
     <Sidebar variant={variant} collapsible={collapsible} {...props}>
@@ -110,7 +152,11 @@ const AppSidebar = ({
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActivePath(pathname, item.url)}
+                    tooltip={item.title}
+                  >
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -172,36 +218,6 @@ const AppSidebar = ({
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Användare</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/users">
-                    <User />
-                    Visa alla Användare
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <SidebarMenuButton asChild>
-                        <Link href="#">
-                          <Plus />
-                          Lägg till Användare
-                        </Link>
-                      </SidebarMenuButton>
-                    </SheetTrigger>
-                    <AddUser />
-                  </Sheet>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
           <SidebarGroupLabel>Ordrar / Transaktioner</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -248,6 +264,83 @@ const AppSidebar = ({
                   Lägg till Order
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {/* Inställningar, last and collapsible.
+            It used to sit fourth from the top, above Produkter and Ordrar —
+            a place you visit occasionally occupying prime real estate.
+
+            Two renderings, because the sidebar primitives force it:
+            SidebarMenuSub carries `group-data-[collapsible=icon]:hidden`, so
+            in icon mode the sub-links would not merely shrink, they would
+            vanish — and collapsed is the default here, cookie-persisted, with
+            a Cmd/Ctrl+B shortcut. Collapsed therefore gets a right-side
+            DropdownMenu, the same pattern the user menu in the footer uses. */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {isCollapsed ? (
+                <SidebarMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={settingsOpen}
+                        tooltip="Inställningar"
+                      >
+                        <Settings />
+                        <span>Inställningar</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      side="right"
+                      align="start"
+                      sideOffset={4}
+                      className="min-w-48"
+                    >
+                      <DropdownMenuLabel>Inställningar</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {settingsItems.map((item) => (
+                        <DropdownMenuItem key={item.url} asChild>
+                          <Link href={item.url}>
+                            <item.icon className="size-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItem>
+              ) : (
+                <Collapsible defaultOpen={settingsOpen} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={settingsOpen}>
+                        <Settings />
+                        <span>Inställningar</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {settingsItems.map((item) => (
+                          <SidebarMenuSubItem key={item.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={isActivePath(pathname, item.url)}
+                            >
+                              <Link href={item.url}>
+                                <item.icon className="size-4" />
+                                <span>{item.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

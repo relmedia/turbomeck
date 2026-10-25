@@ -21,7 +21,13 @@ export function PageTitle() {
     if (pathname.startsWith("/coupons")) return "Kuponger";
     if (pathname.startsWith("/reviews")) return "Recensioner";
     if (pathname.startsWith("/account")) return "Konto";
-    if (pathname.startsWith("/settings")) return "Inställningar";
+    // Most specific first — the generic /settings prefix below would otherwise
+  // swallow every sub-page and title them all "Inställningar".
+  if (pathname.startsWith("/settings/mail")) return "Mailinställningar";
+  if (pathname.startsWith("/settings/notiser")) return "Order-notiser";
+  if (pathname.startsWith("/settings/kundutskick")) return "Automatiska kundutskick";
+  if (pathname.startsWith("/settings/frakt")) return "Frakt & PostNord";
+  if (pathname.startsWith("/settings")) return "Inställningar";
     if (pathname.startsWith("/slider")) return "Startsidan slider";
     return "Dashboard";
   };
