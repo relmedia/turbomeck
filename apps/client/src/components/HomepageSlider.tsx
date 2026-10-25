@@ -11,6 +11,7 @@ import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { ProductType } from "@/types";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { Floating3DParticles } from "@/components/ui/floating-3d-particles";
+import { htmlToText } from "@/lib/html-text";
 
 /**
  * The hero is dark on purpose, and that is the whole design.
@@ -602,7 +603,21 @@ export function HomepageSlider({ initialProducts = [] }: HomepageSliderProps) {
               typeof product.price === "number"
                 ? displayPrice(product.price)
                 : formatPriceKr(product.price, locale);
-            const shortDesc = product.shortDescription?.trim() || product.description?.slice(0, 120);
+            /**
+             * The full description, not the short one — capped at three lines
+             * by `line-clamp-3` below rather than by cutting characters.
+             *
+             * Two reasons it goes through htmlToText: roughly half the
+             * catalogue stores rich text, so rendering the raw field as a
+             * string would print "<p>" to the customer; and the previous
+             * `.slice(0, 120)` cut mid-word *before* the clamp could act, so
+             * the paragraph often stopped short of three lines for no visible
+             * reason. shortDescription stays as the fallback for products
+             * whose long description is empty.
+             */
+            const descSource =
+              product.description?.trim() || product.shortDescription?.trim() || "";
+            const shortDesc = htmlToText(descSource);
             const [line1, line2] = splitName(product.name);
             const imageCount = product.galleryImages?.length ?? 0;
 
