@@ -26,7 +26,13 @@ import {
   isCustomerEmailEnabled,
   sendAdminCoreReturnOverdueEmail,
 } from "./email.js";
-import { sendShippingNoticeEmail } from "./email-shipping-notices.js";
+import {
+  sendShippingNoticeEmail,
+  renderShippingNoticeEmail,
+  SHIPPING_NOTICE_COPY,
+  SHIPPING_NOTICE_LABELS,
+} from "./email-shipping-notices.js";
+import { resolveCopy } from "./email-template-overrides.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { stripeClient } from "./stripe-client.js";
 import {
@@ -2496,6 +2502,71 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
  *
  * Gated by the internal bearer like every other /api route (app.use at the top).
  */
+/**
+ * GET /api/email-templates/preview?key=&locale=
+ *
+ * Renders one email with fixture data so the admin editor can show what a
+ * change looks like before it reaches a customer. Gated by the internal
+ * bearer like every other /api route, so admin proxies to it rather than the
+ * browser calling it directly.
+ *
+ * Applies whatever overrides are currently saved — the point is to preview
+ * the edited copy, not the built-in text.
+ */
+app.get("/api/email-templates/preview", async (req, res) => {
+  try {
+    const key = String(req.query.key ?? "").trim();
+    const locale = req.query.locale === "en" ? "en" : "sv";
+
+    const noticeKinds = [
+      "ready_for_pickup",
+      "pickup_reminder_1",
+      "pickup_reminder_2",
+      "order_delivered",
+      "core_return_reminder",
+    ] as const;
+
+    type NoticeKind = (typeof noticeKinds)[number];
+    const isNotice = (k: string): k is NoticeKind =>
+      (noticeKinds as readonly string[]).includes(k);
+
+    /**
+     * `shipping_common` has no email of its own — it is the shared label set.
+     * Preview it through the notice that uses the most of those labels.
+     */
+    const kind: NoticeKind = isNotice(key) ? key : "ready_for_pickup";
+
+    const sample = {
+      firstName: "Johan",
+      email: "kund@example.test",
+      orderNumber: "ORD-901",
+      trackingId: "00573132902028050319",
+      servicePointName: "ICA Supermarket Backaplan",
+      servicePointStreet: "Backavägen 1",
+      servicePointPostalCode: "41717",
+      servicePointCity: "Göteborg",
+      coreReturnDeadline: new Date("2026-11-07"),
+      locale,
+    } as const;
+
+    const copy = await resolveCopy(kind, locale, SHIPPING_NOTICE_COPY[kind][locale]);
+    const labels = await resolveCopy(
+      "shipping_common",
+      locale,
+      SHIPPING_NOTICE_LABELS[locale],
+    );
+
+    const html = renderShippingNoticeEmail(kind, sample, copy, labels);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    // A preview must never be cached — the whole point is seeing an edit.
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(html);
+  } catch (error) {
+    console.error("email-templates/preview:", error);
+    return res.status(500).json({ error: "Kunde inte rendera förhandsgranskningen" });
+  }
+});
+
 app.post("/api/orders/:id/notifications/:kind", async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

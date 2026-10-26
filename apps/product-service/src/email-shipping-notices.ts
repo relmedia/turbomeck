@@ -25,6 +25,10 @@
 import nodemailer from "nodemailer";
 import { postNordTrackingUrl } from "@repo/shipping";
 import {
+  resolveCopy,
+  type LocaleCode,
+} from "./email-template-overrides.js";
+import {
   getMailConfig,
   isCustomerEmailEnabled,
   getOrderEmailLogoUrl,
@@ -79,7 +83,7 @@ type Copy = {
   accent: string;
 };
 
-const COPY: Record<ShippingNoticeKind, Record<"sv" | "en", Copy>> = {
+export const SHIPPING_NOTICE_COPY: Record<ShippingNoticeKind, Record<"sv" | "en", Copy>> = {
   ready_for_pickup: {
     sv: {
       subject: "Ditt paket finns att hämta",
@@ -190,7 +194,9 @@ const COPY: Record<ShippingNoticeKind, Record<"sv" | "en", Copy>> = {
   },
 };
 
-const LABELS = {
+export type Labels = (typeof SHIPPING_NOTICE_LABELS)[LocaleCode];
+
+export const SHIPPING_NOTICE_LABELS = {
   sv: {
     greeting: "Hej",
     orderNumber: "Ordernummer",
@@ -227,14 +233,21 @@ function infoRow(label: string, value: string, accent?: string): string {
                     <p style="margin: 0 0 16px 0; font-weight: 600; color: ${accent ?? "#111827"}; font-size: 16px;">${value}</p>`;
 }
 
+/**
+ * `copy` and `labels` let the caller pass admin-edited text in. Both default
+ * to the built-in objects, so every existing caller — and the preview, and the
+ * verification harness — keeps rendering exactly what it did before.
+ */
 export function renderShippingNoticeEmail(
   kind: ShippingNoticeKind,
   data: ShippingNoticeData,
+  copy?: Copy,
+  labels?: Labels,
 ): string {
   const locale = data.locale === "en" ? "en" : "sv";
-  const copyForKind = COPY[kind];
-  const t = copyForKind[locale];
-  const l = LABELS[locale];
+  const copyForKind = SHIPPING_NOTICE_COPY[kind];
+  const t = copy ?? copyForKind[locale];
+  const l = labels ?? SHIPPING_NOTICE_LABELS[locale];
   const logoUrl = getOrderEmailLogoUrl();
   const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
   const tracking = (data.trackingId ?? "").trim();
@@ -382,8 +395,17 @@ export async function sendShippingNoticeEmail(
     return { sent: false, skipped: "no mail configuration" };
   }
 
-  const locale = data.locale === "en" ? "en" : "sv";
-  const t = COPY[kind][locale];
+  const locale: LocaleCode = data.locale === "en" ? "en" : "sv";
+
+  /**
+   * Admin overrides are applied here, not inside the renderer, so the renderer
+   * stays synchronous and the preview can hand it any copy it likes.
+   *
+   * `ready_for_pickup` etc. are the same stable keys the order_emails ledger
+   * uses, so one vocabulary covers storage, settings toggles and editing.
+   */
+  const t = await resolveCopy(kind, locale, SHIPPING_NOTICE_COPY[kind][locale]);
+  const l = await resolveCopy("shipping_common", locale, SHIPPING_NOTICE_LABELS[locale]);
   const orderNo = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
 
   const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
@@ -407,7 +429,7 @@ export async function sendShippingNoticeEmail(
     from: `"Turbomeck" <${config.from}>`,
     to: data.email,
     subject: `${t.subject} (#${orderNo}) - Turbomeck`,
-    html: renderShippingNoticeEmail(kind, data),
+    html: renderShippingNoticeEmail(kind, data, t, l),
   });
 
   console.log(`[email] ${kind} sent to ${data.email} order ${data.orderNumber}`);

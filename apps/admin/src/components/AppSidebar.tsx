@@ -23,6 +23,7 @@ import {
   BellRing,
   Send,
   Users,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,23 +78,28 @@ const items = [
     url: "/reviews",
     icon: Star,
   },
+  {
+    title: "Användare",
+    url: "/users",
+    icon: Users,
+  },
 ];
 
 /**
  * Settings sub-pages. Separate from `items` because this group renders as a
  * collapsible section rather than flat rows.
  *
- * Användare lives here rather than as a top-level group: it is administration,
- * not day-to-day work. Its "Lägg till användare" action is not lost — the
- * /users page has its own button (users/page.tsx:140-147), so the sidebar copy
- * was a duplicate.
+ * Användare is NOT here — it sits under Applikation with the other
+ * day-to-day destinations. Its old "Lägg till användare" row is still gone on
+ * purpose: /users has its own button (users/page.tsx:140-147), so the sidebar
+ * copy was a duplicate.
  */
 const settingsItems = [
   { title: "Mail", url: "/settings/mail", icon: Mail },
   { title: "Order-notiser", url: "/settings/notiser", icon: BellRing },
   { title: "Kundutskick", url: "/settings/kundutskick", icon: Send },
   { title: "Frakt & PostNord", url: "/settings/frakt", icon: Truck },
-  { title: "Användare", url: "/users", icon: Users },
+  { title: "E-postmallar", url: "/settings/mallar", icon: FileText },
 ];
 
 /**
