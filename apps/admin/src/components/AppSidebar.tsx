@@ -24,6 +24,7 @@ import {
   Send,
   Users,
   FileText,
+  LayoutTemplate,
 } from "lucide-react";
 import {
   Sidebar,
@@ -100,6 +101,7 @@ const settingsItems = [
   { title: "Kundutskick", url: "/settings/kundutskick", icon: Send },
   { title: "Frakt & PostNord", url: "/settings/frakt", icon: Truck },
   { title: "E-postmallar", url: "/settings/mallar", icon: FileText },
+  { title: "E-postdesign", url: "/settings/design", icon: LayoutTemplate },
 ];
 
 /**

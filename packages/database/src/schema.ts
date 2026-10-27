@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ============ AUTH.JS ============
 export const users = pgTable("user", {
@@ -456,6 +456,59 @@ export const checkoutIntents = pgTable("checkout_intent", {
  * crash mid-send leaves a claim that can be retried rather than a lie that
  * says the customer was told.
  */
+/**
+ * Visually-built email templates from the Unlayer editor.
+ *
+ * Its own table rather than another `app_settings` key: a design is a full
+ * document (the JSON the editor round-trips plus the compiled HTML), tens of
+ * kilobytes each, and several of them in one TEXT value would mean rewriting
+ * every template to save one.
+ *
+ * Two representations are stored on purpose and they are not interchangeable.
+ * `design` is the editor's own format — the only thing it can re-open for
+ * editing. `html` is what actually gets emailed. Keeping both means a template
+ * can be sent without booting the editor, and re-edited without re-parsing
+ * HTML back into blocks, which Unlayer cannot do.
+ *
+ * `templateKey` optionally binds a design to one of the built-in email kinds
+ * (`ready_for_pickup`, `order_delivered`, …). Null means a standalone template
+ * that is only sent by hand.
+ */
+export const emailDesigns = pgTable("email_designs", {
+  id: serial("id").primaryKey(),
+  /** Shown in the admin list. */
+  name: text("name").notNull(),
+  /** `sv` | `en` — a design is per-language, like the copy it replaces. */
+  locale: text("locale").default("sv").notNull(),
+  /**
+   * Which automated email this design replaces, if any. Null = standalone.
+   * Not a foreign key: the kinds live in code, not in a table.
+   */
+  templateKey: text("template_key"),
+  /** Subject line. Plain text — it becomes a mail header. */
+  subject: text("subject").default("").notNull(),
+  /** Unlayer's design document. The only format it can re-open. */
+  design: jsonb("design").$type<Record<string, unknown> | null>(),
+  /** The compiled HTML that is actually sent. */
+  html: text("html").default("").notNull(),
+  /**
+   * Off by default. A newly built design must not start replacing a tested
+   * transactional email the moment it is saved.
+   */
+  isActive: boolean("is_active").default(false).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+}, (table) => [
+  /**
+   * At most ONE active design per (templateKey, locale). Without this, two
+   * active designs for the same email is an ambiguity resolved by whichever
+   * row the query happens to return first.
+   */
+  uniqueIndex("email_designs_active_per_key")
+    .on(table.templateKey, table.locale)
+    .where(sql`${table.isActive} = true AND ${table.templateKey} IS NOT NULL`),
+]);
+
 export const orderEmails = pgTable("order_emails", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id")

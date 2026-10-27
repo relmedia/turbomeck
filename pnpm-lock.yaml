@@ -176,6 +176,9 @@ importers:
       react-dom:
         specifier: 19.1.4
         version: 19.1.4(react@19.1.4)
+      react-email-editor:
+        specifier: ^2.1.3
+        version: 2.1.3(react@19.1.4)
       react-hook-form:
         specifier: ^7.55.0
         version: 7.65.0(react@19.1.4)
@@ -2927,6 +2930,9 @@ packages:
     resolution: {integrity: sha512-8CZ47QwalyRjsypfwnbI3hKy5gJDPmrkLjkgMxhi0+DZZ2QNx2naS6/hWoVYUHU7LU2zleF68V9miaVZvhFfTA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
+  '@unlayer/types@1.532.0':
+    resolution: {integrity: sha512-uPJUXkfoZPSAXh8R6oIPA6s/imutOBcDcIdza5oCzJlpvPSScKF9FxpXmro8m6s+Cp8tahY/JgqHFLQfn4eWzg==}
+
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
 
@@ -4725,6 +4731,12 @@ packages:
 
   react-dom@19.1.4:
     resolution: {integrity: sha512-s2868ab/xo2SI6H4106A7aFI8Mrqa4xC6HZT/pBzYyQ3cBLqa88hu47xYD8xf+uECleN698Awn7RCWlkTiKnqQ==}
+    peerDependencies:
+      react: 19.1.4
+
+  react-email-editor@2.1.3:
+    resolution: {integrity: sha512-HiDkLjwbVexp58wfmceCsVfX7N/nu6yk8+1KPWtIYlH7ks87RTNxX4HgMKWyXZFpXczNZ7J4Tzgt1ZezNWKFJg==}
+    engines: {node: '>=18'}
     peerDependencies:
       react: 19.1.4
 
@@ -7752,6 +7764,8 @@ snapshots:
       '@typescript-eslint/types': 8.40.0
       eslint-visitor-keys: 4.2.1
 
+  '@unlayer/types@1.532.0': {}
+
   abstract-logging@2.0.1: {}
 
   accepts@2.0.0:
@@ -9728,6 +9742,11 @@ snapshots:
     dependencies:
       react: 19.1.4
       scheduler: 0.26.0
+
+  react-email-editor@2.1.3(react@19.1.4):
+    dependencies:
+      '@unlayer/types': 1.532.0
+      react: 19.1.4
 
   react-hook-form@7.65.0(react@19.1.4):
     dependencies:
