@@ -61,15 +61,26 @@ function getR2ImagePattern() {
 }
 
 /**
- * Baseline security headers for the admin app. Admin doesn't load any
- * third-party scripts (no Stripe.js, no Klarna, no PostNord widget), so we can
- * be strict here. HSTS only in production.
+ * Baseline security headers for the admin app.
+ *
+ * Admin loads exactly ONE third-party origin: `editor.unlayer.com`, which
+ * serves the drag-and-drop email builder as a script plus an iframe. Every
+ * other directive stays locked to 'self'. If the builder is ever removed,
+ * remove the two allowances below with it rather than leaving the hole open.
+ *
+ * HSTS only in production.
  */
+const UNLAYER_ORIGIN = "https://editor.unlayer.com";
 function adminSecurityHeaders(): { key: string; value: string }[] {
   const isProd = process.env.NODE_ENV === "production";
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    /**
+     * editor.unlayer.com serves the email builder's embed script. Named
+     * explicitly rather than widening to `https:` — a blanket allowance would
+     * let any compromised dependency pull a script from anywhere.
+     */
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${UNLAYER_ORIGIN}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "img-src 'self' data: blob: https:",
@@ -80,10 +91,13 @@ function adminSecurityHeaders(): { key: string; value: string }[] {
      * `default-src 'self'`, which excludes blob:, and the preview renders
      * blank with no network error to explain it.
      *
+     * The same directive carries the email builder, whose UI is an iframe from
+     * editor.unlayer.com.
+     *
      * This governs what admin may embed. What may embed *admin* is unchanged:
      * `frame-ancestors 'none'` and X-Frame-Options: DENY still stand.
      */
-    "frame-src 'self' blob:",
+    `frame-src 'self' blob: ${UNLAYER_ORIGIN}`,
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
