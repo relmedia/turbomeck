@@ -15,25 +15,33 @@
  * through it, only the template being designed.
  */
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import EmailEditor, { type EditorRef, type EmailEditorProps } from "react-email-editor";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Switch } from "@repo/ui/components/switch";
-import { Loader2, Save, ArrowLeft } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Braces, Copy } from "lucide-react";
 import { toast } from "react-toastify";
 
 /** The automated emails a design can replace. Null = standalone. */
 const BINDABLE = [
   { key: "", label: "Fristående (skickas för hand)" },
+  { key: "order_confirmation", label: "Orderbekräftelse (tack för ditt köp)" },
   { key: "ready_for_pickup", label: "Klar att hämta" },
   { key: "pickup_reminder_1", label: "Påminnelse 1" },
   { key: "pickup_reminder_2", label: "Påminnelse 2" },
   { key: "order_delivered", label: "Levererad" },
   { key: "core_return_reminder", label: "Kärnretur — påminnelse" },
 ];
+
+/** What `/api/settings/designs/merge-tags` hands back. */
+type MergeTagGroups = Record<
+  string,
+  { name: string; mergeTags: Record<string, { name: string; value: string; sample?: string }> }
+>;
+type MergeTagDef = { token: string; label: string; group: string; kind: "scalar" | "block"; sample: string };
 
 export type DesignRecord = {
   id?: number;
@@ -52,6 +60,48 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
   const [meta, setMeta] = useState(initial);
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [tags, setTags] = useState<{ groups: MergeTagGroups; tags: MergeTagDef[] } | null>(null);
+  const [showTags, setShowTags] = useState(false);
+
+  /**
+   * The token catalogue comes from product-service, where the substitution
+   * that fills the tokens in also lives. Fetched rather than hardcoded here:
+   * a second copy in admin could offer a token nothing replaces, and that
+   * ships as a literal "{{order_total}}" in a customer's inbox.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/settings/designs/merge-tags", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as { groups: MergeTagGroups; tags: MergeTagDef[] };
+        if (!cancelled) setTags(json);
+      } catch {
+        /**
+         * Soft failure on purpose. Without the catalogue the editor still
+         * designs and saves — tokens can be typed by hand — so blocking the
+         * whole page on a product-service hiccup would be the worse trade.
+         */
+        if (!cancelled) toast.warn("Kunde inte hämta merge-taggar — du kan skriva dem för hand");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * `options.mergeTags` is read once at init, and the fetch above usually
+   * finishes after the iframe has booted. setMergeTags is the supported way to
+   * push them in afterwards; it runs on whichever of the two lands last.
+   */
+  useEffect(() => {
+    if (!ready || !tags) return;
+    editorRef.current?.editor?.setMergeTags(tags.groups);
+  }, [ready, tags]);
+
+  const blockTags = tags?.tags.filter((t) => t.kind === "block") ?? [];
 
   /**
    * Load the saved design once the editor signals ready. Doing it earlier is
@@ -181,20 +231,123 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
           </Label>
         </div>
 
-        <Button className="ml-auto" onClick={save} disabled={saving || !ready}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto h-8"
+          onClick={() => setShowTags((v) => !v)}
+        >
+          <Braces className="mr-1.5 size-3.5" aria-hidden />
+          Taggar
+        </Button>
+
+        <Button onClick={save} disabled={saving || !ready}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : <Save className="mr-2 size-4" aria-hidden />}
           {saving ? "Sparar…" : "Spara"}
         </Button>
       </div>
+
+      {/* The reference list.
+          The editor's own merge-tag menu (the {} button inside a text block)
+          is the primary way to insert these, but it only reaches text and
+          button content. Anywhere else — an image alt, a link URL, the
+          subject field above, which is not Unlayer's at all — the token has to
+          be pasted, so it is worth being able to copy one from here. */}
+      {showTags && (
+        <div className="max-h-56 overflow-y-auto border-b bg-muted/30 px-4 py-3 text-xs">
+          {!tags ? (
+            <p className="text-muted-foreground">Laddar taggar…</p>
+          ) : (
+            <>
+              <p className="mb-2 text-muted-foreground">
+                Infoga i en textruta med <span className="font-mono">{"{}"}</span>-knappen i
+                editorn, eller kopiera och klistra in.
+              </p>
+
+              {blockTags.length > 0 && (
+                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2.5">
+                  <p className="mb-1.5 font-medium text-amber-900">
+                    Block — lägg var och en i en EGEN textruta
+                  </p>
+                  <p className="mb-2 text-amber-800">
+                    De här expanderar till hela tabeller. Står de tillsammans med annan text i
+                    samma ruta blir layouten fel i Outlook.
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {blockTags.map((t) => (
+                      <TagRow key={t.token} token={t.token} label={t.label} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Object.entries(tags.groups)
+                  .filter(([, g]) => g.name !== "Block")
+                  .map(([key, g]) => (
+                    <div key={key}>
+                      <p className="mb-1 font-medium uppercase tracking-wide text-muted-foreground">
+                        {g.name}
+                      </p>
+                      <div className="flex flex-col gap-0.5">
+                        {Object.entries(g.mergeTags).map(([token, t]) => (
+                          <TagRow key={token} token={token} label={t.name} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="min-h-0 flex-1">
         <EmailEditor
           ref={editorRef}
           onReady={onReady}
           minHeight="100%"
-          options={{ locale: meta.locale === "en" ? "en-US" : "sv-SE", appearance: { theme: "light" } }}
+          options={{
+            locale: meta.locale === "en" ? "en-US" : "sv-SE",
+            appearance: { theme: "light" },
+            /** Set here in case the fetch beat the iframe; the effect above
+                covers the usual order. Harmless either way — the later call
+                replaces the same catalogue. */
+            ...(tags ? { mergeTags: tags.groups } : {}),
+            mergeTagsConfig: { sort: false },
+          }}
         />
       </div>
     </div>
+  );
+}
+
+/** One copyable token. */
+function TagRow({ token, label }: { token: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const text = `{{${token}}}`;
+  return (
+    <button
+      type="button"
+      className="group flex items-center gap-1.5 text-left hover:text-foreground"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          },
+          () => toast.error("Kunde inte kopiera"),
+        );
+      }}
+      title={label}
+    >
+      <code className="rounded bg-background px-1 py-0.5 font-mono text-[11px]">{text}</code>
+      <span className="truncate text-muted-foreground">{label}</span>
+      {copied ? (
+        <span className="text-[10px] text-green-600">kopierad</span>
+      ) : (
+        <Copy className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" aria-hidden />
+      )}
+    </button>
   );
 }

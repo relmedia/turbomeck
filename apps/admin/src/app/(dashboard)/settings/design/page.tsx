@@ -4,6 +4,7 @@ import { emailDesigns } from "@repo/database/schema";
 import { desc } from "drizzle-orm";
 import { Button } from "@repo/ui/components/button";
 import { Plus, Pencil, CheckCircle2, Circle } from "lucide-react";
+import MigrateDesignsClient from "@/components/MigrateDesignsClient";
 
 export const metadata = {
   title: "E-postdesign",
@@ -11,6 +12,7 @@ export const metadata = {
 };
 
 const KEY_LABELS: Record<string, string> = {
+  order_confirmation: "Orderbekräftelse (tack för ditt köp)",
   ready_for_pickup: "Klar att hämta",
   pickup_reminder_1: "Påminnelse 1",
   pickup_reminder_2: "Påminnelse 2",
@@ -43,13 +45,23 @@ export default async function DesignListPage() {
             den är <strong>aktiv</strong> och kopplad till ett utskick — tills
             dess används den inbyggda mallen.
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <strong>Migrera standardmallar</strong> skapar redigerbara versioner
+            av de inbyggda mejlen (orderbekräftelse, hämtning, påminnelser,
+            levererad, kärnretur) på svenska och engelska, och aktiverar dem.
+            Innehållet blir detsamma — skillnaden är att du kan ändra det här.
+            Kör den igen när du vill återställa en mall till standard.
+          </p>
         </div>
-        <Button asChild>
-          <Link href="/settings/design/ny">
-            <Plus className="mr-2 size-4" aria-hidden />
-            Ny mall
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-start gap-2">
+          <MigrateDesignsClient />
+          <Button asChild>
+            <Link href="/settings/design/ny">
+              <Plus className="mr-2 size-4" aria-hidden />
+              Ny mall
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {rows.length === 0 ? (

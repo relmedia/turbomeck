@@ -32,7 +32,8 @@ import {
   SHIPPING_NOTICE_COPY,
   SHIPPING_NOTICE_LABELS,
 } from "./email-shipping-notices.js";
-import { resolveCopy } from "./email-template-overrides.js";
+import { MERGE_TAGS, mergeTagsForEditor } from "./email-merge-tags.js";
+import { seedTemplates } from "./email-designs-seed.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { stripeClient } from "./stripe-client.js";
 import {
@@ -2503,6 +2504,46 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
  * Gated by the internal bearer like every other /api route (app.use at the top).
  */
 /**
+ * GET /api/email-templates/merge-tags
+ *
+ * The catalogue of tokens a designed email may use, in Unlayer's own
+ * `mergeTags` shape plus a flat list for anything else that needs it.
+ *
+ * Served rather than duplicated in admin: a second hand-maintained copy is
+ * exactly how the PostNord booking config and its status checker drifted
+ * apart, and a token that exists in the editor but not in the substitution
+ * ships as a literal "{{order_total}}" in a customer's inbox.
+ */
+/**
+ * GET /api/email-templates/seed
+ *
+ * The compiled templates expressed as builder designs — the migration payload.
+ *
+ * Returns the design JSON but no HTML, because only Unlayer can turn a design
+ * into the HTML that gets emailed, and Unlayer runs in the browser. Admin
+ * loads each design into the editor, exports it, and saves both halves back.
+ * That keeps the stored HTML byte-identical to what the editor would produce
+ * for an admin who built the same thing by hand.
+ */
+app.get("/api/email-templates/seed", async (_req, res) => {
+  try {
+    return res.json({ templates: seedTemplates() });
+  } catch (error) {
+    console.error("email-templates/seed:", error);
+    return res.status(500).json({ error: "Kunde inte bygga standardmallarna" });
+  }
+});
+
+app.get("/api/email-templates/merge-tags", async (_req, res) => {
+  try {
+    return res.json({ groups: mergeTagsForEditor(), tags: MERGE_TAGS });
+  } catch (error) {
+    console.error("email-templates/merge-tags:", error);
+    return res.status(500).json({ error: "Kunde inte hämta merge-taggar" });
+  }
+});
+
+/**
  * GET /api/email-templates/preview?key=&locale=
  *
  * Renders one email with fixture data so the admin editor can show what a
@@ -2549,12 +2590,8 @@ app.get("/api/email-templates/preview", async (req, res) => {
       locale,
     } as const;
 
-    const copy = await resolveCopy(kind, locale, SHIPPING_NOTICE_COPY[kind][locale]);
-    const labels = await resolveCopy(
-      "shipping_common",
-      locale,
-      SHIPPING_NOTICE_LABELS[locale],
-    );
+    const copy = SHIPPING_NOTICE_COPY[kind][locale];
+    const labels = SHIPPING_NOTICE_LABELS[locale];
 
     const html = renderShippingNoticeEmail(kind, sample, copy, labels);
     res.setHeader("Content-Type", "text/html; charset=utf-8");

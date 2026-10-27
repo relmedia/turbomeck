@@ -24,10 +24,8 @@
 
 import nodemailer from "nodemailer";
 import { postNordTrackingUrl } from "@repo/shipping";
-import {
-  resolveCopy,
-  type LocaleCode,
-} from "./email-template-overrides.js";
+import { resolveActiveDesign, renderDesign } from "./email-designed.js";
+import type { MergeValues } from "./email-merge-tags.js";
 import {
   getMailConfig,
   isCustomerEmailEnabled,
@@ -36,6 +34,9 @@ import {
   escapeHtml,
   SHOP_CONTACT_EMAIL,
 } from "./email.js";
+
+/** The two languages every customer-facing mail exists in. */
+export type LocaleCode = "sv" | "en";
 
 export type ShippingNoticeKind =
   | "ready_for_pickup"
@@ -382,6 +383,48 @@ ${t.note ? `                    <p style="margin: 16px 0 0 0; font-size: 12px; c
  * Send
  * ------------------------------------------------------------------ */
 
+
+/**
+ * The merge values a shipping-notice design can draw on.
+ *
+ * Only scalars: these notices carry no order lines, so none of the block
+ * tokens apply. A design that uses one anyway gets an empty string rather
+ * than a stray `{{order_items}}` in the customer's inbox.
+ */
+export function shippingNoticeMergeValues(
+  data: ShippingNoticeData,
+  locale: LocaleCode,
+  orderNo: string,
+): MergeValues {
+  /**
+   * Built from the parts rather than one stored string, and joined only on
+   * the parts that exist — an order with a named service point but no street
+   * must not render a leading comma.
+   */
+  const servicePointAddress = [
+    data.servicePointStreet,
+    [data.servicePointPostalCode, data.servicePointCity].filter(Boolean).join(" ").trim(),
+  ]
+    .filter((p) => p && String(p).trim())
+    .join(", ");
+
+  return {
+    scalars: {
+      customer_first_name: data.firstName ?? "",
+      customer_email: data.email ?? "",
+      order_number: orderNo,
+      service_point: data.servicePointName ?? "",
+      service_point_address: servicePointAddress,
+      tracking_number: data.trackingId ?? "",
+      tracking_url: data.trackingId ? postNordTrackingUrl(data.trackingId) : "",
+      core_return_deadline: data.coreReturnDeadline
+        ? new Date(data.coreReturnDeadline).toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE")
+        : "",
+    },
+    blocks: { order_items: "", order_totals: "", next_steps: "" },
+  };
+}
+
 export async function sendShippingNoticeEmail(
   kind: ShippingNoticeKind,
   data: ShippingNoticeData,
@@ -398,14 +441,13 @@ export async function sendShippingNoticeEmail(
   const locale: LocaleCode = data.locale === "en" ? "en" : "sv";
 
   /**
-   * Admin overrides are applied here, not inside the renderer, so the renderer
-   * stays synchronous and the preview can hand it any copy it likes.
-   *
-   * `ready_for_pickup` etc. are the same stable keys the order_emails ledger
-   * uses, so one vocabulary covers storage, settings toggles and editing.
+   * The compiled copy, used directly. The field-by-field override layer that
+   * used to sit here is gone: customising an email is now done by building a
+   * design for it, so there is exactly one place wording can come from other
+   * than the code — and that place is visible in the admin UI.
    */
-  const t = await resolveCopy(kind, locale, SHIPPING_NOTICE_COPY[kind][locale]);
-  const l = await resolveCopy("shipping_common", locale, SHIPPING_NOTICE_LABELS[locale]);
+  const t = SHIPPING_NOTICE_COPY[kind][locale];
+  const l = SHIPPING_NOTICE_LABELS[locale];
   const orderNo = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
 
   const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
@@ -425,11 +467,37 @@ export async function sendShippingNoticeEmail(
    * retryable claim — returning false here would be indistinguishable from
    * "switched off" and would quietly drop the mail.
    */
+  /**
+   * An admin-built design replaces the compiled notice when one is active for
+   * this kind and locale. Same rule as the order confirmation: no design, an
+   * empty body or an empty subject all fall through to the compiled template,
+   * so a half-finished design can never send a blank mail.
+   */
+  let subject = `${t.subject} (#${orderNo}) - Turbomeck`;
+  let html = renderShippingNoticeEmail(kind, data, t, l);
+
+  const activeDesign = await resolveActiveDesign(kind, locale);
+  if (activeDesign) {
+    const rendered = renderDesign(
+      activeDesign,
+      shippingNoticeMergeValues(data, locale, orderNo),
+      kind,
+    );
+    if (rendered) {
+      subject = rendered.subject;
+      html = rendered.html;
+    } else {
+      console.warn(
+        `[email] ${kind} design #${activeDesign.id} was unusable; sent the built-in template`,
+      );
+    }
+  }
+
   await transporter.sendMail({
     from: `"Turbomeck" <${config.from}>`,
     to: data.email,
-    subject: `${t.subject} (#${orderNo}) - Turbomeck`,
-    html: renderShippingNoticeEmail(kind, data, t, l),
+    subject,
+    html,
   });
 
   console.log(`[email] ${kind} sent to ${data.email} order ${data.orderNumber}`);

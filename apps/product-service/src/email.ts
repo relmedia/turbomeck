@@ -1,4 +1,12 @@
 import nodemailer from "nodemailer";
+import { escapeHtml } from "./email-escape.js";
+import { resolveActiveDesign, renderDesign } from "./email-designed.js";
+import {
+  renderItemsBlock,
+  renderStepsBlock,
+  renderTotalsBlock,
+  type MergeValues,
+} from "./email-merge-tags.js";
 import { db, appSettings } from "@repo/database";
 import { eq } from "drizzle-orm";
 import { postNordTrackingUrl } from "@repo/shipping";
@@ -97,13 +105,7 @@ function vatFromGrossIncl25(grossSek: number): number {
   return Math.round(Number(grossSek) * 0.2);
 }
 
-export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+export { escapeHtml } from "./email-escape.js";
 
 function escapeHtmlAttr(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -278,7 +280,7 @@ export async function getMailConfig(): Promise<MailConfig | null> {
   };
 }
 
-type OrderEmailData = {
+export type OrderEmailData = {
   orderNumber: string;
   /** ISO code the order was charged in. Defaults to SEK when absent. */
   currency?: string;
@@ -1120,6 +1122,79 @@ export async function sendRefundIssuedEmail(data: RefundIssuedEmailData): Promis
   }
 }
 
+/**
+ * The merge values an order-confirmation design can draw on.
+ *
+ * Mirrors what `renderOrderConfirmationEmail` puts in the compiled template,
+ * so a design is a re-arrangement of the same facts rather than a second,
+ * separately-maintained version of the order summary. Every figure is
+ * formatted here, in the order's own currency — a design must never do
+ * arithmetic, and `formatMoney` is what prevents a Norwegian order showing
+ * "kr" totals.
+ */
+export function orderConfirmationMergeValues(data: OrderEmailData): MergeValues {
+  const locale = data.locale || "sv";
+  const t = translations[locale];
+  const money = (amount: number) => formatMoney(amount, data.currency);
+
+  const isExport = data.vatTreatment === "export" || data.vatTreatment === "zero_rated";
+  const vat =
+    data.vatAmount != null ? Number(data.vatAmount) : isExport ? 0 : vatFromGrossIncl25(data.total);
+
+  const addressLine = [
+    data.address,
+    `${data.postalCode} ${data.city}`.trim(),
+    getCountryName(data.country, locale),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const scalars: Record<string, string> = {
+    customer_first_name: data.firstName ?? "",
+    customer_last_name: data.lastName ?? "",
+    customer_email: data.email ?? "",
+    order_number: data.orderNumber ?? "",
+    order_date: new Date().toLocaleDateString(locale === "en" ? "en-GB" : "sv-SE"),
+    order_subtotal: money(data.subtotal),
+    order_shipping: data.shippingCost > 0 ? money(data.shippingCost) : t.free,
+    /** Blank, not "0 kr", so a design's discount line can simply disappear. */
+    order_discount: data.discount > 0 ? `-${money(data.discount)}` : "",
+    order_vat: isExport ? "" : money(vat),
+    order_total: money(data.total),
+    payment_method: data.paymentMethodDisplay ?? "",
+    delivery_address: addressLine,
+    service_point: data.servicePointName ?? "",
+    tracking_number: data.trackingId ?? "",
+    tracking_url: data.trackingId ? postNordTrackingUrl(data.trackingId) : "",
+  };
+
+  const blocks: Record<string, string> = {
+    order_items: renderItemsBlock(
+      data.items.map((i) => ({
+        productName: i.productName,
+        variant: i.variant,
+        quantity: i.quantity,
+        lineTotal: money(i.price * i.quantity),
+      })),
+      { quantity: t.quantity },
+    ),
+    order_totals: renderTotalsBlock([
+      { label: t.subtotal, value: scalars.order_subtotal ?? "" },
+      { label: t.shipping, value: scalars.order_shipping ?? "" },
+      { label: t.discount, value: scalars.order_discount ?? "", accent: true },
+      { label: t.vatIncluded, value: scalars.order_vat ?? "" },
+      { label: t.total, value: scalars.order_total ?? "", strong: true },
+    ]),
+    next_steps: renderStepsBlock([
+      { title: t.nextStep1Title, body: t.nextStep1Body },
+      { title: t.nextStep2Title, body: t.nextStep2Body },
+      { title: t.nextStep3Title, body: t.nextStep3Body },
+    ]),
+  };
+
+  return { scalars, blocks };
+}
+
 export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<boolean> {
   const config = await getMailConfig();
   if (!config) {
@@ -1141,13 +1216,34 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
 
   const locale = data.locale || "sv";
   const t = translations[locale];
-  const html = renderOrderConfirmationEmail(data);
+
+  /**
+   * An admin-built design wins when one is active for this locale; otherwise
+   * the compiled template renders exactly as before. Both the subject and the
+   * body come from the design, because a design that says "Din order är på
+   * väg" under the subject "Orderbekräftelse" reads as two different emails.
+   */
+  let subject = `${t.title} ${data.orderNumber} - Turbomeck`;
+  let html = renderOrderConfirmationEmail(data);
+
+  const design = await resolveActiveDesign("order_confirmation", locale);
+  if (design) {
+    const rendered = renderDesign(design, orderConfirmationMergeValues(data), "order_confirmation");
+    if (rendered) {
+      subject = rendered.subject;
+      html = rendered.html;
+    } else {
+      console.warn(
+        `[email] order_confirmation design #${design.id} was unusable; sent the built-in template`,
+      );
+    }
+  }
 
   try {
     await transporter.sendMail({
       from: `"Turbomeck" <${config.from}>`,
       to: data.email,
-      subject: `${t.title} ${data.orderNumber} - Turbomeck`,
+      subject,
       html,
     });
     console.log(`[email] Order confirmation sent to ${data.email} for ${data.orderNumber}`);

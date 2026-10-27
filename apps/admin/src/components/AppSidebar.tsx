@@ -23,7 +23,6 @@ import {
   BellRing,
   Send,
   Users,
-  FileText,
   LayoutTemplate,
 } from "lucide-react";
 import {
@@ -100,7 +99,6 @@ const settingsItems = [
   { title: "Order-notiser", url: "/settings/notiser", icon: BellRing },
   { title: "Kundutskick", url: "/settings/kundutskick", icon: Send },
   { title: "Frakt & PostNord", url: "/settings/frakt", icon: Truck },
-  { title: "E-postmallar", url: "/settings/mallar", icon: FileText },
   { title: "E-postdesign", url: "/settings/design", icon: LayoutTemplate },
 ];
 
