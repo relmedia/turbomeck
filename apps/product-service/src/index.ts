@@ -2584,6 +2584,64 @@ app.post("/api/orders/:id/notifications/:kind", async (req, res) => {
     }
 
     /**
+     * The order confirmation — the "tack för ditt köp" mail.
+     *
+     * It is sent automatically when a customer checks out, but NOT for orders
+     * staff create in admin: persistOrder returns before the mail when
+     * `origin === "admin"`, on the reasoning that the shop already knows. The
+     * customer does not, so this lets it be sent deliberately.
+     *
+     * Rebuilt from the stored row rather than from whatever was in memory at
+     * checkout, so a re-send reflects the order as it stands now.
+     */
+    if (kind === "order_confirmation") {
+      // No toggle: the confirmation has always been unconditional, and a
+      // customer who bought something should always be told so.
+      const lines = await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id));
+
+      const ok = await sendOrderConfirmationEmail({
+        orderNumber: order.orderNumber,
+        currency: order.currency ?? "SEK",
+        firstName: order.firstName,
+        lastName: order.lastName,
+        email: order.email,
+        address: order.address,
+        city: order.city,
+        postalCode: order.postalCode,
+        country: order.country ?? "SE",
+        servicePointName: order.servicePointName,
+        deliveryOption: order.deliveryOption,
+        subtotal: Number(order.subtotal),
+        shippingCost: Number(order.shippingCost),
+        discount: Number(order.discount),
+        total: Number(order.total),
+        vatAmount: order.vatAmount != null ? Number(order.vatAmount) : null,
+        vatTreatment: order.vatTreatment,
+        trackingId: order.postNordTrackingId,
+        locale,
+        paymentMethodDisplay:
+          order.stripePaymentId?.startsWith("pi_")
+            ? "Kort"
+            : "Order skapad av Turbomeck",
+        items: lines.map((l) => ({
+          productName: l.productName,
+          productImage: l.productImage,
+          variant: l.variant,
+          price: Number(l.price),
+          quantity: l.quantity,
+        })),
+      });
+
+      if (!ok) {
+        return res.status(503).json({ error: "E-post kunde inte skickas (SMTP ej konfigurerat)" });
+      }
+      return res.json({ sent: true, recipient: order.email });
+    }
+
+    /**
      * Only the parcel mails need a tracking number. The core-return pair is
      * about a shipment going the other way and is checked after, not here —
      * guarding globally would have made them impossible to send.

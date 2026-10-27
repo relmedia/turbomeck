@@ -141,6 +141,7 @@ type OrderEmailRow = {
  * visible here, even one added after this map was written.
  */
 const ORDER_EMAIL_LABELS: Record<string, string> = {
+  order_confirmation: "Orderbekräftelse",
   shipment_dispatched: "Skickad + spårlänk",
   ready_for_pickup: "Klar att hämta",
   pickup_reminder_1: "Påminnelse 1",
@@ -487,6 +488,44 @@ export default function OrderDetailPage() {
   };
 
   const [cancelling, setCancelling] = useState(false);
+  const [sendingConfirmation, setSendingConfirmation] = useState(false);
+
+  /**
+   * Send the "tack för ditt köp" mail for this order.
+   *
+   * Needed because an order created in admin never sends one — persistOrder
+   * suppresses it for staff-created orders. The shop knows about the order;
+   * the customer does not.
+   */
+  const sendOrderConfirmation = async (force = false) => {
+    if (!id) return;
+    setSendingConfirmation(true);
+    try {
+      const res = await fetch(
+        `/api/orders/${id}/send-confirmation${force ? "?force=true" : ""}`,
+        { method: "POST" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        alreadySent?: boolean;
+        recipient?: string;
+      };
+      if (res.status === 409 && data.alreadySent) {
+        // Already sent once. Ask rather than silently duplicating it.
+        if (window.confirm("Orderbekräftelsen har redan skickats. Skicka igen?")) {
+          await sendOrderConfirmation(true);
+        }
+        return;
+      }
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      toast.success(`Orderbekräftelse skickad till ${data.recipient ?? "kunden"}`);
+      await refreshOrderEmails();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunde inte skicka bekräftelsen");
+    } finally {
+      setSendingConfirmation(false);
+    }
+  };
 
   /**
    * Records that the booking was cancelled in PostNord's portal, or undoes that
@@ -1316,6 +1355,31 @@ export default function OrderDetailPage() {
                 {/* Utskick. Only rendered once something has actually been
                     sent — an empty log is noise on an order that has not
                     shipped yet. */}
+                {/* Orderbekräftelse. Always offered: a staff-created order
+                    never sent one automatically, and a customer who bought
+                    over the phone still needs their receipt. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 bg-white text-xs"
+                    disabled={sendingConfirmation}
+                    onClick={() => void sendOrderConfirmation(false)}
+                  >
+                    {sendingConfirmation ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Mail className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    )}
+                    {sendingConfirmation ? "Skickar…" : "Skicka orderbekräftelse"}
+                  </Button>
+                  {!orderEmails.some((m) => m.kind === "order_confirmation" && m.sentAt) && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Kunden har inte fått någon bekräftelse än.
+                    </span>
+                  )}
+                </div>
+
                 {orderEmails.length > 0 && (
                   <div className="mt-3">
                     <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

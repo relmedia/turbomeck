@@ -33,6 +33,13 @@ import { and, eq, isNull, lt } from "drizzle-orm";
  * name it.
  */
 export const ORDER_EMAIL_KINDS = [
+  /**
+   * The "tack för ditt köp" mail. Sent automatically at checkout, but NOT for
+   * orders staff create in admin — persistOrder suppresses it there. Recording
+   * it here means a manual send is tracked like any other, and the Utskick
+   * list shows whether the customer was ever told.
+   */
+  "order_confirmation",
   "shipment_dispatched",
   "ready_for_pickup",
   "pickup_reminder_1",
