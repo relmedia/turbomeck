@@ -40,6 +40,7 @@ type SeedTemplate = {
 
 type ExistingDesign = {
   id: number;
+  name: string;
   templateKey: string | null;
   locale: string;
 };
@@ -97,17 +98,23 @@ export default function MigrateDesignsButton() {
       if (templates.length === 0) throw new Error("Inga standardmallar att migrera");
 
       /**
-       * Existing designs are looked up so a second run UPDATES rather than
-       * duplicating. Without this, re-running the migration would leave two
-       * designs per template and the partial unique index would reject the
-       * second as active — an error the admin would have to untangle by hand.
+       * Existing designs are looked up so a second run UPDATES its own rows
+       * rather than duplicating them — that is what makes re-running this the
+       * way to reset a template to standard.
+       *
+       * Matched on NAME as well as template and locale, so it only ever
+       * overwrites a design this migration created. A design someone built and
+       * named themselves keeps that name, so it is not recognised, and is left
+       * untouched while the standard one is created alongside it. Matching on
+       * template and locale alone would have silently replaced hand-built work
+       * — there is already one such design in production.
        */
       const listRes = await fetch("/api/settings/designs", { cache: "no-store" });
       const listJson = (await listRes.json()) as { designs?: ExistingDesign[] };
       const existing = new Map(
         (listJson.designs ?? [])
           .filter((d) => d.templateKey)
-          .map((d) => [`${d.templateKey}:${d.locale}`, d.id]),
+          .map((d) => [`${d.templateKey}:${d.locale}:${d.name}`, d.id]),
       );
 
       for (let i = 0; i < templates.length; i++) {
@@ -115,7 +122,7 @@ export default function MigrateDesignsButton() {
         setProgress(`(${i + 1}/${templates.length}) ${t.name} [${t.locale}]`);
 
         const exported = await exportOne(t.design);
-        const id = existing.get(`${t.templateKey}:${t.locale}`);
+        const id = existing.get(`${t.templateKey}:${t.locale}:${t.name}`);
 
         const res = await fetch("/api/settings/designs", {
           method: "POST",
@@ -137,9 +144,27 @@ export default function MigrateDesignsButton() {
         else created++;
       }
 
+      /**
+       * Hand-built designs bound to the same events are named explicitly, so
+       * the admin can see which of their own designs are now superseded by a
+       * standard one and delete or re-activate them deliberately.
+       */
+      const untouched = (listJson.designs ?? []).filter(
+        (d) =>
+          d.templateKey &&
+          !templates.some(
+            (t) => t.templateKey === d.templateKey && t.locale === d.locale && t.name === d.name,
+          ),
+      );
       toast.success(
         `Klart — ${created} nya mallar skapade${updated ? `, ${updated} uppdaterade` : ""}. Alla är aktiva.`,
       );
+      if (untouched.length > 0) {
+        toast.info(
+          `Dina egna mallar lämnades orörda: ${untouched.map((d) => `${d.name} (${d.locale})`).join(", ")}.`,
+          { autoClose: 10000 },
+        );
+      }
       router.refresh();
     } catch (err) {
       /**
