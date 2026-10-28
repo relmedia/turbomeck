@@ -30,6 +30,7 @@
   "exclude": [
     "node_modules",
     "src/lib/__verify-ai-generation.ts",
-    "src/lib/__upload-email-logo.ts"
+    "src/lib/__upload-email-logo.ts",
+    "src/lib/__verify-asset-mirror.ts"
   ]
 }
