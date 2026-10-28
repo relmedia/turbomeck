@@ -22,7 +22,8 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Switch } from "@repo/ui/components/switch";
-import { Loader2, Save, ArrowLeft, Braces, Copy, Send } from "lucide-react";
+import { Textarea } from "@repo/ui/components/textarea";
+import { Loader2, Save, ArrowLeft, Braces, Copy, Send, Sparkles } from "lucide-react";
 import { toast } from "react-toastify";
 
 /** The automated emails a design can replace. Null = standalone. */
@@ -63,6 +64,9 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
   const [tags, setTags] = useState<{ groups: MergeTagGroups; tags: MergeTagDef[] } | null>(null);
   const [showTags, setShowTags] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
 
   /**
    * The token catalogue comes from product-service, where the substitution
@@ -119,6 +123,77 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
       );
     }
   }, [initial.design]);
+
+  /**
+   * Generate a design from a description and load it into the canvas.
+   *
+   * Loaded, not saved: the admin reads it, edits it, and presses Spara if
+   * they want it. Nothing reaches a customer from this button.
+   *
+   * The model fills in a small block spec which the server converts using the
+   * verified builders — it never writes Unlayer JSON, because a design with a
+   * subtly wrong shape opens blank rather than failing, and the admin would
+   * read that as the feature being broken.
+   */
+  const generate = async () => {
+    const text = aiPrompt.trim();
+    if (!text) {
+      toast.error("Beskriv vad mallen ska innehålla");
+      return;
+    }
+    const editor = editorRef.current?.editor;
+    if (!editor) {
+      toast.error("Editorn är inte redo än");
+      return;
+    }
+    /**
+     * Replacing the canvas throws away unsaved work, so it is confirmed —
+     * but only when there is something to lose. A blank new template needs
+     * no ceremony.
+     */
+    if (meta.id && !window.confirm("Ersätt innehållet i editorn med ett nytt AI-förslag?")) {
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/settings/designs/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          locale: meta.locale,
+          templateKey: meta.templateKey,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        design?: Record<string, unknown>;
+        subject?: string;
+        warnings?: string[];
+      };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (!json.design) throw new Error("AI returnerade ingen mall");
+
+      editor.loadDesign(
+        json.design as Parameters<
+          NonNullable<NonNullable<EditorRef["editor"]>["loadDesign"]>
+        >[0],
+      );
+      /** The subject is part of the generated template, not a separate step. */
+      if (json.subject) setMeta((m) => ({ ...m, subject: json.subject! }));
+
+      toast.success("Förslaget laddades in — granska och spara");
+      if (json.warnings && json.warnings.length > 0) {
+        toast.warn(json.warnings.join(" · "), { autoClose: 10000 });
+      }
+      setShowAi(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunde inte generera mallen");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   /**
    * Mail the design as it currently stands, filled with sample data.
@@ -291,6 +366,17 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
           variant="outline"
           size="sm"
           className="ml-auto h-8"
+          onClick={() => setShowAi((v) => !v)}
+          title="Skapa ett förslag med AI"
+        >
+          <Sparkles className="mr-1.5 size-3.5" aria-hidden />
+          AI
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
           disabled={testing || !ready}
           onClick={sendTest}
           title="Skicka mallen till din egen e-post med exempeldata"
@@ -318,6 +404,59 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
           {saving ? "Sparar…" : "Spara"}
         </Button>
       </div>
+
+      {/* The AI prompt.
+          Sits above the token list because the usual order is "generate
+          something, then adjust it" — and the generated design already uses
+          the tokens, so the reference below is the follow-up, not the start. */}
+      {showAi && (
+        <div className="border-b bg-muted/30 px-4 py-3">
+          <label htmlFor="ai-prompt" className="text-xs font-medium">
+            Beskriv mallen
+          </label>
+          <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+            Skriv vad mejlet ska säga och i vilken ton. AI:n fyller i rätt taggar
+            åt dig — förslaget laddas in i editorn, inget sparas eller skickas
+            förrän du väljer det.
+          </p>
+          <Textarea
+            id="ai-prompt"
+            rows={3}
+            className="bg-background text-sm"
+            placeholder={
+              meta.templateKey
+                ? "T.ex. Kort och varmt tack, visa produkterna och summan, och berätta att spårningsnummer kommer på mejl när vi skickat."
+                : "T.ex. Ett mejl som berättar att vi har en kampanj på turbos i november, med en knapp till butiken."
+            }
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            disabled={generating}
+            maxLength={2000}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <Button size="sm" onClick={() => void generate()} disabled={generating || !ready}>
+              {generating ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Sparkles className="mr-1.5 size-3.5" aria-hidden />
+              )}
+              {generating ? "Genererar…" : "Generera förslag"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAi(false)}
+              disabled={generating}
+            >
+              Avbryt
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {meta.locale === "en" ? "Skrivs på engelska" : "Skrivs på svenska"}
+              {meta.templateKey ? " · anpassas till valt utskick" : ""}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* The reference list.
           The editor's own merge-tag menu (the {} button inside a text block)

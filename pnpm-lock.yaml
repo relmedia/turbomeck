@@ -471,6 +471,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/sanitize-html':
+        specifier: workspace:*
+        version: link:../../packages/sanitize-html
       '@repo/shipping':
         specifier: workspace:*
         version: link:../../packages/shipping

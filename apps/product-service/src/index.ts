@@ -34,6 +34,12 @@ import {
 } from "./email-shipping-notices.js";
 import { MERGE_TAGS, mergeTagsForEditor } from "./email-merge-tags.js";
 import { seedTemplates } from "./email-designs-seed.js";
+import {
+  buildDesignFromSpec,
+  mergeTagBriefing,
+  PALETTE_HINT,
+  SpecError,
+} from "./email-design-from-spec.js";
 import { sendDesignPreview } from "./email-preview-fixtures.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { stripeClient } from "./stripe-client.js";
@@ -2570,6 +2576,46 @@ app.post("/api/email-templates/test-send", async (req, res) => {
      */
     const message = error instanceof Error ? error.message : "Kunde inte skicka testmejlet";
     return res.status(502).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/email-templates/from-spec
+ *
+ * Converts a generated block spec into an Unlayer design.
+ *
+ * Separate from the generation itself, which happens in admin where the
+ * Anthropic key lives. The conversion belongs here because the verified
+ * design builders are here — and because validation must not run in the same
+ * place as the thing being validated's author.
+ */
+app.post("/api/email-templates/from-spec", async (req, res) => {
+  try {
+    const result = buildDesignFromSpec((req.body ?? {}).spec);
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof SpecError) {
+      /** A rejected spec is the caller's problem to show, not a server fault. */
+      return res.status(422).json({ error: error.message });
+    }
+    console.error("email-templates/from-spec:", error);
+    return res.status(500).json({ error: "Kunde inte bygga mallen" });
+  }
+});
+
+/**
+ * GET /api/email-templates/ai-briefing
+ *
+ * The token catalogue and palette as prompt text. Served rather than written
+ * into the admin prompt so the model is told about exactly the tokens that
+ * the substitution can fill — the two cannot drift.
+ */
+app.get("/api/email-templates/ai-briefing", async (_req, res) => {
+  try {
+    return res.json({ tokens: mergeTagBriefing(), palette: PALETTE_HINT });
+  } catch (error) {
+    console.error("email-templates/ai-briefing:", error);
+    return res.status(500).json({ error: "Kunde inte hämta taggar" });
   }
 });
 

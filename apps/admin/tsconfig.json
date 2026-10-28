@@ -29,6 +29,6 @@
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": [
     "node_modules",
-    "src/lib/__verify-template-roundtrip.ts"
+    "src/lib/__verify-ai-generation.ts"
   ]
 }
