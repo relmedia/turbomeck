@@ -17,6 +17,7 @@ import {
   Mail,
   MapPin,
   Package,
+  PackageCheck,
   ShoppingBag,
   Truck,
   XCircle,
@@ -606,18 +607,21 @@ function OrderSuccessContent() {
     title: string;
     body: string;
   }> = [
+    // Packed, shipped with tracking, arrived — the same three steps and the
+    // same order as the confirmation email's "Vad händer nu?" block, which is
+    // the one place a customer can compare them side by side.
     {
-      icon: Mail,
+      icon: Box,
       title: t("orderSuccess.nextStep1Title"),
       body: t("orderSuccess.nextStep1Body"),
     },
     {
-      icon: Box,
+      icon: Truck,
       title: t("orderSuccess.nextStep2Title"),
       body: t("orderSuccess.nextStep2Body"),
     },
     {
-      icon: Truck,
+      icon: PackageCheck,
       title: t("orderSuccess.nextStep3Title"),
       body: t("orderSuccess.nextStep3Body"),
     },

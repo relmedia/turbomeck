@@ -384,14 +384,21 @@ const translations = {
     norway: "Norge",
     paymentMethod: "Betalningsmetod",
     // Same wording as the order success page (client i18n: orderSuccess.nextStep*)
+    //
+    // The three steps are the three mails this shop actually sends, in order:
+    // this confirmation, then shipment_dispatched with the tracking number,
+    // then ready_for_pickup or order_delivered on arrival. The old step 1 said
+    // "we have emailed you a confirmation" — in the confirmation itself — and
+    // nothing told the customer a tracking number was coming.
     nextStepsTitle: "Vad händer nu?",
-    nextStep1Title: "Bekräftelse",
-    nextStep1Body: "Vi har mejlat en orderbekräftelse till dig.",
-    nextStep2Title: "Packning",
-    nextStep2Body: "Vi plockar och packar din order inom 1–2 arbetsdagar.",
-    nextStep3Title: "Leverans",
+    nextStep1Title: "Vi packar din order",
+    nextStep1Body: "Vi plockar och packar din order inom 1–2 arbetsdagar.",
+    nextStep2Title: "Vi skickar paketet",
+    nextStep2Body:
+      "När paketet lämnar oss får du ett mejl med ditt spårningsnummer, så att du kan följa det hela vägen.",
+    nextStep3Title: "Paketet kommer fram",
     nextStep3Body:
-      "PostNord levererar normalt på 2–4 arbetsdagar. Du får ett mejl med spårningsnummer när paketet skickas.",
+      "PostNord levererar normalt på 2–4 arbetsdagar. Du får ett mejl så snart paketet är levererat eller finns att hämta hos ditt ombud.",
   },
   en: {
     title: "Order Confirmation",
@@ -434,13 +441,14 @@ const translations = {
     norway: "Norway",
     paymentMethod: "Payment method",
     nextStepsTitle: "What happens next?",
-    nextStep1Title: "Confirmation",
-    nextStep1Body: "We've emailed an order confirmation to you.",
-    nextStep2Title: "Packing",
-    nextStep2Body: "We'll pick and pack your order within 1–2 business days.",
-    nextStep3Title: "Delivery",
+    nextStep1Title: "We pack your order",
+    nextStep1Body: "We'll pick and pack your order within 1–2 business days.",
+    nextStep2Title: "We ship your parcel",
+    nextStep2Body:
+      "When it leaves us you'll get an email with your tracking number, so you can follow it the whole way.",
+    nextStep3Title: "Your parcel arrives",
     nextStep3Body:
-      "PostNord delivers in 2–4 business days. You'll receive an email with the tracking number when your parcel ships.",
+      "PostNord delivers in 2–4 business days. You'll get an email as soon as it's delivered or ready to collect at your pickup point.",
   },
 };
 
@@ -449,6 +457,28 @@ function getCountryName(code: string, locale: "sv" | "en"): string {
   if (code === "SE") return t.sweden;
   if (code === "NO") return t.norway;
   return code;
+}
+
+/**
+ * The "Vad händer nu?" steps: the three mails this shop sends, in order.
+ *
+ * One definition because there are two renderers — the compiled template and
+ * the block that fills `{{next_steps}}` in a built design — and they listed
+ * the same three steps separately. They had already drifted: the compiled one
+ * carried icons and the designed one numbered circles.
+ *
+ * Icons are literal emoji rather than HTML entities, matching
+ * SHIPPING_NOTICE_COPY, so they survive being escaped and read correctly in
+ * the source.
+ */
+export function orderNextSteps(
+  t: (typeof translations)["sv"],
+): Array<{ icon: string; title: string; body: string }> {
+  return [
+    { icon: "📦", title: t.nextStep1Title, body: t.nextStep1Body },
+    { icon: "🚚", title: t.nextStep2Title, body: t.nextStep2Body },
+    { icon: "📬", title: t.nextStep3Title, body: t.nextStep3Body },
+  ];
 }
 
 export function renderOrderConfirmationEmail(data: OrderEmailData): string {
@@ -535,23 +565,19 @@ export function renderOrderConfirmationEmail(data: OrderEmailData): string {
     .join("");
 
   // "Vad hander nu?" steps, mirroring the ordered list on the order success page.
-  const nextStepsHtml = [
-    { icon: "&#9993;&#65039;", title: t.nextStep1Title, body: t.nextStep1Body },
-    { icon: "&#128230;", title: t.nextStep2Title, body: t.nextStep2Body },
-    { icon: "&#128666;", title: t.nextStep3Title, body: t.nextStep3Body },
-  ]
+  const nextStepsHtml = orderNextSteps(t)
     .map(
       (step, idx) => `
                 <tr>
                   <td width="28" style="width: 28px; vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 0;">
                     <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius: 9999px; background-color: #eef2f7;">
                       <tr>
-                        <td width="28" height="28" style="width: 28px; height: 28px; border-radius: 9999px; background-color: #eef2f7; text-align: center; vertical-align: middle; line-height: 28px; mso-line-height-rule: exactly; font-size: 12px; font-weight: 700; color: #111827;">${idx + 1}</td>
+                        <td width="28" height="28" style="width: 28px; height: 28px; border-radius: 9999px; background-color: #eef2f7; text-align: center; vertical-align: middle; line-height: 28px; mso-line-height-rule: exactly; font-size: 14px; color: #111827;">${step.icon}</td>
                       </tr>
                     </table>
                   </td>
                   <td style="vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 12px;">
-                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #111827;">${step.icon} ${step.title}</p>
+                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #111827;">${step.title}</p>
                     <p style="margin: 3px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.55;">${step.body}</p>
                   </td>
                 </tr>`,
@@ -1189,11 +1215,7 @@ export function orderConfirmationMergeValues(data: OrderEmailData): MergeValues 
       { label: t.vatIncluded, value: scalars.order_vat ?? "" },
       { label: t.total, value: scalars.order_total ?? "", strong: true },
     ]),
-    next_steps: renderStepsBlock([
-      { title: t.nextStep1Title, body: t.nextStep1Body },
-      { title: t.nextStep2Title, body: t.nextStep2Body },
-      { title: t.nextStep3Title, body: t.nextStep3Body },
-    ]),
+    next_steps: renderStepsBlock(orderNextSteps(t)),
   };
 
   return { scalars, blocks };

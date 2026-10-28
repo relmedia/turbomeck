@@ -262,22 +262,35 @@ export function renderTotalsBlock(rows: MergeTotalRow[]): string {
   return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">${body}</table>`;
 }
 
-export type MergeStep = { title: string; body: string };
+export type MergeStep = {
+  title: string;
+  body: string;
+  /** An emoji shown in the badge. Falls back to the step's position. */
+  icon?: string;
+};
 
-/** The numbered "Vad händer nu?" list. */
+/**
+ * The "Vad händer nu?" list.
+ *
+ * Each step gets a round badge holding its icon. `mso-line-height-rule` and
+ * the explicit width/height on the cell are what keep that badge circular in
+ * Outlook, which ignores line-height on a table cell otherwise and renders an
+ * oval. The number is the fallback when a step has no icon, so an older
+ * caller still produces a sensible list.
+ */
 export function renderStepsBlock(steps: MergeStep[]): string {
   const body = steps
     .map(
       (st, i) => `
       <tr>
-        <td width="28" style="width:28px;padding:6px 10px 6px 0;vertical-align:top;">
-          <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius:9999px;background-color:#f3f4f6;">
-            <tr><td width="24" height="24" style="width:24px;height:24px;text-align:center;vertical-align:middle;line-height:24px;font-size:12px;color:${INK};">${i + 1}</td></tr>
+        <td width="30" style="width:30px;padding:7px 12px 7px 0;vertical-align:top;">
+          <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius:9999px;background-color:#eef2f7;">
+            <tr><td width="30" height="30" style="width:30px;height:30px;border-radius:9999px;background-color:#eef2f7;text-align:center;vertical-align:middle;line-height:30px;mso-line-height-rule:exactly;font-size:15px;color:${INK};">${st.icon ? escapeHtml(st.icon) : i + 1}</td></tr>
           </table>
         </td>
-        <td style="padding:6px 0;vertical-align:top;">
+        <td style="padding:7px 0;vertical-align:top;">
           <p style="margin:0;font-weight:600;color:${INK};font-size:14px;">${escapeHtml(st.title)}</p>
-          <p style="margin:2px 0 0 0;color:${MUTED};font-size:13px;line-height:1.5;">${escapeHtml(st.body)}</p>
+          <p style="margin:3px 0 0 0;color:${MUTED};font-size:13px;line-height:1.55;">${escapeHtml(st.body)}</p>
         </td>
       </tr>`,
     )

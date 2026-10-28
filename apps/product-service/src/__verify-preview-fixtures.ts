@@ -18,6 +18,9 @@ import { sampleMergeValues, previewBanner } from "./email-preview-fixtures.js";
 import { MERGE_TAGS, applyMergeTags, applyMergeTagsPlain, unknownTokens } from "./email-merge-tags.js";
 import { seedTemplates } from "./email-designs-seed.js";
 
+/** The badges the three order-confirmation steps carry. */
+const STEP_ICONS = ["📦", "🚚", "📬"];
+
 let failures = 0;
 const check = (label: string, ok: boolean, detail?: unknown) => {
   console.log(
@@ -69,13 +72,14 @@ for (const locale of ["sv", "en"] as const) {
     (values.blocks.order_totals ?? "").replace(/\u00a0/gu, " ").includes("16 989"),
   );
   /**
-   * Counted by the numbers in the step badges, not by `<tr>`: each step nests
-   * a one-row table for its circle, so a row count sees six and not three.
+   * Counted by the icons in the step badges, not by `<tr>`: each step nests a
+   * one-row table for its badge, so a row count sees six and not three. The
+   * badges carry icons rather than numbers now.
    */
   const steps = values.blocks.next_steps ?? "";
   check(
-    `${locale}: the steps block has three numbered steps`,
-    [">1<", ">2<", ">3<"].every((n) => steps.includes(n)) && !steps.includes(">4<"),
+    `${locale}: the steps block has three icon badges`,
+    STEP_ICONS.every((icon) => steps.includes(icon)),
   );
 
   /* ---- a design using every token renders clean ----------------------- */

@@ -166,9 +166,20 @@ async function main() {
   );
 
   // ---- the next-steps block ----------------------------------------------
+  /**
+   * Asserted on the icons and the promises rather than the exact titles: the
+   * wording is copy someone may reasonably reword, while "there are three
+   * steps and one of them tells the customer a tracking number is coming" is
+   * the part that must not quietly disappear.
+   */
   check(
-    "the three steps are there",
-    html.includes("Bekräftelse") && html.includes("Packning") && html.includes("Leverans"),
+    "all three step badges are there",
+    ["📦", "🚚", "📬"].every((icon) => html.includes(icon)),
+  );
+  check("a step promises the tracking number", html.toLowerCase().includes("spårningsnummer"));
+  check(
+    "a step promises a mail on arrival",
+    html.includes("levererad") || html.includes("hämta"),
   );
 
   // ---- markup integrity ---------------------------------------------------
