@@ -84,6 +84,37 @@ export function buttonBlock(label: string, href: string, accent: string): Block 
   };
 }
 
+/**
+ * An image block.
+ *
+ * `fullWidth` false keeps a logo at its natural size; true lets a banner fill
+ * the 600px body. Both carry explicit width so a client that blocks images
+ * still reserves the right space instead of collapsing the layout.
+ */
+export function imageBlock(
+  src: string,
+  alt: string,
+  opts: { width?: number; fullWidth?: boolean; padding?: string; href?: string } = {},
+): Block {
+  return {
+    id: nextId("c"),
+    type: "image",
+    values: {
+      containerPadding: opts.padding ?? "16px 24px",
+      _meta: { htmlID: nextId("u_content_image"), htmlClassNames: "u_content_image" },
+      selectable: true,
+      draggable: true,
+      duplicatable: true,
+      deletable: true,
+      hideable: true,
+      src: { url: src, width: opts.width ?? 600, height: null, autoWidth: !opts.fullWidth, maxWidth: "100%" },
+      textAlign: "center",
+      altText: alt,
+      ...(opts.href ? { action: { name: "web", values: { href: opts.href, target: "_blank" } } } : {}),
+    },
+  };
+}
+
 export function dividerBlock(): Block {
   return {
     id: nextId("c"),

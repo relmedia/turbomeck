@@ -5,6 +5,7 @@ import { asc } from "drizzle-orm";
 import { Button } from "@repo/ui/components/button";
 import { Plus, Pencil, CheckCircle2, Circle } from "lucide-react";
 import TestSendDesignButton from "@/components/TestSendDesignButton";
+import ApplyLogoClient from "@/components/ApplyLogoClient";
 import DeleteDesignButton from "@/components/DeleteDesignButton";
 
 export const metadata = {
@@ -101,12 +102,15 @@ export default async function DesignListPage() {
             <strong>[TEST]</strong> i ämnesraden och påverkar ingen order.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/settings/design/ny">
-            <Plus className="mr-2 size-4" aria-hidden />
-            Ny mall
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-start gap-2">
+          <ApplyLogoClient />
+          <Button asChild>
+            <Link href="/settings/design/ny">
+              <Plus className="mr-2 size-4" aria-hidden />
+              Ny mall
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {sorted.length === 0 ? (

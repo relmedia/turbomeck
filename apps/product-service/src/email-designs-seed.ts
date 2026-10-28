@@ -34,6 +34,7 @@ import {
   type ShippingNoticeKind,
 } from "./email-shipping-notices.js";
 import { SHOP_CONTACT_EMAIL } from "./email.js";
+import { getOrderEmailLogoUrl } from "./email-logo.js";
 import {
   CARD_BG,
   INK,
@@ -41,6 +42,7 @@ import {
   buttonBlock,
   design,
   dividerBlock,
+  imageBlock,
   resetIdSequence,
   textBlock,
   type Block,
@@ -61,11 +63,22 @@ export type SeedTemplate = {
  * Shared pieces
  * ------------------------------------------------------------------ */
 
-const brandRow = () =>
-  textBlock(
-    `<p style="line-height: 150%;"><strong style="font-size: 20px; letter-spacing: 1px;">TURBOMECK</strong></p>`,
-    { align: "center", padding: "24px 24px 8px" },
-  );
+/**
+ * The real logo when one is configured, the wordmark otherwise.
+ *
+ * It used to be text unconditionally, which is how twelve live templates
+ * ended up with no logo in them. The fallback stays for a machine with no
+ * EMAIL_LOGO_URL, where a broken image would be worse than type.
+ */
+const brandRow = () => {
+  const logo = getOrderEmailLogoUrl();
+  return logo
+    ? imageBlock(logo, "Turbomeck", { width: 180, padding: "24px 24px 8px" })
+    : textBlock(
+        `<p style="line-height: 150%;"><strong style="font-size: 20px; letter-spacing: 1px;">TURBOMECK</strong></p>`,
+        { align: "center", padding: "24px 24px 8px" },
+      );
+};
 
 const footerRow = (locale: SeedLocale) => {
   const l = SHIPPING_NOTICE_LABELS[locale];

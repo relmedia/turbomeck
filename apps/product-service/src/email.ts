@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { escapeHtml } from "./email-escape.js";
+import { getOrderEmailLogoUrl } from "./email-logo.js";
 import { resolveActiveDesign, renderDesign } from "./email-designed.js";
 import {
   renderItemsBlock,
@@ -14,18 +15,7 @@ import { postNordTrackingUrl } from "@repo/shipping";
 /** Customer-facing contact address in transactional emails */
 export const SHOP_CONTACT_EMAIL = "shop@turbomeck.se";
 
-/**
- * Identical to @repo/auth `email-templates.ts` (magic link) LOGO_URL resolution.
- */
-export function getOrderEmailLogoUrl(): string {
-  const env = process.env;
-  if (env.EMAIL_LOGO_URL) return env.EMAIL_LOGO_URL;
-  const r2Base = (env.R2_PUBLIC_URL || env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
-  if (r2Base) return `${r2Base}/branding/logo.png`;
-  const appBase = (env.NEXT_PUBLIC_APP_URL || env.NEXTAUTH_URL || "").replace(/\/$/, "");
-  if (appBase) return `${appBase}/logo.png`;
-  return "";
-}
+export { getOrderEmailLogoUrl } from "./email-logo.js";
 
 /**
  * Order confirmation email header: logo + wordmark (or “T” fallback), horizontally centered (email-safe tables).

@@ -34,6 +34,8 @@ import {
 } from "./email-shipping-notices.js";
 import { MERGE_TAGS, mergeTagsForEditor } from "./email-merge-tags.js";
 import { seedTemplates } from "./email-designs-seed.js";
+import { applyLogoToDesign } from "./email-design-logo.js";
+import { getOrderEmailLogoUrl } from "./email-logo.js";
 import {
   buildDesignFromSpec,
   mergeTagBriefing,
@@ -2616,6 +2618,41 @@ app.get("/api/email-templates/ai-briefing", async (_req, res) => {
   } catch (error) {
     console.error("email-templates/ai-briefing:", error);
     return res.status(500).json({ error: "Kunde inte hämta taggar" });
+  }
+});
+
+/**
+ * GET /api/email-templates/logo
+ *
+ * The shop's logo URL, resolved from configuration. Served so admin never
+ * has to work it out for itself — the compiled templates and the designed
+ * ones must agree on one picture.
+ */
+app.get("/api/email-templates/logo", async (_req, res) => {
+  const url = getOrderEmailLogoUrl();
+  if (!url) return res.status(503).json({ error: "Ingen logotyp konfigurerad (EMAIL_LOGO_URL)" });
+  return res.json({ url });
+});
+
+/**
+ * POST /api/email-templates/apply-logo
+ *
+ * Puts the shop's logo at the top of a design, repointing an existing
+ * third-party one or inserting a new row. Returns the modified design for
+ * the editor to re-export; the HTML is not touched here because only Unlayer
+ * can regenerate it correctly.
+ */
+app.post("/api/email-templates/apply-logo", async (req, res) => {
+  try {
+    const design = (req.body ?? {}).design;
+    if (!design || typeof design !== "object") {
+      return res.status(400).json({ error: "Ingen design skickades" });
+    }
+    return res.json(applyLogoToDesign(design as Record<string, unknown>));
+  } catch (error) {
+    console.error("email-templates/apply-logo:", error);
+    const message = error instanceof Error ? error.message : "Kunde inte lägga till logotypen";
+    return res.status(422).json({ error: message });
   }
 });
 

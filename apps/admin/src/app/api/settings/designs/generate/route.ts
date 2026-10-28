@@ -12,7 +12,7 @@ const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
  *
  * ## The model never writes Unlayer JSON
  *
- * It fills in a five-block spec, and product-service converts that to a
+ * It fills in a seven-block spec, and product-service converts that to a
  * design with the builders whose output is verified to open in the editor.
  * The reason is the failure shape: a design with a subtly wrong field does
  * not throw, it opens BLANK — invisible to anything that only parses JSON,
@@ -32,6 +32,12 @@ const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
  *
  * Nothing is saved: the design comes back to the browser, loads into the
  * editor, and the admin decides whether to keep it.
+ *
+ * ## Pictures
+ *
+ * A `logo` block is resolved by product-service from the shop's own
+ * configuration — the model is never asked to guess that URL, and cannot
+ * point an email at anything else.
  */
 
 // SECURITY (mirrors M7 on the other AI routes): cap the admin-controlled
@@ -60,11 +66,11 @@ const SPEC_TOOL: Anthropic.Tool = {
           properties: {
             type: {
               type: "string",
-              enum: ["heading", "text", "button", "divider", "token"],
+              enum: ["heading", "text", "button", "divider", "token", "logo"],
               description:
                 "heading = large centred title with an optional emoji; text = a paragraph; " +
                 "button = a call to action; divider = a horizontal rule; token = a server-rendered " +
-                "block such as the order lines.",
+                "block such as the order lines; logo = the shop's own logo, resolved by the server.",
             },
             text: { type: "string", description: "heading only: the title." },
             icon: { type: "string", description: "heading only: one emoji." },
@@ -188,6 +194,9 @@ export async function POST(req: NextRequest) {
         `Write all customer-facing copy in ${language}.\n\n` +
         `Use merge tokens for anything that varies per order. Never invent a token; only these exist:\n\n` +
         `${briefing.tokens}\n\n${briefing.palette}\n\n` +
+        `Pictures:\n` +
+        `- Start the email with a {"type":"logo"} block unless the shop owner says otherwise. The server fills in the real logo; you do not supply a URL.\n` +
+        `\n` +
         `Rules that will be enforced and will cause a rejection if broken:\n` +
         `- Block tokens go in their own {"type":"token"} block, never inside text.\n` +
         `- Text blocks allow inline tags only (strong, em, a, br). No <p>, <table>, <div> or style attributes.\n` +

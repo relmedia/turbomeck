@@ -9,7 +9,7 @@
  * available: invisible to any check that only parses the JSON, and the admin
  * concludes the feature is broken.
  *
- * So the model emits five block kinds with a handful of fields each, this
+ * So the model emits six block kinds with a handful of fields each, this
  * file validates them, and the already-verified builders in
  * `email-design-builder.ts` produce the actual design. A malformed spec is
  * rejected with a reason; it cannot become a broken template.
@@ -29,18 +29,22 @@
  *    `javascript:` href in a button is the obvious hole.
  *  - **Tokens** must exist in the catalogue. An invented `{{order_totals_2}}`
  *    would ship as literal braces to a customer.
+ *  - **The logo** is resolved by this server, not supplied by the model, so
+ *    a generated template cannot point an email at an outside host.
  */
 
 import {
   buttonBlock,
   design,
   dividerBlock,
+  imageBlock,
   resetIdSequence,
   textBlock,
   INK,
   MUTED,
   type Block,
 } from "./email-design-builder.js";
+import { getOrderEmailLogoUrl } from "./email-logo.js";
 import { MERGE_TAGS, BLOCK_TOKENS } from "./email-merge-tags.js";
 import { sanitizeEmailCopy } from "@repo/sanitize-html";
 
@@ -49,7 +53,8 @@ export type SpecBlock =
   | { type: "text"; html: string }
   | { type: "button"; label: string; href: string; color?: string }
   | { type: "divider" }
-  | { type: "token"; token: string };
+  | { type: "token"; token: string }
+  | { type: "logo" };
 
 export type DesignSpec = {
   subject: string;
@@ -196,6 +201,23 @@ export function buildDesignFromSpec(raw: unknown): BuildResult {
       case "divider":
         blocks.push(dividerBlock());
         break;
+
+      case "logo": {
+        /**
+         * Resolved here, not chosen by the model: the shop's logo is a fact
+         * this server knows and a generated template should not be guessing
+         * at a URL for it.
+         */
+        const logo = getOrderEmailLogoUrl();
+        if (!logo) {
+          warnings.push("Ingen logotyp är konfigurerad (EMAIL_LOGO_URL), blocket hoppades över");
+          break;
+        }
+        blocks.push(
+          imageBlock(logo, "Turbomeck", { width: 180, padding: "24px 24px 8px" }),
+        );
+        break;
+      }
 
       case "token": {
         const token = asString(item.token, `${where} tagg`, 60).toLowerCase().replace(/[{}\s]/g, "");
