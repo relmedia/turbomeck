@@ -214,6 +214,25 @@ async function main() {
     (await resolveActiveDesign(KEY, "zz_other")) === null,
   );
 
+  /**
+   * DELETING an active design must fall back too — that is exactly what the
+   * delete confirmation in admin promises ("the built-in template is sent
+   * again"), and a promise in a destructive dialog is worth asserting.
+   */
+  await db
+    .update(emailDesigns)
+    .set({ isActive: true, html: DESIGN_HTML, subject: "Återställd" })
+    .where(eq(emailDesigns.id, row!.id));
+  invalidateDesignCache();
+  check("precondition: the design is active again", (await resolveActiveDesign(KEY, LOCALE)) !== null);
+
+  await db.delete(emailDesigns).where(eq(emailDesigns.id, row!.id));
+  invalidateDesignCache();
+  check(
+    "deleting an active design falls back to the built-in template",
+    (await resolveActiveDesign(KEY, LOCALE)) === null,
+  );
+
   await db.delete(emailDesigns).where(eq(emailDesigns.locale, LOCALE));
   const left = await db
     .select({ id: emailDesigns.id })
