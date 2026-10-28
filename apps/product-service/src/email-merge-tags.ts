@@ -267,33 +267,86 @@ export type MergeStep = {
   body: string;
   /** An emoji shown in the badge. Falls back to the step's position. */
   icon?: string;
+  /** Eyebrow above the title, e.g. "Steg 1". Omitted if absent. */
+  label?: string;
 };
 
 /**
- * The "Vad händer nu?" list.
+ * The "Vad händer nu?" steps, side by side.
  *
- * Each step gets a round badge holding its icon. `mso-line-height-rule` and
- * the explicit width/height on the cell are what keep that badge circular in
- * Outlook, which ignores line-height on a table cell otherwise and renders an
- * oval. The number is the fallback when a step has no icon, so an older
- * caller still produces a sensible list.
+ * ## Why this markup and not three table cells
+ *
+ * Three fixed `<td>` columns are horizontal on a desktop and unreadable on a
+ * phone: each becomes ~100px of wrapped text. A media query would fix that
+ * but cannot be relied on — it is stripped by some clients, and this block is
+ * injected into a built design where there is no `<head>` to put one in.
+ *
+ * So this is the fluid-hybrid pattern: `display:inline-block` with a
+ * `max-width` lets the three sit in a row when there is room and stack when
+ * there is not, with no media query at all. Outlook ignores inline-block, so
+ * it gets a real table through the `[if mso]` comments — invisible to every
+ * other client.
+ *
+ * Two details that look like noise and are not:
+ *  - `font-size:0` on the parent cell kills the whitespace between the
+ *    inline-blocks, which would otherwise add ~4px each and break the fit.
+ *    Each column restores its own size.
+ *  - `mso-line-height-rule:exactly` with explicit width/height keeps the
+ *    badge a circle in Outlook, which otherwise renders an oval.
+ *
+ * Widths: 164px plus 8px of padding is 172 per column, 516 for three. Sized
+ * against the USABLE width, not the body width: the cell this sits in has
+ * 24px of padding a side, so a 600px email offers 552px — a first attempt at
+ * 192 per column totalled 576 and wrapped the third step onto its own line.
+ * 516 leaves room for a design with slightly more padding than ours.
+ *
+ * On a phone two columns no longer fit, so they stack one per row.
  */
 export function renderStepsBlock(steps: MergeStep[]): string {
-  const body = steps
-    .map(
-      (st, i) => `
-      <tr>
-        <td width="30" style="width:30px;padding:7px 12px 7px 0;vertical-align:top;">
-          <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius:9999px;background-color:#eef2f7;">
-            <tr><td width="30" height="30" style="width:30px;height:30px;border-radius:9999px;background-color:#eef2f7;text-align:center;vertical-align:middle;line-height:30px;mso-line-height-rule:exactly;font-size:15px;color:${INK};">${st.icon ? escapeHtml(st.icon) : i + 1}</td></tr>
-          </table>
-        </td>
-        <td style="padding:7px 0;vertical-align:top;">
-          <p style="margin:0;font-weight:600;color:${INK};font-size:14px;">${escapeHtml(st.title)}</p>
-          <p style="margin:3px 0 0 0;color:${MUTED};font-size:13px;line-height:1.55;">${escapeHtml(st.body)}</p>
-        </td>
-      </tr>`,
-    )
-    .join("");
-  return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">${body}</table>`;
+  if (steps.length === 0) return "";
+
+  const columns = steps
+    .map((st, i) => {
+      const badge = st.icon ? escapeHtml(st.icon) : String(i + 1);
+      const eyebrow = st.label
+        ? `<p style="margin:10px 0 0 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${escapeHtml(st.label)}</p>`
+        : "";
+      return `
+          <div class="tm-step" style="display:inline-block;width:100%;max-width:164px;vertical-align:top;text-align:center;padding:0 4px 14px 4px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-radius:9999px;background-color:#eef2f7;">
+              <tr><td width="46" height="46" style="width:46px;height:46px;border-radius:9999px;background-color:#eef2f7;text-align:center;vertical-align:middle;line-height:46px;mso-line-height-rule:exactly;font-size:22px;color:${INK};">${badge}</td></tr>
+            </table>
+            ${eyebrow}
+            <p style="margin:3px 0 0 0;font-size:14px;font-weight:600;color:${INK};line-height:1.35;">${escapeHtml(st.title)}</p>
+            <p style="margin:5px 0 0 0;font-size:13px;color:${MUTED};line-height:1.5;">${escapeHtml(st.body)}</p>
+          </div>`;
+    })
+    .join(
+      `
+          <!--[if mso]></td><td width="33.33%" valign="top" align="center"><![endif]-->`,
+    );
+
+  /**
+   * Inline-block alone gives 3-up at 600px and a clean 1-up stack at 320px,
+   * but 2+1 in between — two columns still fit at 375-414px and the third
+   * drops to its own line. There is no column width that avoids that
+   * without a media query: three must total under ~550px, and two of those
+   * fit inside a phone.
+   *
+   * So one rule forces a full-width stack below 480px. It lives in a `style`
+   * tag inside the block rather than the document head, because the same
+   * renderer feeds a built design where there is no head to reach. Clients
+   * that drop `style` in the body simply get the 2+1 fallback, which is
+   * untidy and not broken — nothing depends on this rule landing.
+   */
+  return `<style>@media only screen and (max-width:479px){.tm-step{max-width:100%!important;width:100%!important;display:block!important}}</style>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
+  <tr>
+    <td align="center" style="font-size:0;line-height:0;padding:0;">
+      <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td width="33.33%" valign="top" align="center"><![endif]-->${columns}
+      <!--[if mso]></td></tr></table><![endif]-->
+    </td>
+  </tr>
+</table>`;
 }
+

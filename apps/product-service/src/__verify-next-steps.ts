@@ -62,6 +62,7 @@ for (const locale of ["sv", "en"] as const) {
   /* ---- the single definition ------------------------------------------- */
   const compiled = renderOrderConfirmationEmail({ ...ORDER, locale });
   const block = orderConfirmationMergeValues({ ...ORDER, locale }).blocks.next_steps ?? "";
+  const sv = locale === "sv";
 
   check(`${locale}: compiled template renders the steps`, compiled.length > 0);
   check(`${locale}: the designed block renders`, block.length > 0);
@@ -73,32 +74,49 @@ for (const locale of ["sv", "en"] as const) {
   }
 
   /**
-   * The icon used to appear twice on a step line — once in the badge and once
-   * before the title. Counted PER ROW, not per document: 📦 is also used by
-   * the tracking panel and the no-image product placeholder elsewhere in this
-   * same email, so a document-wide count says 3 and proves nothing.
+   * The icon used to appear twice on a step — once in the badge and once
+   * before the title. Counted PER COLUMN, not per document: 📦 is also used
+   * by the tracking panel and the no-image product placeholder elsewhere in
+   * this same email, so a document-wide count says 3 and proves nothing.
    */
   for (const [name, html] of [
     ["compiled", compiled],
     ["designed", block],
   ] as const) {
-    const rows = html.split("<tr");
+    const columns = html.split("display:inline-block");
     for (const icon of ICONS) {
-      const worst = Math.max(0, ...rows.map((r) => r.split(icon).length - 1));
-      check(`${locale}/${name}: ${icon} appears at most once per row`, worst <= 1, worst);
+      const worst = Math.max(0, ...columns.map((c) => c.split(icon).length - 1));
+      check(`${locale}/${name}: ${icon} appears at most once per column`, worst <= 1, worst);
     }
   }
 
-  /** The numbered circles are gone; the icons replaced them. */
-  check(
-    `${locale}: the designed block no longer numbers the steps`,
-    !/>1<\/td>/.test(block) && !/>2<\/td>/.test(block),
-  );
+  /* ---- horizontal layout ---------------------------------------------- */
+  for (const [name, html] of [
+    ["compiled", compiled],
+    ["designed", block],
+  ] as const) {
+    const columns = (html.match(/display:inline-block/g) ?? []).length;
+    check(`${locale}/${name}: three side-by-side columns`, columns === 3, columns);
+    /** Outlook ignores inline-block, so it must get a real table instead. */
+    check(`${locale}/${name}: carries the Outlook fallback table`, html.includes("[if mso]"));
+    /** Without font-size:0 the whitespace between columns breaks the fit. */
+    check(`${locale}/${name}: collapses inter-column whitespace`, html.includes("font-size:0"));
+  }
+
+  /* ---- step numbers --------------------------------------------------- */
+  const stepWord = sv ? "Steg" : "Step";
+  for (const [name, html] of [
+    ["compiled", compiled],
+    ["designed", block],
+  ] as const) {
+    for (const n of [1, 2, 3]) {
+      check(`${locale}/${name}: numbered "${stepWord} ${n}"`, html.includes(`${stepWord} ${n}`));
+    }
+  }
 
   /* ---- the promises the steps make ------------------------------------ */
-  const sv = locale === "sv";
   const trackingWord = sv ? "spårningsnummer" : "tracking number";
-  const packWord = sv ? "packar" : "pack";
+  const packWord = sv ? "gör i ordning och packar" : "ready and packed";
 
   for (const [name, html] of [
     ["compiled", compiled],

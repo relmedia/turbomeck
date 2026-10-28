@@ -391,8 +391,9 @@ const translations = {
     // "we have emailed you a confirmation" — in the confirmation itself — and
     // nothing told the customer a tracking number was coming.
     nextStepsTitle: "Vad händer nu?",
+    stepLabel: "Steg",
     nextStep1Title: "Vi packar din order",
-    nextStep1Body: "Vi plockar och packar din order inom 1–2 arbetsdagar.",
+    nextStep1Body: "Vi gör i ordning och packar din order inom 1–2 arbetsdagar.",
     nextStep2Title: "Vi skickar paketet",
     nextStep2Body:
       "När paketet lämnar oss får du ett mejl med ditt spårningsnummer, så att du kan följa det hela vägen.",
@@ -441,8 +442,9 @@ const translations = {
     norway: "Norway",
     paymentMethod: "Payment method",
     nextStepsTitle: "What happens next?",
+    stepLabel: "Step",
     nextStep1Title: "We pack your order",
-    nextStep1Body: "We'll pick and pack your order within 1–2 business days.",
+    nextStep1Body: "We'll get your order ready and packed within 1–2 business days.",
     nextStep2Title: "We ship your parcel",
     nextStep2Body:
       "When it leaves us you'll get an email with your tracking number, so you can follow it the whole way.",
@@ -473,12 +475,12 @@ function getCountryName(code: string, locale: "sv" | "en"): string {
  */
 export function orderNextSteps(
   t: (typeof translations)["sv"],
-): Array<{ icon: string; title: string; body: string }> {
+): Array<{ icon: string; title: string; body: string; label: string }> {
   return [
     { icon: "📦", title: t.nextStep1Title, body: t.nextStep1Body },
     { icon: "🚚", title: t.nextStep2Title, body: t.nextStep2Body },
     { icon: "📬", title: t.nextStep3Title, body: t.nextStep3Body },
-  ];
+  ].map((step, i) => ({ ...step, label: `${t.stepLabel} ${i + 1}` }));
 }
 
 export function renderOrderConfirmationEmail(data: OrderEmailData): string {
@@ -564,25 +566,12 @@ export function renderOrderConfirmationEmail(data: OrderEmailData): string {
     )
     .join("");
 
-  // "Vad hander nu?" steps, mirroring the ordered list on the order success page.
-  const nextStepsHtml = orderNextSteps(t)
-    .map(
-      (step, idx) => `
-                <tr>
-                  <td width="28" style="width: 28px; vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 0;">
-                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-radius: 9999px; background-color: #eef2f7;">
-                      <tr>
-                        <td width="28" height="28" style="width: 28px; height: 28px; border-radius: 9999px; background-color: #eef2f7; text-align: center; vertical-align: middle; line-height: 28px; mso-line-height-rule: exactly; font-size: 14px; color: #111827;">${step.icon}</td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td style="vertical-align: top; padding: ${idx === 0 ? "0" : "14px"} 0 0 12px;">
-                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #111827;">${step.title}</p>
-                    <p style="margin: 3px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.55;">${step.body}</p>
-                  </td>
-                </tr>`,
-    )
-    .join("");
+  /**
+   * The same renderer the designed path uses, so the two cannot diverge in
+   * layout the way they did in icons. It returns a complete table, which is
+   * why the wrapper table that used to surround it is gone.
+   */
+  const nextStepsHtml = renderStepsBlock(orderNextSteps(t));
 
   const headerBrandInner = orderEmailHeaderBrandInner(logoUrl);
 
@@ -785,8 +774,7 @@ ${
                 <tr>
                   <td style="padding: 22px 24px;">
                     <h4 style="margin: 0 0 16px 0; font-size: 15px; font-weight: 600; color: #111827;">${t.nextStepsTitle}</h4>
-                    <table cellpadding="0" cellspacing="0" border="0" width="100%">${nextStepsHtml}
-                    </table>
+${nextStepsHtml}
                   </td>
                 </tr>
               </table>
