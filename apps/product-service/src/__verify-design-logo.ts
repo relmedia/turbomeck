@@ -88,6 +88,21 @@ async function main() {
 
     /** Deep copy, so a failed assertion cannot leave a half-changed object. */
     const copy = JSON.parse(JSON.stringify(before)) as Record<string, unknown>;
+
+    /**
+     * Simulate the mirror step that runs first in production.
+     *
+     * It lives in admin because it needs R2 credentials, so it cannot be
+     * imported here — but without it this harness would feed the transform a
+     * design whose logo still points at the third-party CDN, and the
+     * transform would correctly conclude there is no logo and add one. That
+     * is a true result for a false input: the pipeline never presents it.
+     *
+     * Only the rename is reproduced, which is the part that changes the
+     * transform's decision. Copying bytes to R2 does not.
+     */
+    const mirroredLogos = canonicaliseLogos(copy, logoUrl);
+
     const result = applyLogoToDesign(copy);
     actions[result.action] = (actions[result.action] ?? 0) + 1;
 
@@ -97,12 +112,20 @@ async function main() {
 
     /** Whatever the route taken, the logo must end up in the design. */
     check(
-      `${label}: ends up with a logo`,
-      after.some((i) => /logo|logga/i.test(i.values?.src?.url ?? "")),
+      `${label}: ends up carrying our own logo URL`,
+      after.some((i) => i.values?.src?.url === logoUrl),
       result.action,
+    );
+    check(
+      `${label}: nothing is left pointing at the logo on a third party`,
+      !after.some((i) => {
+        const u = i.values?.src?.url ?? "";
+        return /logo|logga/i.test(u) && u.includes("unlayer.com");
+      }),
     );
 
     if (hasLogoBefore) {
+      check(`${label}: the mirror found its logo`, mirroredLogos === 1, mirroredLogos);
       check(`${label}: left alone, it already has the logo`, result.action === "unchanged", result.action);
       check(`${label}: row count unchanged`, rowsAfter === rowsBefore, { rowsBefore, rowsAfter });
       check(`${label}: image count unchanged`, after.length === imagesBefore, { imagesBefore, after: after.length });
@@ -120,6 +143,7 @@ async function main() {
       const lost = contentBefore.filter((u) => !contentAfter.includes(u));
       check(`${label}: content images survive untouched`, lost.length === 0, lost);
     } else {
+      check(`${label}: the mirror found no logo to rename`, mirroredLogos === 0, mirroredLogos);
       check(`${label}: inserted a logo row`, result.action === "inserted", result.action);
       check(`${label}: gained exactly one row`, rowsAfter === rowsBefore + 1, { rowsBefore, rowsAfter });
       /** At the top, or it is not a header. */
@@ -156,6 +180,26 @@ async function main() {
 
   console.log(`${failures === 0 ? "ALL PASS" : `${failures} FAILED`}`);
   process.exit(failures === 0 ? 0 : 1);
+}
+
+/**
+ * The logo half of the mirror step: point any logo-named image at our own
+ * canonical URL. Returns how many were renamed.
+ *
+ * Filename is the only available signal — the editor renames nothing on
+ * upload — and it is what separates `turbologo.png` from the content
+ * pictures `thankyou.jpg`, `takk.jpg`, `posten.jpg` and `levererad.jpg`.
+ */
+function canonicaliseLogos(design: Record<string, unknown>, logoUrl: string): number {
+  let renamed = 0;
+  for (const img of imagesOf(design)) {
+    const url = img.values?.src?.url ?? "";
+    if (/logo|logga/i.test(url) && img.values?.src) {
+      img.values.src.url = logoUrl;
+      renamed++;
+    }
+  }
+  return renamed;
 }
 
 void main();
