@@ -22,7 +22,7 @@ import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Switch } from "@repo/ui/components/switch";
-import { Loader2, Save, ArrowLeft, Braces, Copy } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Braces, Copy, Send } from "lucide-react";
 import { toast } from "react-toastify";
 
 /** The automated emails a design can replace. Null = standalone. */
@@ -62,6 +62,7 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
   const [saving, setSaving] = useState(false);
   const [tags, setTags] = useState<{ groups: MergeTagGroups; tags: MergeTagDef[] } | null>(null);
   const [showTags, setShowTags] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   /**
    * The token catalogue comes from product-service, where the substitution
@@ -118,6 +119,61 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
       );
     }
   }, [initial.design]);
+
+  /**
+   * Mail the design as it currently stands, filled with sample data.
+   *
+   * Exports from the editor rather than reading the saved row, so what arrives
+   * is what is on screen — unsaved edits included. That is the whole point:
+   * otherwise checking a change would mean saving it first, and a half-built
+   * template would have to be stored to be looked at.
+   *
+   * The recipient defaults to the signed-in admin server-side, so no address
+   * is typed here and there is nothing to mistype.
+   */
+  const sendTest = () => {
+    const editor = editorRef.current?.editor;
+    if (!editor) {
+      toast.error("Editorn är inte redo än");
+      return;
+    }
+    setTesting(true);
+    editor.exportHtml(async (data) => {
+      try {
+        const res = await fetch("/api/settings/designs/test-send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: meta.subject,
+            html: data.html,
+            locale: meta.locale,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          recipient?: string;
+          unknown?: string[];
+        };
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+        toast.success(`Testmejl skickat till ${json.recipient ?? "dig"}`);
+        /**
+         * Unknown tokens are reported rather than silently left: a typo like
+         * {{order_nummer}} renders as literal text in the mail, and seeing it
+         * named here is quicker than spotting it in an inbox.
+         */
+        if (json.unknown && json.unknown.length > 0) {
+          toast.warn(
+            `Okända taggar i mallen: ${json.unknown.map((t) => `{{${t}}}`).join(", ")} — de skickas som text.`,
+            { autoClose: 10000 },
+          );
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Kunde inte skicka testmejlet");
+      } finally {
+        setTesting(false);
+      }
+    });
+  };
 
   const save = () => {
     const editor = editorRef.current?.editor;
@@ -235,6 +291,22 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
           variant="outline"
           size="sm"
           className="ml-auto h-8"
+          disabled={testing || !ready}
+          onClick={sendTest}
+          title="Skicka mallen till din egen e-post med exempeldata"
+        >
+          {testing ? (
+            <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Send className="mr-1.5 size-3.5" aria-hidden />
+          )}
+          {testing ? "Skickar…" : "Skicka test"}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
           onClick={() => setShowTags((v) => !v)}
         >
           <Braces className="mr-1.5 size-3.5" aria-hidden />

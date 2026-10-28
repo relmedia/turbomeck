@@ -5,6 +5,7 @@ import { desc } from "drizzle-orm";
 import { Button } from "@repo/ui/components/button";
 import { Plus, Pencil, CheckCircle2, Circle } from "lucide-react";
 import MigrateDesignsClient from "@/components/MigrateDesignsClient";
+import TestSendDesignButton from "@/components/TestSendDesignButton";
 
 export const metadata = {
   title: "E-postdesign",
@@ -52,6 +53,11 @@ export default async function DesignListPage() {
             Innehållet blir detsamma — skillnaden är att du kan ändra det här.
             Kör den igen när du vill återställa en mall till standard.
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <strong>Testa</strong> skickar mallen till din egen e-post med
+            exempeldata ifylld, så du ser exakt vad kunden får. Testmejl märks
+            med <strong>[TEST]</strong> i ämnesraden och påverkar ingen order.
+          </p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <MigrateDesignsClient />
@@ -91,12 +97,15 @@ export default async function DesignListPage() {
                   {d.subject ? ` — ${d.subject}` : ""}
                 </p>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/settings/design/${d.id}`}>
-                  <Pencil className="mr-1.5 size-3.5" aria-hidden />
-                  Redigera
-                </Link>
-              </Button>
+              <div className="flex items-center gap-1">
+                <TestSendDesignButton id={d.id} name={d.name} />
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/settings/design/${d.id}`}>
+                    <Pencil className="mr-1.5 size-3.5" aria-hidden />
+                    Redigera
+                  </Link>
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

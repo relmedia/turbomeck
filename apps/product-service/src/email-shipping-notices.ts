@@ -22,11 +22,11 @@
  * 7-day window would arrive after the parcel had already been sent back to us.
  */
 
-import nodemailer from "nodemailer";
 import { postNordTrackingUrl } from "@repo/shipping";
 import { resolveActiveDesign, renderDesign } from "./email-designed.js";
 import type { MergeValues } from "./email-merge-tags.js";
 import {
+  buildMailTransport,
   getMailConfig,
   isCustomerEmailEnabled,
   getOrderEmailLogoUrl,
@@ -450,16 +450,7 @@ export async function sendShippingNoticeEmail(
   const l = SHIPPING_NOTICE_LABELS[locale];
   const orderNo = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
 
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  const transporter = buildMailTransport(config);
 
   /**
    * Throws rather than returning false on a transport error. The caller holds a

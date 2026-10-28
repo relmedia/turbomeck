@@ -34,6 +34,7 @@ import {
 } from "./email-shipping-notices.js";
 import { MERGE_TAGS, mergeTagsForEditor } from "./email-merge-tags.js";
 import { seedTemplates } from "./email-designs-seed.js";
+import { sendDesignPreview } from "./email-preview-fixtures.js";
 import { internalProductApiAuth } from "./internal-auth-middleware.js";
 import { stripeClient } from "./stripe-client.js";
 import {
@@ -2525,6 +2526,53 @@ app.post("/api/orders/:id/send-shipment-notification", async (req, res) => {
  * That keeps the stored HTML byte-identical to what the editor would produce
  * for an admin who built the same thing by hand.
  */
+/**
+ * POST /api/email-templates/test-send
+ *
+ * Mails one design to one address, filled with sample data, so an admin can
+ * see what a customer will actually receive.
+ *
+ * Takes the HTML in the body rather than a design id, because the useful
+ * preview is of what is on screen right now — the editor exports the design
+ * being edited, unsaved changes included. Previewing only saved designs would
+ * mean saving a half-finished template to look at it.
+ */
+app.post("/api/email-templates/test-send", async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      to?: string;
+      subject?: string;
+      html?: string;
+      locale?: string;
+    };
+    const to = String(body.to ?? "").trim().toLowerCase();
+    if (!to.includes("@")) {
+      return res.status(400).json({ error: "Giltig mottagaradress krävs" });
+    }
+    const html = String(body.html ?? "");
+    if (!html.trim()) {
+      return res.status(400).json({ error: "Mallen har inget innehåll att skicka" });
+    }
+
+    const result = await sendDesignPreview({
+      to,
+      subject: String(body.subject ?? ""),
+      html,
+      locale: body.locale === "en" ? "en" : "sv",
+    });
+    return res.json({ sent: true, ...result });
+  } catch (error) {
+    console.error("email-templates/test-send:", error);
+    /**
+     * The SMTP failure reason is passed through: "Invalid login" or "connect
+     * ECONNREFUSED" is what the admin needs to fix their mail settings, and a
+     * generic message would send them hunting in the wrong place.
+     */
+    const message = error instanceof Error ? error.message : "Kunde inte skicka testmejlet";
+    return res.status(502).json({ error: message });
+  }
+});
+
 app.get("/api/email-templates/seed", async (_req, res) => {
   try {
     return res.json({ templates: seedTemplates() });

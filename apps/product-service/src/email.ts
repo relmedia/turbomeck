@@ -258,6 +258,28 @@ function getMailConfigFromEnv(): MailConfig | null {
   return { host, port: Number.isFinite(port) ? port : 587, secure, user, password, from };
 }
 
+/**
+ * The SMTP transport for a given mail configuration.
+ *
+ * One factory because the same six lines were built inline in every send
+ * function — including the TLS opt-out, which is the one line that must not
+ * drift between them. `SMTP_REJECT_UNAUTHORIZED=false` exists for a host with
+ * a self-signed certificate; it is read here so no caller can forget it or
+ * apply it inconsistently.
+ */
+export function buildMailTransport(config: MailConfig) {
+  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.password } : undefined,
+    tls: skipTlsVerify
+      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
+      : {},
+  });
+}
+
 export async function getMailConfig(): Promise<MailConfig | null> {
   try {
     const [row] = await db
@@ -893,16 +915,7 @@ export async function sendShipmentDispatchedEmail(data: ShipmentDispatchedEmailD
     return false;
   }
 
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  const transporter = buildMailTransport(config);
 
   const locale = data.locale === "en" ? "en" : "sv";
   const t = shipmentDispatchedTranslations[locale];
@@ -1092,16 +1105,7 @@ export async function sendRefundIssuedEmail(data: RefundIssuedEmailData): Promis
     return false;
   }
 
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  const transporter = buildMailTransport(config);
 
   const locale = data.locale === "en" ? "en" : "sv";
   const t = refundIssuedTranslations[locale];
@@ -1202,17 +1206,7 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
     return false;
   }
 
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  const transporter = buildMailTransport(config);
 
   const locale = data.locale || "sv";
   const t = translations[locale];
@@ -1464,16 +1458,7 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
     return false;
   }
 
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  const transporter = buildMailTransport(config);
 
   const html = renderAdminNewOrderEmail(data);
   const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
@@ -1623,17 +1608,13 @@ function adminBlockSection(title: string, html: string): string {
   </tr>`;
 }
 
+/**
+ * Kept as a thin wrapper rather than removed: several admin senders await it,
+ * and `buildMailTransport` is synchronous. Collapsing the duplicate body is
+ * the point — the signature can go when those call sites are next touched.
+ */
 async function buildAdminTransport(config: MailConfig) {
-  const skipTlsVerify = process.env.SMTP_REJECT_UNAUTHORIZED === "false";
-  return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: config.user ? { user: config.user, pass: config.password } : undefined,
-    tls: skipTlsVerify
-      ? { rejectUnauthorized: false, checkServerIdentity: () => undefined }
-      : {},
-  });
+  return buildMailTransport(config);
 }
 
 // ——— Admin notification: new review submitted ———
