@@ -1,14 +1,18 @@
 /**
  * Puts the shop's own logo at the top of a stored design.
  *
- * Two situations, found by surveying the live designs:
+ * Narrowly: inserts a logo row when the design has no logo. Rewriting
+ * third-party image URLs is a separate step that runs first (see
+ * `r2-email-assets.ts` in admin), because it has to download and re-upload
+ * and only admin holds those credentials.
  *
- *  - Four already show a logo, but load it from `assets.unlayer.com` — the
- *    editor uploaded it there when it was dragged in. That is a third-party
- *    CDN nobody here controls, and if those files are pruned every customer
- *    gets a broken logo in a transactional email. Those are repointed at our
- *    own copy, which is byte-identical, so they do not change appearance.
- *  - Eight have no image at all. Those get a logo row inserted at the top.
+ * The split matters for a reason worth recording. An earlier version of this
+ * file repointed EVERY `assets.unlayer.com` image at the logo, on the
+ * assumption that such an image was always the logo. It is not: four of the
+ * live templates also carry a content picture — `thankyou.jpg`, `takk.jpg`,
+ * `posten.jpg`, `levererad.jpg` — and that version would have replaced each
+ * of them with a second copy of the logo. Deciding which image is the logo
+ * now happens in one place, by filename, next to the code that moves it.
  *
  * Operates on the design JSON only. The HTML that is actually emailed is
  * re-exported by the editor afterwards, because only Unlayer can produce it
@@ -21,9 +25,6 @@
 import { imageBlock, row, resetIdSequence } from "./email-design-builder.js";
 import { getOrderEmailLogoUrl } from "./email-logo.js";
 
-/** Hosts whose images are a logo we are replacing, not content to keep. */
-const FOREIGN_LOGO_HOSTS = ["assets.unlayer.com"];
-
 type ImageValues = { src?: { url?: string } };
 type Content = { type?: string; values?: ImageValues };
 type Column = { contents?: Content[] };
@@ -33,7 +34,7 @@ type DesignBody = { body?: { rows?: Row[] } };
 export type LogoResult = {
   design: Record<string, unknown>;
   /** What was done, for reporting back to the admin. */
-  action: "repointed" | "inserted" | "unchanged";
+  action: "inserted" | "unchanged";
   logoUrl: string;
 };
 
@@ -62,20 +63,8 @@ export function applyLogoToDesign(input: Record<string, unknown>): LogoResult {
     return { design: input, action: "unchanged", logoUrl };
   }
 
-  const foreign = found.filter((img) => {
-    const url = img.values?.src?.url ?? "";
-    return FOREIGN_LOGO_HOSTS.some((host) => url.includes(host));
-  });
-
-  if (foreign.length > 0) {
-    for (const img of foreign) {
-      if (img.values?.src) img.values.src.url = logoUrl;
-    }
-    return { design: input, action: "repointed", logoUrl };
-  }
-
   /**
-   * No image anywhere, so insert one. 180px against a natural 183px wide
+   * No logo in the design, so insert one. 180px against a natural 183px wide
    * logo: displayed at its own size rather than upscaled, which is what keeps
    * it from looking soft on a retina screen.
    */

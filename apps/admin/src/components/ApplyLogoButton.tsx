@@ -73,6 +73,7 @@ export default function ApplyLogoButton() {
     setBusy(true);
     let changed = 0;
     let skipped = 0;
+    let movedImages = 0;
     const failed: string[] = [];
 
     try {
@@ -102,10 +103,33 @@ export default function ApplyLogoButton() {
           if (!fullRes.ok) throw new Error(full.error ?? `HTTP ${fullRes.status}`);
           if (!full.design) throw new Error("mallen saknar design");
 
-          const applyRes = await fetch("/api/settings/designs/apply-logo", {
+          /**
+           * Move images off the third-party CDN first. This also rewrites the
+           * logo to its canonical URL, which is what lets the next step tell
+           * "already has our logo" from "needs one inserted".
+           */
+          const mirrorRes = await fetch("/api/settings/designs/mirror-images", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ design: full.design }),
+          });
+          const mirrored = (await mirrorRes.json()) as {
+            error?: string;
+            design?: Record<string, unknown>;
+            movedToLogo?: number;
+            mirrored?: number;
+            failures?: string[];
+          };
+          if (!mirrorRes.ok) throw new Error(mirrored.error ?? `HTTP ${mirrorRes.status}`);
+          if (mirrored.failures?.length) {
+            failed.push(`${row.name} (bilder): ${mirrored.failures.join(", ")}`);
+          }
+          movedImages += (mirrored.movedToLogo ?? 0) + (mirrored.mirrored ?? 0);
+
+          const applyRes = await fetch("/api/settings/designs/apply-logo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ design: mirrored.design ?? full.design }),
           });
           const applied = (await applyRes.json()) as {
             error?: string;
@@ -114,7 +138,12 @@ export default function ApplyLogoButton() {
           };
           if (!applyRes.ok) throw new Error(applied.error ?? `HTTP ${applyRes.status}`);
 
-          if (applied.action === "unchanged") {
+          /**
+           * "unchanged" means the logo was already in place — but mirroring
+           * may still have rewritten image URLs, and those have to be saved.
+           */
+          const needsSave = applied.action !== "unchanged" || (mirrored.mirrored ?? 0) > 0 || (mirrored.movedToLogo ?? 0) > 0;
+          if (!needsSave) {
             skipped++;
             continue;
           }
@@ -151,8 +180,9 @@ export default function ApplyLogoButton() {
 
       if (changed > 0) {
         toast.success(
-          `Logotypen tillagd i ${changed} ${changed === 1 ? "mall" : "mallar"}` +
-            (skipped ? `, ${skipped} hade den redan` : ""),
+          `${changed} ${changed === 1 ? "mall" : "mallar"} uppdaterade` +
+            (movedImages ? `, ${movedImages} bilder flyttade till egen server` : "") +
+            (skipped ? `, ${skipped} var redan klara` : ""),
         );
       } else if (failed.length === 0) {
         toast.info("Alla mallar har redan logotypen");

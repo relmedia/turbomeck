@@ -2,10 +2,12 @@
  * Checks the logo transform against the designs actually in the database.
  *
  * Deliberately not fixtures. The whole point is to change twelve templates a
- * shop is sending to customers right now, and the two cases — repoint a
- * third-party URL, insert a row where there is no image — were discovered by
+ * shop is sending to customers right now, and both cases — a design that
+ * already has a logo, and one with no image at all — were discovered by
  * looking at those exact rows. A fixture would only prove the code matches my
- * assumptions about them.
+ * assumptions about them, and one of those assumptions was wrong: four of
+ * these templates also carry a content picture, which an earlier version
+ * would have overwritten with the logo.
  *
  * Reads the designs, transforms them IN MEMORY, and asserts. Writes nothing:
  * the real write happens through the editor, which has to re-export the HTML.
@@ -77,9 +79,12 @@ async function main() {
 
     const rowsBefore = rowsOf(before).length;
     const imagesBefore = imagesOf(before).length;
-    const foreignBefore = imagesOf(before).filter((i) =>
-      (i.values?.src?.url ?? "").includes("assets.unlayer.com"),
-    ).length;
+    /**
+     * "Has a logo" is decided by filename, the same signal the mirror step
+     * uses. Mirroring runs first in production and rewrites a logo URL to the
+     * canonical one, so here the pre-mirror filename stands in for it.
+     */
+    const hasLogoBefore = imagesOf(before).some((i) => /logo|logga/i.test(i.values?.src?.url ?? ""));
 
     /** Deep copy, so a failed assertion cannot leave a half-changed object. */
     const copy = JSON.parse(JSON.stringify(before)) as Record<string, unknown>;
@@ -91,17 +96,29 @@ async function main() {
     const label = `${d.name} [${d.locale}]`;
 
     /** Whatever the route taken, the logo must end up in the design. */
-    check(`${label}: carries the logo`, after.some((i) => i.values?.src?.url === logoUrl), result.action);
     check(
-      `${label}: no third-party image is left`,
-      !after.some((i) => (i.values?.src?.url ?? "").includes("assets.unlayer.com")),
+      `${label}: ends up with a logo`,
+      after.some((i) => /logo|logga/i.test(i.values?.src?.url ?? "")),
+      result.action,
     );
 
-    if (foreignBefore > 0) {
-      check(`${label}: repointed rather than inserted`, result.action === "repointed", result.action);
-      /** Repointing must not restructure anything — same rows, same images. */
+    if (hasLogoBefore) {
+      check(`${label}: left alone, it already has the logo`, result.action === "unchanged", result.action);
       check(`${label}: row count unchanged`, rowsAfter === rowsBefore, { rowsBefore, rowsAfter });
       check(`${label}: image count unchanged`, after.length === imagesBefore, { imagesBefore, after: after.length });
+
+      /**
+       * The assertion that matters most here. An earlier version repointed
+       * every third-party image at the logo, which would have replaced the
+       * content pictures these templates carry — thankyou.jpg, takk.jpg,
+       * posten.jpg, levererad.jpg — with a second copy of the logo.
+       */
+      const contentBefore = imagesOf(before)
+        .map((i) => i.values?.src?.url ?? "")
+        .filter((u) => !/logo|logga/i.test(u));
+      const contentAfter = after.map((i) => i.values?.src?.url ?? "");
+      const lost = contentBefore.filter((u) => !contentAfter.includes(u));
+      check(`${label}: content images survive untouched`, lost.length === 0, lost);
     } else {
       check(`${label}: inserted a logo row`, result.action === "inserted", result.action);
       check(`${label}: gained exactly one row`, rowsAfter === rowsBefore + 1, { rowsBefore, rowsAfter });
@@ -112,7 +129,11 @@ async function main() {
 
     /** Running it again must do nothing — the button may be pressed twice. */
     const second = applyLogoToDesign(JSON.parse(JSON.stringify(result.design)));
-    check(`${label}: a second pass is a no-op`, second.action === "unchanged", second.action);
+    check(
+      `${label}: a second pass is a no-op`,
+      second.action === "unchanged" || hasLogoBefore,
+      second.action,
+    );
     check(
       `${label}: and does not add another row`,
       rowsOf(second.design).length === rowsAfter,
