@@ -1023,6 +1023,7 @@ app.get("/api/products", async (req, res) => {
     const productCols = {
       id: products.id,
       name: products.name,
+      slug: products.slug,
       shortDescription: products.shortDescription,
       description: products.description,
       nameEn: products.nameEn,
@@ -1066,7 +1067,7 @@ app.get("/api/products", async (req, res) => {
       const loc = localizeProduct(p, locale);
       return {
       id: p.id,
-      slug: productNameToSlug(p.name),
+      slug: productSlug(p),
       name: loc.name,
       shortDescription: loc.shortDescription,
       description: loc.description,
@@ -1099,6 +1100,18 @@ app.get("/api/products", async (req, res) => {
 });
 
 // Slug helper for product lookup
+/**
+ * A product's canonical URL segment.
+ *
+ * Prefers the stored slug and falls back to deriving it from the name, which
+ * is what every row did before migration 0028. The fallback is not dead code:
+ * it covers a row written before the column existed, and keeps this working
+ * if the migration has not run yet on some environment.
+ */
+function productSlug(p: { slug?: string | null; name: string }): string {
+  return p.slug?.trim() || productNameToSlug(p.name);
+}
+
 function productNameToSlug(name: string): string {
   return name
     .toLowerCase()
@@ -1121,6 +1134,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       .select({
         id: products.id,
         name: products.name,
+        slug: products.slug,
         shortDescription: products.shortDescription,
         description: products.description,
         nameEn: products.nameEn,
@@ -1143,6 +1157,12 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       })
       .from(products);
     const product = allProducts.find((p) => {
+      /**
+       * Stored slug first. The name-derived forms are kept as fallbacks so a
+       * link created before the slug was stored — or before a rename — still
+       * finds the product instead of 404ing.
+       */
+      if (productSlug(p) === slug) return true;
       if (productNameToSlug(p.name) === slug) return true;
       const nameEn = (p as { nameEn?: string | null }).nameEn;
       return nameEn ? productNameToSlug(nameEn) === slug : false;
@@ -1156,7 +1176,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
     const rating = (await getProductRatings([p.id])).get(p.id);
     res.json({
       id: p.id,
-      slug: productNameToSlug(p.name),
+      slug: productSlug(p),
       name: loc.name,
       shortDescription: loc.shortDescription,
       description: loc.description,
@@ -1193,6 +1213,7 @@ app.get("/api/products/:id", async (req, res) => {
       .select({
         id: products.id,
         name: products.name,
+        slug: products.slug,
         shortDescription: products.shortDescription,
         description: products.description,
         nameEn: products.nameEn,
@@ -1234,7 +1255,7 @@ app.get("/api/products/:id", async (req, res) => {
     const rating = (await getProductRatings([p.id])).get(p.id);
     res.json({
       id: p.id,
-      slug: productNameToSlug(p.name),
+      slug: productSlug(p),
       name: loc.name,
       shortDescription: loc.shortDescription,
       description: loc.description,

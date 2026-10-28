@@ -113,6 +113,9 @@ importers:
       '@repo/shipping':
         specifier: workspace:*
         version: link:../../packages/shipping
+      '@repo/text':
+        specifier: workspace:*
+        version: link:../../packages/text
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -297,6 +300,9 @@ importers:
       '@repo/shipping':
         specifier: workspace:*
         version: link:../../packages/shipping
+      '@repo/text':
+        specifier: workspace:*
+        version: link:../../packages/text
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -642,6 +648,12 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+
+  packages/text:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
 
   packages/types:
     devDependencies:

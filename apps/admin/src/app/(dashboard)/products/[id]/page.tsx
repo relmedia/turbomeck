@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
+import { Textarea } from "@repo/ui/components/textarea";
+import SeoAssistant, { type SeoFields } from "@/components/SeoAssistant";
 import { Checkbox } from "@repo/ui/components/checkbox";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
@@ -79,6 +81,9 @@ type Product = {
   name: string;
   shortDescription: string;
   description: string;
+  nameEn?: string | null;
+  shortDescriptionEn?: string | null;
+  descriptionEn?: string | null;
   price: number;
   image: string | null;
   thumbnails: string[];
@@ -146,7 +151,10 @@ export default function ProductDetailPage() {
   const [formData, setFormData] = useState<{
     name: string;
     description: string;
+    /** The meta description. Empty falls back to the body's first 100 chars. */
+    shortDescription: string;
     nameEn: string;
+    shortDescriptionEn: string;
     descriptionEn: string;
     price: string;
     stock: string;
@@ -164,7 +172,9 @@ export default function ProductDetailPage() {
   }>({
     name: "",
     description: "",
+    shortDescription: "",
     nameEn: "",
+    shortDescriptionEn: "",
     descriptionEn: "",
     price: "",
     stock: "",
@@ -199,7 +209,9 @@ export default function ProductDetailPage() {
       setFormData({
         name: data.name || "",
         description: data.description || "",
+        shortDescription: data.shortDescription || "",
         nameEn: data.nameEn || "",
+        shortDescriptionEn: data.shortDescriptionEn || "",
         descriptionEn: data.descriptionEn || "",
         price: data.price?.toString() || "",
         stock: data.stock?.toString() || "0",
@@ -461,10 +473,12 @@ export default function ProductDetailPage() {
         },
         body: JSON.stringify({
           name: String(formData.name ?? ""),
-          shortDescription: shortDescriptionFromFull(formData.description),
+          shortDescription:
+            formData.shortDescription.trim() || shortDescriptionFromFull(formData.description),
           description: String(formData.description ?? ""),
           nameEn: formData.nameEn?.trim() || null,
-          shortDescriptionEn: shortDescriptionFromFull(formData.descriptionEn),
+          shortDescriptionEn:
+            formData.shortDescriptionEn.trim() || shortDescriptionFromFull(formData.descriptionEn),
           descriptionEn: formData.descriptionEn?.trim() || null,
           price: Number(formData.price) || 0,
           stock: Number(formData.stock) || 0,
@@ -640,6 +654,48 @@ export default function ProductDetailPage() {
                   placeholder="Ange produktnamn"
                 />
               </div>
+
+              {/* The meta description Google shows. Empty falls back to the
+                  body's first 100 characters, which is how every product
+                  reads today — and why ten of them end mid-sentence. */}
+              <div className="space-y-2">
+                <Label htmlFor="shortDescription">Kort beskrivning (visas i Google)</Label>
+                <Textarea
+                  id="shortDescription"
+                  name="shortDescription"
+                  rows={2}
+                  value={formData.shortDescription ?? ""}
+                  onChange={handleInputChange}
+                  placeholder="Lämna tom för att använda början av beskrivningen…"
+                />
+              </div>
+
+              <SeoAssistant
+                fields={{
+                  name: formData.name ?? "",
+                  shortDescription:
+                    formData.shortDescription.trim() ||
+                    shortDescriptionFromFull(formData.description),
+                  nameEn: formData.nameEn ?? "",
+                  shortDescriptionEn:
+                    formData.shortDescriptionEn.trim() ||
+                    shortDescriptionFromFull(formData.descriptionEn),
+                }}
+                description={formData.description ?? ""}
+                onApply={(patch: Partial<SeoFields>) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    ...(patch.name !== undefined ? { name: patch.name } : {}),
+                    ...(patch.shortDescription !== undefined
+                      ? { shortDescription: patch.shortDescription }
+                      : {}),
+                    ...(patch.nameEn !== undefined ? { nameEn: patch.nameEn } : {}),
+                    ...(patch.shortDescriptionEn !== undefined
+                      ? { shortDescriptionEn: patch.shortDescriptionEn }
+                      : {}),
+                  }))
+                }
+              />
 
               <div className="space-y-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

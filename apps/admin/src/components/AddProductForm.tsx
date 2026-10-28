@@ -13,10 +13,12 @@ import {
   FormMessage,
 } from "@repo/ui/components/form";
 import { Input } from "@repo/ui/components/input";
+import { Textarea } from "@repo/ui/components/textarea";
 import { Button } from "@repo/ui/components/button";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { useState, useEffect, useCallback } from "react";
 import { ShipmentSection } from "@/components/ShipmentSection";
+import SeoAssistant, { type SeoFields } from "@/components/SeoAssistant";
 import { Loader2, Plus, Languages, Sparkles } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { ThumbnailsUpload } from "./ThumbnailsUpload";
@@ -59,7 +61,15 @@ function categoryDisplayName(c: Category): string {
 const formSchema = z.object({
   name: z.string().min(1, { message: "Produkt namn är obligatoriskt!" }),
   description: z.string().min(1, { message: "Beskrivning är obligatoriskt!" }),
+  /**
+   * The meta description Google shows under the title. Optional: left empty
+   * it falls back to the first 100 characters of the body, which is what
+   * happened unconditionally before — so an untouched form behaves exactly
+   * as it did.
+   */
+  shortDescription: z.string().optional(),
   nameEn: z.string().optional(),
+  shortDescriptionEn: z.string().optional(),
   descriptionEn: z.string().optional(),
   price: z.coerce.number().min(0.01, {
     message: "Pris måste vara större än 0!",
@@ -113,7 +123,9 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
     defaultValues: {
       name: "",
       description: "",
+      shortDescription: "",
       nameEn: "",
+      shortDescriptionEn: "",
       descriptionEn: "",
       price: 0,
       stock: 0,
@@ -319,10 +331,12 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
         },
         body: JSON.stringify({
           name: values.name,
-          shortDescription: shortDescriptionFromFull(values.description),
+          shortDescription:
+            values.shortDescription?.trim() || shortDescriptionFromFull(values.description),
           description: values.description,
           nameEn: values.nameEn || undefined,
-          shortDescriptionEn: shortDescriptionFromFull(values.descriptionEn),
+          shortDescriptionEn:
+            values.shortDescriptionEn?.trim() || shortDescriptionFromFull(values.descriptionEn),
           descriptionEn: values.descriptionEn || undefined,
           price: values.price,
           stock: values.stock,
@@ -426,6 +440,47 @@ export function AddProductForm({ onSuccess }: AddProductFormProps) {
               <FormMessage />
             </FormItem>
           )}
+        />
+
+        {/* The meta description. Left empty it falls back to the first 100
+            characters of the body — which is how every product reads today,
+            and why ten of them end mid-sentence with an ellipsis. */}
+        <FormField
+          control={form.control}
+          name="shortDescription"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Kort beskrivning (visas i Google)</FormLabel>
+              <FormControl>
+                <Textarea
+                  rows={2}
+                  placeholder="Lämna tom för att använda början av beskrivningen…"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <SeoAssistant
+          fields={{
+            name: form.watch("name") ?? "",
+            shortDescription:
+              form.watch("shortDescription")?.trim() ||
+              shortDescriptionFromFull(form.watch("description")),
+            nameEn: form.watch("nameEn") ?? "",
+            shortDescriptionEn:
+              form.watch("shortDescriptionEn")?.trim() ||
+              shortDescriptionFromFull(form.watch("descriptionEn")),
+          }}
+          description={form.watch("description") ?? ""}
+          onApply={(patch: Partial<SeoFields>) => {
+            for (const [key, value] of Object.entries(patch)) {
+              if (value === undefined) continue;
+              form.setValue(key as keyof FormValues, value as never, { shouldDirty: true });
+            }
+          }}
         />
 
         <FormField

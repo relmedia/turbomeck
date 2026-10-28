@@ -197,6 +197,13 @@
       "when": 1792782612826,
       "tag": "0027_email_designs",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792782612827,
+      "tag": "0028_product_slug",
+      "breakpoints": true
     }
   ]
 }

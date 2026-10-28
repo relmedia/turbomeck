@@ -30,6 +30,7 @@
     "@repo/currency": "workspace:*",
     "@repo/database": "workspace:*",
     "@repo/sanitize-html": "workspace:*",
+    "@repo/text": "workspace:*",
     "@repo/shipping": "workspace:*",
     "@repo/ui": "workspace:*",
     "@stripe/react-stripe-js": "^6.0.0",

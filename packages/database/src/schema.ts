@@ -85,6 +85,15 @@ export const passwordResetTokens = pgTable("password_reset_token", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  /**
+   * The product URL, stored rather than derived from the name.
+   *
+   * It used to be computed per read, so renaming a product changed its
+   * address and the old one died. Backfilled with exactly the previous value
+   * for every existing row, so no URL moved — it only stops future renames
+   * from moving them.
+   */
+  slug: text("slug"),
   shortDescription: text("short_description"),
   description: text("description"),
   /** English translations; when locale=en, used instead of name/shortDescription/description */
