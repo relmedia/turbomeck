@@ -257,12 +257,25 @@ export function ProductImageGallery({
 
     <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
       <DialogContent
-        /* Edge to edge: no inset, no rounding, no border, and the max-width
-           the dialog primitive sets by default has to be overridden rather
-           than widened. The close button is dark because the background is
-           light — it was white for the old dark backdrop and would be
-           invisible here. */
-        className="!max-w-none !max-h-none w-screen h-screen rounded-none p-0 gap-0 overflow-hidden border-0 bg-neutral-200 [&_[data-slot=dialog-close]]:text-neutral-700 [&_[data-slot=dialog-close]]:hover:text-neutral-900"
+        /*
+          Edge to edge, which takes more than a width.
+
+          Three things the dialog primitive does have to be undone, and two of
+          them do not yield to a plain utility:
+
+          - `max-w-lg` has to be overridden rather than widened.
+          - `sm:rounded-lg` outranks a bare `rounded-none`, because a
+            media-query variant sorts later in Tailwind's output. Hence the
+            important modifier.
+          - `zoom-in-95` leaves the panel sitting at 95% scale, which is a
+            48px gap down each side at 1920 wide and reads as "not
+            fullscreen". Overriding the enter and exit scale to 100 keeps the
+            fade without the shrink.
+
+          The close button is dark because the background is light; it was
+          white for the old dark backdrop and would be invisible here.
+        */
+        className="!max-w-none !max-h-none w-screen h-screen !rounded-none p-0 gap-0 overflow-hidden border-0 bg-neutral-200 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100 [&_[data-slot=dialog-close]]:text-neutral-700 [&_[data-slot=dialog-close]]:hover:text-neutral-900"
         showCloseButton={true}
         /* A lightbox has nothing to say beyond its title; this is Radix's
            documented way to declare that, and it silences the warning. */
