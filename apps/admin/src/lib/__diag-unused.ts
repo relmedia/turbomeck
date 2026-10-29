@@ -10,7 +10,7 @@ async function main() {
   const { objects } = (await res.json()) as { objects: Array<{ key: string }> };
   const keys = new Set(objects.map((o) => o.key));
 
-  const [prods, users] = await Promise.all([
+  const [prods, userRows] = await Promise.all([
     db.select({ image: products.image, thumbnails: products.thumbnails }).from(products),
     db.select({ image: users.image }).from(users),
   ]);
@@ -34,8 +34,8 @@ async function main() {
   console.log(`  ...whose .avif sibling IS used: ${siblingUsed.length}`);
   console.log(`  ...with no sibling at all: ${pngs.filter((k) => !keys.has(k.replace(/\.png$/, ".avif"))).length}`);
 
-  console.log(`\nuser avatars referenced in the user table: ${users.filter((u) => u.image).length}`);
-  for (const u of users.filter((x) => x.image).slice(0, 3)) {
+  console.log(`\nuser avatars referenced in the user table: ${userRows.filter((u) => u.image).length}`);
+  for (const u of userRows.filter((x) => x.image).slice(0, 3)) {
     const k = objectKeyFromUrl(u.image!);
     console.log(`  ${u.image} -> key ${k} -> in bucket: ${k ? keys.has(k) : false}`);
   }
