@@ -41,10 +41,18 @@ export function ProductImageGallery({
    * Only sampled while the lightbox is open — there is no reason to fetch a
    * swatch for an image nobody has enlarged.
    */
-  const fullscreenSrc = fullscreenOpen
-    ? displayImages[selectedIndex] ?? displayImages[0] ?? null
-    : null;
-  const backdrop = useDominantColor(fullscreenSrc);
+  /**
+   * Sampled for the image on show, not only while the lightbox is open.
+   *
+   * Gating it on `fullscreenOpen` meant the work started at the moment the
+   * lightbox appeared, so there was always a round trip during which the old
+   * black backdrop was still painted — visible as the previous background
+   * fading away. Working it out up front costs one ~1 kB request against a
+   * product photo of a couple of hundred, and the lightbox opens already
+   * wearing the right colour.
+   */
+  const activeSrc = displayImages[selectedIndex] ?? displayImages[0] ?? null;
+  const backdrop = useDominantColor(activeSrc);
 
   // Native scroll-snap carousel: a horizontal overflow container handles
   // both mouse-wheel and touch scrolling. We sync `selectedIndex` from the

@@ -91,6 +91,20 @@ function hslToCss(h: number, s: number, l: number): string {
 }
 
 /**
+ * Colours already worked out, kept for the life of the page.
+ *
+ * Without it every render starts at null and the backdrop has to fade in
+ * again — which is exactly what made opening the lightbox show the old black
+ * backdrop washing away. With it, an image sampled once is known
+ * synchronously on the next render, so the lightbox opens already wearing the
+ * right colour.
+ *
+ * Keyed by source URL. Unbounded, but a product page holds a handful of
+ * images and the entries are short strings.
+ */
+const cache = new Map<string, string>();
+
+/**
  * Returns a CSS colour derived from the image, or null until it is known.
  *
  * Null rather than a guess: the caller keeps its existing backdrop until
@@ -98,11 +112,22 @@ function hslToCss(h: number, s: number, l: number): string {
  * happened instead of a flash of the wrong colour.
  */
 export function useDominantColor(src: string | null | undefined): string | null {
-  const [color, setColor] = useState<string | null>(null);
+  /**
+   * Seeded from the cache rather than null, so a known colour is applied on
+   * the first paint instead of after an effect — no transition from whatever
+   * the element's default background is.
+   */
+  const [color, setColor] = useState<string | null>(() => (src ? cache.get(src) ?? null : null));
 
   useEffect(() => {
     if (!src) {
       setColor(null);
+      return;
+    }
+
+    const known = cache.get(src);
+    if (known) {
+      setColor(known);
       return;
     }
 
@@ -147,9 +172,9 @@ export function useDominantColor(src: string | null | undefined): string | null 
 
         const [h0, s0, l0] = rgbToHsl(r / weight, g / weight, b / weight);
         const lightness = l0 < DARK_SUBJECT_BELOW ? LIGHT_BACKDROP : DARK_BACKDROP;
-        if (!cancelled) {
-          setColor(hslToCss(h0, Math.min(s0, MAX_SATURATION), lightness));
-        }
+        const resolved = hslToCss(h0, Math.min(s0, MAX_SATURATION), lightness);
+        cache.set(src, resolved);
+        if (!cancelled) setColor(resolved);
       } catch {
         /**
          * A tainted canvas throws here. Swallowed deliberately: the lightbox
