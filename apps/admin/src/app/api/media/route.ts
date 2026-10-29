@@ -3,6 +3,7 @@ import { db } from "@repo/database";
 import { mediaUploads, products, emailDesigns } from "@repo/database/schema";
 import { NextResponse } from "next/server";
 import { objectKeyFromUrl } from "@/lib/media-uploads";
+import { inArray } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
@@ -156,5 +157,79 @@ export async function GET() {
   } catch (err) {
     console.error("[media]", err);
     return NextResponse.json({ error: "Kunde inte hämta mediabiblioteket" }, { status: 502 });
+  }
+}
+
+/**
+ * Deletes images by object key.
+ *
+ * The usage warning lives in the UI rather than here: an image in use is
+ * sometimes exactly the one you mean to replace, and a server that refuses
+ * would be second-guessing an admin who was shown the consequence and chose
+ * anyway. What this does guarantee is that the consequence was knowable —
+ * the list page computes usage from the same data before anything is
+ * selected.
+ */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const secret = process.env.INTERNAL_PRODUCT_API_SECRET?.trim();
+  if (!secret) {
+    return NextResponse.json({ error: "INTERNAL_PRODUCT_API_SECRET saknas" }, { status: 503 });
+  }
+
+  let base = (process.env.PRODUCT_SERVICE_URL || "http://localhost:8000").replace(/\/$/u, "");
+  if (base.endsWith("/api")) base = base.slice(0, -4);
+
+  try {
+    const body = (await req.json().catch(() => ({}))) as { keys?: string[] };
+    const keys = (body.keys ?? []).map((k) => String(k)).filter(Boolean);
+    if (keys.length === 0) {
+      return NextResponse.json({ error: "Inga bilder angivna" }, { status: 400 });
+    }
+
+    const res = await fetch(`${base}/api/media`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ keys }),
+      cache: "no-store",
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      results?: Array<{ key: string; deleted: boolean }>;
+      deleted?: number;
+      failed?: number;
+    };
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: json.error ?? `HTTP ${res.status}` },
+        { status: res.status },
+      );
+    }
+
+    /**
+     * Drop the uploader rows for whatever actually went. Left behind they
+     * would attribute an image that no longer exists, and a later upload
+     * reusing the key would inherit the wrong name.
+     *
+     * Only for keys that really were deleted, and never allowed to fail the
+     * request: the files are already gone, and an error here would suggest
+     * otherwise.
+     */
+    const gone = (json.results ?? []).filter((r) => r.deleted).map((r) => r.key);
+    if (gone.length > 0) {
+      try {
+        await db.delete(mediaUploads).where(inArray(mediaUploads.objectKey, gone));
+      } catch (err) {
+        console.error("[media] could not clear uploader rows:", err);
+      }
+    }
+
+    return NextResponse.json(json);
+  } catch (err) {
+    console.error("[media] delete", err);
+    return NextResponse.json({ error: "Kunde inte ta bort bilderna" }, { status: 502 });
   }
 }

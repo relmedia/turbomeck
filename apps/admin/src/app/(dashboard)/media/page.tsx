@@ -30,6 +30,17 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Button } from "@repo/ui/components/button";
 import { Badge } from "@repo/ui/components/badge";
+import { Checkbox } from "@repo/ui/components/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@repo/ui/components/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -44,8 +55,11 @@ import {
   Copy,
   ExternalLink,
   ImageOff,
+  Loader2,
   RefreshCw,
   Search,
+  Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { resolveImageUrl } from "@/lib/image-utils";
@@ -119,6 +133,10 @@ export default function MediaPage() {
     key: "uploadedAt",
     asc: false,
   });
+  /** Object keys, not indexes: the list reorders under the selection. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<MediaItem[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +146,8 @@ export default function MediaPage() {
       const json = (await res.json()) as { objects?: MediaItem[]; error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setItems(json.objects ?? []);
+      /** A refresh must not leave a selection pointing at vanished rows. */
+      setSelected(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta bilderna");
     } finally {
@@ -138,6 +158,61 @@ export default function MediaPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const runDelete = useCallback(
+    async (targets: MediaItem[]) => {
+      setDeleting(true);
+      try {
+        const res = await fetch("/api/media", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: targets.map((t) => t.key) }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          deleted?: number;
+          failed?: number;
+          results?: Array<{ key: string; deleted: boolean; error?: string; detachedFromProducts?: number[] }>;
+        };
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+        const deleted = json.deleted ?? 0;
+        const detached = (json.results ?? []).flatMap((r) => r.detachedFromProducts ?? []);
+        if (deleted > 0) {
+          toast.success(
+            `${deleted} ${deleted === 1 ? "bild" : "bilder"} borttagna` +
+              (detached.length > 0
+                ? ` · lossade från ${new Set(detached).size} produkt(er)`
+                : ""),
+          );
+        }
+        /**
+         * Failures are named rather than counted. "3 misslyckades" tells you
+         * nothing you can act on; the filename does.
+         */
+        const failures = (json.results ?? []).filter((r) => !r.deleted);
+        if (failures.length > 0) {
+          toast.error(
+            `Kunde inte ta bort: ${failures
+              .map((f) => `${f.key.split("/").pop()} (${f.error ?? "okänt fel"})`)
+              .join(", ")}`,
+            { autoClose: 12000 },
+          );
+        }
+
+        /** Drop what actually went, rather than refetching the whole bucket. */
+        const gone = new Set((json.results ?? []).filter((r) => r.deleted).map((r) => r.key));
+        setItems((prev) => prev.filter((i) => !gone.has(i.key)));
+        setSelected((prev) => new Set([...prev].filter((k) => !gone.has(k))));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Kunde inte ta bort bilderna");
+      } finally {
+        setDeleting(false);
+        setPendingDelete(null);
+      }
+    },
+    [],
+  );
 
   const folders = useMemo(
     () => [...new Set(items.map((i) => i.folder))].sort(),
@@ -193,6 +268,40 @@ export default function MediaPage() {
       }
     });
   }, [items, search, folder, usage, uploader, sort]);
+
+  /**
+   * "Select all" means every row currently VISIBLE, not every object in the
+   * bucket. With filters applied, the other reading would quietly select
+   * things that are not on screen — and this list ends in a delete button.
+   */
+  const allVisibleSelected = visible.length > 0 && visible.every((i) => selected.has(i.key));
+  const someVisibleSelected = visible.some((i) => selected.has(i.key));
+
+  const toggleAllVisible = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const i of visible) next.delete(i.key);
+      } else {
+        for (const i of visible) next.add(i.key);
+      }
+      return next;
+    });
+  };
+
+  const toggleOne = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectedItems = useMemo(
+    () => items.filter((i) => selected.has(i.key)),
+    [items, selected],
+  );
 
   const totalSize = useMemo(() => items.reduce((sum, i) => sum + i.size, 0), [items]);
   const unusedCount = useMemo(() => items.filter((i) => i.usedBy.length === 0).length, [items]);
@@ -309,10 +418,44 @@ export default function MediaPage() {
         </p>
       )}
 
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">
+            {selected.size} {selected.size === 1 ? "bild vald" : "bilder valda"}
+          </span>
+          {selectedItems.some((i) => i.usedBy.length > 0) && (
+            <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-500">
+              <TriangleAlert className="size-3.5" aria-hidden />
+              {selectedItems.filter((i) => i.usedBy.length > 0).length} används
+            </span>
+          )}
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => setSelected(new Set())}>
+            Avmarkera
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="ml-auto h-7"
+            onClick={() => setPendingDelete(selectedItems)}
+          >
+            <Trash2 className="mr-1.5 size-3.5" aria-hidden />
+            Ta bort {selected.size}
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[44px]">
+                <Checkbox
+                  checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleAllVisible}
+                  disabled={visible.length === 0}
+                  aria-label="Markera alla synliga bilder"
+                />
+              </TableHead>
               <TableHead className="w-[76px]">Bild</TableHead>
               <TableHead>
                 <SortHeader label="Filnamn" sortKey="filename" />
@@ -338,7 +481,7 @@ export default function MediaPage() {
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-sm text-muted-foreground">
                   <ImageOff className="mx-auto mb-2 size-5 opacity-50" aria-hidden />
                   {items.length === 0
                     ? "Inga bilder i lagringen än."
@@ -347,7 +490,14 @@ export default function MediaPage() {
               </TableRow>
             ) : (
               visible.map((item) => (
-                <TableRow key={item.key}>
+                <TableRow key={item.key} data-state={selected.has(item.key) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(item.key)}
+                      onCheckedChange={() => toggleOne(item.key)}
+                      aria-label={`Markera ${item.filename}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <a
                       href={item.url}
@@ -465,6 +615,15 @@ export default function MediaPage() {
                           <ExternalLink className="size-3.5" aria-hidden />
                         </a>
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title="Ta bort"
+                        onClick={() => setPendingDelete([item])}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -473,6 +632,92 @@ export default function MediaPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/*
+        The confirmation carries the consequence, not just a count.
+        Deleting an unused image is housekeeping; deleting one a product
+        shows is a visible change to the shop, and those must not look like
+        the same action. Products are relinked automatically — an email
+        design is not, so that case is called out separately.
+      */}
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.length === 1
+                ? "Ta bort bilden?"
+                : `Ta bort ${pendingDelete?.length ?? 0} bilder?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Filerna raderas permanent från lagringen. Det går inte att ångra.</p>
+
+                {(() => {
+                  const inUse = (pendingDelete ?? []).filter((i) => i.usedBy.length > 0);
+                  const inDesigns = inUse.filter((i) => i.usedBy.some((u) => u.kind === "design"));
+                  if (inUse.length === 0) {
+                    return (
+                      <p className="text-emerald-700 dark:text-emerald-500">
+                        Ingen av bilderna används av någon produkt eller e-postmall.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+                      <p className="font-medium text-amber-900 dark:text-amber-300">
+                        {inUse.length} av bilderna används just nu.
+                      </p>
+                      <ul className="space-y-0.5 text-xs text-amber-900/90 dark:text-amber-200/90">
+                        {inUse.slice(0, 5).map((i) => (
+                          <li key={i.key} className="truncate">
+                            <strong>{i.filename}</strong> — {i.usedBy.map((u) => u.name).join(", ")}
+                          </li>
+                        ))}
+                        {inUse.length > 5 && <li>…och {inUse.length - 5} till</li>}
+                      </ul>
+                      <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
+                        Produkter kopplas loss automatiskt och visar nästa bild i galleriet.
+                      </p>
+                      {inDesigns.length > 0 && (
+                        <p className="text-xs font-medium text-destructive">
+                          {inDesigns.length} används i en e-postmall. Mallar kopplas INTE loss —
+                          bilden blir trasig i mejlet tills du ändrar mallen.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                /** Keep the dialog up while the request is in flight. */
+                e.preventDefault();
+                if (pendingDelete) void runDelete(pendingDelete);
+              }}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                  Tar bort…
+                </>
+              ) : (
+                `Ta bort ${pendingDelete?.length ?? 0}`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {visible.length > 0 && visible.length !== items.length && (
         <p className="text-xs text-muted-foreground">

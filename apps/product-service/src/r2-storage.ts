@@ -120,6 +120,27 @@ export async function deleteAllFromR2(): Promise<number> {
  * Delete an object from R2 by key.
  * Key can be full URL or just filename (e.g. products/xxx.png or xxx.png).
  */
+/**
+ * Delete exactly this object key. No guessing.
+ *
+ * `deleteFromR2` below forces the `products/` prefix onto anything without
+ * one, which is right for its callers — they pass a bare product filename —
+ * and wrong for anything else. Handed `email-assets/takk.jpg` it would aim at
+ * `products/takk.jpg`: a different object, possibly someone else's, and a
+ * silent miss at best.
+ *
+ * The media library spans every folder in the bucket, so it needs a delete
+ * that treats the key as the key.
+ */
+export async function deleteR2Object(key: string): Promise<void> {
+  /** Trimmed before the emptiness check: "   " is a truthy string. */
+  const clean = (key.split("?")[0] ?? "").trim().replace(/^\/+/, "").trim();
+  if (!clean) throw new Error("Tom nyckel");
+  await getR2Client().send(
+    new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: clean }),
+  );
+}
+
 export async function deleteFromR2(keyOrUrl: string): Promise<void> {
   const client = getR2Client();
   let key = keyOrUrl;

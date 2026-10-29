@@ -14,7 +14,7 @@ import { db, products, categories, productCategories, orders, orderItems, review
 import { ORDER_NUMBER_SEQUENCE } from "@repo/database/schema";
 import { eq, inArray, desc, asc, sql, or, and, isNull } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
-import { isR2Configured, uploadToR2, deleteFromR2, listR2Products, listR2Objects } from "./r2-storage.js";
+import { isR2Configured, uploadToR2, deleteFromR2, listR2Products, listR2Objects, deleteR2Object } from "./r2-storage.js";
 import {
   sendAdminNewOrderEmail,
   sendAdminNewReviewEmail,
@@ -612,6 +612,75 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
  * and is called on every product edit. The library needs more, and the
  * picker does not need to carry it.
  */
+/**
+ * DELETE /api/media
+ *
+ * Removes images by object key, in bulk.
+ *
+ * Detaching happens BEFORE the delete, for the same reason the single-file
+ * endpoint documents: the two failure modes are not symmetric. A failed R2
+ * delete leaves an image detached but present, which is recoverable by
+ * re-attaching it. The other order leaves products pointing at a key that no
+ * longer exists, which nothing short of an audit would find.
+ *
+ * Each key is reported on individually. One bad key in a selection of thirty
+ * should not decide the fate of the other twenty-nine.
+ */
+app.delete("/api/media", async (req, res) => {
+  try {
+    if (!USE_R2) return res.status(503).json({ error: "R2 är inte konfigurerat" });
+
+    const keys = (req.body?.keys ?? []) as unknown[];
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ error: "Inga bilder angivna" });
+    }
+    if (keys.length > 200) {
+      return res.status(400).json({ error: "För många bilder på en gång (max 200)" });
+    }
+
+    const results: Array<{
+      key: string;
+      deleted: boolean;
+      detachedFromProducts?: number[];
+      error?: string;
+    }> = [];
+
+    for (const raw of keys) {
+      /** Trimmed first: a whitespace-only key is truthy and would reach R2. */
+      const key = (String(raw ?? "").split("?")[0] ?? "").trim().replace(/^\/+/, "").trim();
+      if (!key) {
+        results.push({ key: String(raw), deleted: false, error: "Ogiltig nyckel" });
+        continue;
+      }
+      try {
+        /**
+         * Detaching matches on the bare filename, which is what the products
+         * table stores inside its URLs; the key keeps its folder so the
+         * delete hits the right object.
+         */
+        const filename = key.split("/").pop() ?? key;
+        const detached = await detachImageFromProducts(filename);
+        await deleteR2Object(key);
+        results.push({ key, deleted: true, detachedFromProducts: detached });
+      } catch (error) {
+        console.error(`[media] failed to delete ${key}:`, error);
+        results.push({
+          key,
+          deleted: false,
+          error: error instanceof Error ? error.message : "Kunde inte ta bort",
+        });
+      }
+    }
+
+    const deleted = results.filter((r) => r.deleted).length;
+    console.log(`[media] deleted ${deleted}/${results.length} objects`);
+    return res.json({ results, deleted, failed: results.length - deleted });
+  } catch (error) {
+    console.error("Error deleting media:", error);
+    return res.status(500).json({ error: "Kunde inte ta bort bilderna" });
+  }
+});
+
 app.get("/api/media", async (_req, res) => {
   try {
     if (!USE_R2) return res.json({ objects: [], storage: "local" });
