@@ -1,5 +1,5 @@
 import { db } from "@repo/database";
-import { products, user } from "@repo/database/schema";
+import { products, users } from "@repo/database/schema";
 import { objectKeyFromUrl } from "./media-uploads";
 
 async function main() {
@@ -12,7 +12,7 @@ async function main() {
 
   const [prods, users] = await Promise.all([
     db.select({ image: products.image, thumbnails: products.thumbnails }).from(products),
-    db.select({ image: user.image }).from(user),
+    db.select({ image: users.image }).from(users),
   ]);
 
   const used = new Set<string>();
