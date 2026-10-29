@@ -98,7 +98,16 @@ export function resolveImageUrl(path: string | null): string {
 export function apiProductToProductType(api: ApiProduct): ProductType {
   const mainImg = resolveImageUrl(api.image || api.thumbnails?.[0] || null);
   const thumbnails = (api.thumbnails ?? []).map((t) => resolveImageUrl(t));
-  const galleryImages = [mainImg, ...thumbnails.filter((t) => t !== mainImg)];
+  /**
+   * Blank and whitespace-only entries are dropped, not just falsy ones.
+   * `[""].filter(Boolean)` removes an empty string but keeps "  ", which
+   * reaches the gallery as `<img src="  ">` — a broken tile the customer
+   * sees and nothing logs. The admin gallery editor applies the same rule,
+   * so what is arranged there is what renders here.
+   */
+  const galleryImages = [mainImg, ...thumbnails.filter((t) => t !== mainImg)]
+    .map((u) => (u ?? "").trim())
+    .filter(Boolean);
   return {
     id: api.id,
     slug: api.slug,

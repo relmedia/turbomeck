@@ -8,6 +8,7 @@ import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { Textarea } from "@repo/ui/components/textarea";
 import SeoAssistant, { type SeoFields } from "@/components/SeoAssistant";
+import ProductGalleryOrder from "@/components/ProductGalleryOrder";
 import { Checkbox } from "@repo/ui/components/checkbox";
 import { RichTextEditor } from "@repo/ui/components/rich-text-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
@@ -55,7 +56,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@repo/ui/components/tooltip";
-import { ImageUpload } from "@/components/ImageUpload";
 import { ThumbnailsUpload } from "@/components/ThumbnailsUpload";
 import { toast } from "react-toastify";
 import { PRODUCT_API } from "@/lib/product-api";
@@ -455,10 +455,6 @@ export default function ProductDetailPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleImageChange = (url: string | null) => {
-    setFormData((prev) => ({ ...prev, image: url }));
   };
 
   const handleSave = async () => {
@@ -1257,18 +1253,41 @@ export default function ProductDetailPage() {
               <CardTitle>Produktbild</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <ImageUpload
-                value={formData.image}
-                onChange={handleImageChange}
-                disabled={saving}
-              />
-              <ThumbnailsUpload
-                value={formData.thumbnails}
-                onChange={(thumbnails) =>
-                  setFormData((prev) => ({ ...prev, thumbnails }))
+              {/* The gallery in the order a customer meets it. The first
+                  image is the product card's, so choosing it is a drag
+                  rather than a separate "main image" field. */}
+              <ProductGalleryOrder
+                value={{ image: formData.image, thumbnails: formData.thumbnails }}
+                onChange={({ image, thumbnails }) =>
+                  setFormData((prev) => ({ ...prev, image, thumbnails }))
                 }
                 disabled={saving}
               />
+
+              {/* Adding only — the grid is hidden so the same pictures are
+                  not editable in two places on one screen. */}
+              <div className="border-t pt-4">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  Lägg till bilder
+                </p>
+                <ThumbnailsUpload
+                  value={formData.thumbnails}
+                  onChange={(thumbnails) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      thumbnails,
+                      /**
+                       * A product with no main image yet takes the first one
+                       * uploaded, so an upload is never invisible to the
+                       * storefront.
+                       */
+                      image: prev.image || thumbnails[0] || null,
+                    }))
+                  }
+                  disabled={saving}
+                  showGrid={false}
+                />
+              </div>
             </CardContent>
           </Card>
 

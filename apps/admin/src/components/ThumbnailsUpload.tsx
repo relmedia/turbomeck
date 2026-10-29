@@ -32,9 +32,18 @@ interface ThumbnailsUploadProps {
   value?: string[];
   onChange: (urls: string[]) => void;
   disabled?: boolean;
+  /**
+   * Hide this component's own tile grid.
+   *
+   * The product edit page now shows the gallery in the order a customer sees
+   * it, with reordering and removal there. Rendering the same pictures twice
+   * on one screen invites editing the wrong copy, so that page keeps this
+   * component only for adding images.
+   */
+  showGrid?: boolean;
 }
 
-export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsUploadProps) {
+export function ThumbnailsUpload({ value = [], onChange, disabled, showGrid = true }: ThumbnailsUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -164,7 +173,7 @@ export function ThumbnailsUpload({ value = [], onChange, disabled }: ThumbnailsU
 
   return (
     <div className="space-y-4">
-      {value.length > 0 && (
+      {showGrid && value.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {value.map((url, index) => (
             <div key={`${url}-${index}`} className="relative group">
