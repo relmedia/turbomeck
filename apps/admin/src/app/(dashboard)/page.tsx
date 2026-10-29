@@ -10,6 +10,7 @@ import { CustomerReviews } from "@/components/CustomerReviews";
 import { OrdersAndProductsTabs } from "@/components/OrdersAndProductsTabs";
 import { SalesByLocation } from "@/components/SalesByLocation";
 import { SectionCards, type DashboardStats } from "@/components/SectionCards";
+import { VisitorsByLocation } from "@/components/VisitorsByLocation";
 import type { OrderRow } from "@/components/RecentOrders";
 import { StudioLogin } from "@/components/StudioLogin";
 
@@ -169,10 +170,16 @@ export default async function StudioPage() {
         <div className="rounded-xl border bg-card p-4 lg:col-span-2 2xl:col-span-2">
           <SalesByLocation />
         </div>
+        {/* Traffic, next to the revenue it did or did not turn into. */}
+        <div className="rounded-xl border bg-card p-4 lg:col-span-2 2xl:col-span-2">
+          <VisitorsByLocation />
+        </div>
         <div className="rounded-xl border bg-card p-4 2xl:col-span-2">
           <AppPieChart />
         </div>
-        <div className="rounded-xl border bg-card p-4 lg:col-span-2 2xl:col-span-2">
+        {/* Full width: the row above is now three cards of two, so this fills
+            the next one rather than leaving two thirds of it empty. */}
+        <div className="rounded-xl border bg-card p-4 lg:col-span-2 2xl:col-span-6">
           <CustomerReviews />
         </div>
       </div>

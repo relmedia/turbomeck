@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useConsentGate } from "@/components/cookie-consent";
 
 function getDeviceType(): "mobile" | "desktop" | "tablet" {
   if (typeof window === "undefined") return "desktop";
@@ -27,11 +28,28 @@ function getBrowser(): "chrome" | "safari" | "firefox" | "edge" | "other" {
 
 const VISIT_SENT_KEY = "turbomeck-visit-sent";
 
+/**
+ * Records one visit per session -- but only once the visitor has said yes to
+ * analytics.
+ *
+ * The banner asks for an `analytics` category and, until this, nothing read
+ * the answer: a visitor who declined was still counted. That was already
+ * wrong; it became indefensible when a visit started carrying an
+ * IP-derived country and city.
+ *
+ * `isLoading` covers the window before any choice has been made, which is the
+ * case that matters most -- tracking during it would mean every visitor is
+ * recorded before they are asked.
+ */
 export function VisitTracker() {
   const pathname = usePathname();
   const sentRef = useRef(false);
+  const { isAllowed, isLoading } = useConsentGate("analytics");
 
   useEffect(() => {
+    // Not "no": "not yet". A visit is still sent if consent arrives later in
+    // the session, because the effect re-runs when isAllowed changes.
+    if (isLoading || !isAllowed) return;
     if (sentRef.current) return;
     const sent = sessionStorage.getItem(VISIT_SENT_KEY);
     if (sent) return;
@@ -45,7 +63,7 @@ export function VisitTracker() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceType, browser, path: pathname ?? "/" }),
     }).catch(() => {});
-  }, [pathname]);
+  }, [pathname, isAllowed, isLoading]);
 
   return null;
 }

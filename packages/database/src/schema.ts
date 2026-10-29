@@ -660,6 +660,18 @@ export const pageVisits = pgTable("page_visits", {
   /** chrome | safari | firefox | edge | other */
   browser: text("browser"),
   path: text("path"),
+  /**
+   * Where the visit came from, resolved from the request IP at insert time.
+   *
+   * No IP is stored, so these cannot be recomputed later -- a visit recorded
+   * before the geo columns existed, or one whose lookup failed, stays null
+   * forever. The dashboard counts that bucket as "okand" rather than
+   * excluding it, because silently dropping it would overstate every country.
+   */
+  /** ISO 3166-1 alpha-2, uppercase. */
+  country: text("country"),
+  region: text("region"),
+  city: text("city"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

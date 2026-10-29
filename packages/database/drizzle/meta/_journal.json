@@ -218,6 +218,13 @@
       "when": 1792782612829,
       "tag": "0030_product_published",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792782612830,
+      "tag": "0031_page_visit_geo",
+      "breakpoints": true
     }
   ]
 }
