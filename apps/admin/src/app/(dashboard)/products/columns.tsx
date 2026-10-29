@@ -39,6 +39,11 @@ export type Product = {
   sku?: string;
   averageRating?: number | null;
   reviewCount?: number;
+  nameEn?: string | null;
+  shortDescriptionEn?: string | null;
+  /** Filled in by the list page, which can see the whole catalogue. */
+  seoScore?: number;
+  seoFindings?: { id: string; severity: "good" | "warn" | "bad"; message: string }[];
 };
 
 function DeleteProductDialog({
@@ -235,6 +240,52 @@ export const createColumns = (
     ),
     cell: ({ row }: { row: { original: Product } }) =>
       row.original.sku ?? "—",
+  },
+  {
+    accessorKey: "seoScore",
+    header: ({ column }: { column: { toggleSorting: (asc: boolean) => void; getIsSorted: () => string | false } }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        SEO
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    /**
+     * Sortable on purpose: the useful question is not "what does this one
+     * score" but "which listings need work", and one click on the header
+     * answers it.
+     *
+     * The findings sit in the title attribute rather than a popover — a
+     * number alone says something is wrong without saying what, and a tooltip
+     * is enough to decide whether to open the product.
+     */
+    cell: ({ row }: { row: { original: Product } }) => {
+      const score = row.original.seoScore;
+      if (score == null) return <span className="text-muted-foreground">—</span>;
+
+      const problems = (row.original.seoFindings ?? []).filter((f) => f.severity !== "good");
+      const tone =
+        score >= 80
+          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+          : score >= 55
+            ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
+            : "bg-destructive/10 text-destructive";
+
+      return (
+        <span
+          className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${tone}`}
+          title={
+            problems.length > 0
+              ? problems.map((f) => `• ${f.message}`).join("\n")
+              : "Inga anmärkningar."
+          }
+        >
+          {score}
+        </span>
+      );
+    },
   },
   {
     id: "rating",

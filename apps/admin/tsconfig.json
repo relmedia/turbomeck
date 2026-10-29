@@ -32,6 +32,7 @@
     "src/lib/__verify-ai-generation.ts",
     "src/lib/__upload-email-logo.ts",
     "src/lib/__verify-asset-mirror.ts",
-    "src/lib/__verify-suggest-seo.ts"
+    "src/lib/__verify-suggest-seo.ts",
+    "src/lib/__verify-catalogue-seo.ts"
   ]
 }

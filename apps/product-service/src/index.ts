@@ -1071,6 +1071,14 @@ app.get("/api/products", async (req, res) => {
       name: loc.name,
       shortDescription: loc.shortDescription,
       description: loc.description,
+      /**
+       * The raw translations, alongside the localised copy above. Admin needs
+       * them to tell "no English yet" from "English is the same as Swedish",
+       * which the localised fields cannot express — `loc` falls back to the
+       * Swedish text when a translation is missing.
+       */
+      nameEn: (p as { nameEn?: string | null }).nameEn ?? null,
+      shortDescriptionEn: (p as { shortDescriptionEn?: string | null }).shortDescriptionEn ?? null,
       price: parseFloat(p.price),
       image: p.image,
       thumbnails: (p as { thumbnails?: string[] }).thumbnails ?? [],

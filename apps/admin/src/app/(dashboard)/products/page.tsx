@@ -8,6 +8,32 @@ import { Button } from "@repo/ui/components/button";
 import { Plus, RefreshCw } from "lucide-react";
 import { PRODUCT_API } from "@/lib/product-api";
 import { DashboardDataTableSkeleton } from "@/components/dashboard-skeletons";
+import { scoreSeo } from "@/lib/seo-score";
+
+/**
+ * Attach an SEO score to every product.
+ *
+ * The same scorer the product form uses, so the number in the table and the
+ * number on the page agree. It is given the rest of the catalogue so a
+ * duplicate name or meta description is actually caught — that only shows up
+ * when products are compared against each other, which is exactly what a
+ * list can do and a single form cannot.
+ */
+function withSeoScores(products: Product[]): Product[] {
+  return products.map((p, i) => {
+    const others = products
+      .filter((_, j) => j !== i)
+      .map((o) => ({ name: o.name, shortDescription: o.shortDescription }));
+    const result = scoreSeo({
+      name: p.name ?? "",
+      shortDescription: p.shortDescription ?? "",
+      nameEn: p.nameEn ?? "",
+      shortDescriptionEn: p.shortDescriptionEn ?? "",
+      others,
+    });
+    return { ...p, seoScore: result.score, seoFindings: result.findings };
+  });
+}
 
 const ProductsPage = () => {
   const [data, setData] = useState<Product[]>([]);
@@ -27,8 +53,17 @@ const ProductsPage = () => {
         fetch(`${PRODUCT_API}/categories`),
       ]);
       if (!productsRes.ok) throw new Error("Failed to fetch products");
-      const products = await productsRes.json();
-      setData(products);
+      const products: Product[] = await productsRes.json();
+
+      /**
+       * Scored here, once, rather than inside the cell renderer.
+       *
+       * Two reasons. Duplicate detection needs every OTHER product, which a
+       * cell does not have; and attaching the number to the row is what lets
+       * the column sort by it, so "show me the worst listings" is one click
+       * on the header.
+       */
+      setData(withSeoScores(products));
       if (categoriesRes.ok) {
         const cats = await categoriesRes.json();
         setCategories(cats);
