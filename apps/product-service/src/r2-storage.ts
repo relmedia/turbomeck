@@ -153,6 +153,58 @@ function isImageKey(key: string): boolean {
  * List all image objects in the bucket (products/ prefix and root).
  * Returns public URLs for each object. Paginates through all results.
  */
+export type R2Object = {
+  /** The object key, which is the stable identity. */
+  key: string;
+  url: string;
+  size: number;
+  /** R2's last-modified, which for a write-once object is its upload time. */
+  lastModified: string | null;
+};
+
+/**
+ * Every image in the bucket, with the metadata R2 already returns.
+ *
+ * `listR2Products` threw away `Size` and `LastModified` and handed back bare
+ * URLs — fine for an image picker, useless for a library that has to sort by
+ * date or show how much space something takes. Same listing, nothing
+ * discarded.
+ */
+export async function listR2Objects(): Promise<R2Object[]> {
+  const client = getR2Client();
+  const base = (R2_PUBLIC_URL || "").replace(/\/$/, "");
+  const out: R2Object[] = [];
+  const seen = new Set<string>();
+
+  for (const prefix of [PRODUCTS_PREFIX, ""] as const) {
+    let continuationToken: string | undefined;
+    do {
+      const params: {
+        Bucket: string;
+        Prefix?: string;
+        MaxKeys: number;
+        ContinuationToken?: string;
+      } = { Bucket: R2_BUCKET_NAME, MaxKeys: 1000, ContinuationToken: continuationToken };
+      if (prefix) params.Prefix = prefix;
+
+      const result = await client.send(new ListObjectsV2Command(params));
+      for (const obj of result.Contents || []) {
+        if (!obj.Key || !isImageKey(obj.Key) || seen.has(obj.Key)) continue;
+        seen.add(obj.Key);
+        out.push({
+          key: obj.Key,
+          url: base ? `${base}/${obj.Key}` : obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified ? new Date(obj.LastModified).toISOString() : null,
+        });
+      }
+      continuationToken = result.NextContinuationToken;
+    } while (continuationToken);
+  }
+
+  return out;
+}
+
 export async function listR2Products(): Promise<string[]> {
   const client = getR2Client();
   const objects: string[] = [];

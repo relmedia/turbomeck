@@ -14,7 +14,8 @@ export function PageTitle() {
     if (pathname === "/") return "Dashboard";
     if (pathname === "/products/add") return "Lägg till produkt";
     if (pathname.startsWith("/products")) return "Produkter";
-    if (pathname.startsWith("/users")) return "Användare";
+    if (pathname.startsWith("/media")) return "Media";
+  if (pathname.startsWith("/users")) return "Användare";
     if (pathname.startsWith("/payments")) return "Transaktioner";
     if (pathname.startsWith("/shipping")) return "Leveransdetaljer";
     if (pathname.startsWith("/categories")) return "Kategorier";

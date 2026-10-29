@@ -4,6 +4,7 @@ import {
   requireInternalProductApiSecret,
 } from "@/lib/internal-product-api";
 import { requireAdmin } from "@/lib/require-admin";
+import { recordUpload } from "@/lib/media-uploads";
 import {
   affectsStorefrontCatalog,
   revalidateStorefrontCatalog,
@@ -108,8 +109,20 @@ export async function POST(
   try {
     const contentType = req.headers.get("content-type") || "";
     let body: FormData | string;
+    /**
+     * Read off the incoming form before it is forwarded: the upstream
+     * response carries the stored URL but not what the file was called or
+     * how big it was, and both are what make a media library browsable.
+     */
+    let uploadedFileName: string | null = null;
+    let uploadedFileSize: number | null = null;
     if (contentType.includes("multipart/form-data")) {
       body = await req.formData();
+      const file = body.get("image");
+      if (file && typeof file === "object" && "name" in file) {
+        uploadedFileName = (file as File).name || null;
+        uploadedFileSize = (file as File).size || null;
+      }
     } else {
       body = await req.text();
     }
@@ -136,6 +149,22 @@ export async function POST(
             );
             const text = await res.text();
             const data = parseUpstreamJson(text);
+            /**
+             * Record the byline here, where the session still exists. Awaited
+             * rather than fired off, so the row is in place before the media
+             * library can be opened — but it can only log, never throw.
+             */
+            if (res.ok && isUpload && gate.session?.user?.id) {
+              const url = (data as { url?: string } | null)?.url;
+              if (url) {
+                await recordUpload({
+                  url,
+                  user: gate.session.user,
+                  originalName: uploadedFileName,
+                  byteSize: uploadedFileSize,
+                });
+              }
+            }
             return respondAndRevalidate(pathStr, "POST", res.status, data);
           } catch (e) {
             const isConnReset =

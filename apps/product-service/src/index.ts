@@ -14,7 +14,7 @@ import { db, products, categories, productCategories, orders, orderItems, review
 import { ORDER_NUMBER_SEQUENCE } from "@repo/database/schema";
 import { eq, inArray, desc, asc, sql, or, and, isNull } from "drizzle-orm";
 import { processProductImage, removeBackgroundFromImageUrl } from "./image-utils.js";
-import { isR2Configured, uploadToR2, deleteFromR2, listR2Products } from "./r2-storage.js";
+import { isR2Configured, uploadToR2, deleteFromR2, listR2Products, listR2Objects } from "./r2-storage.js";
 import {
   sendAdminNewOrderEmail,
   sendAdminNewReviewEmail,
@@ -603,6 +603,26 @@ app.post("/api/upload", upload.single("image"), async (req, res) => {
 });
 
 // List upload files (for attaching existing files to products) – R2 only
+/**
+ * GET /api/media
+ *
+ * Every image in storage with the metadata R2 keeps: key, size and date.
+ *
+ * Separate from /api/upload, which returns bare URLs for the image picker
+ * and is called on every product edit. The library needs more, and the
+ * picker does not need to carry it.
+ */
+app.get("/api/media", async (_req, res) => {
+  try {
+    if (!USE_R2) return res.json({ objects: [], storage: "local" });
+    const objects = await listR2Objects();
+    return res.json({ objects, storage: "r2" });
+  } catch (error) {
+    console.error("Error listing media:", error);
+    return res.status(500).json({ error: "Kunde inte lista bilderna" });
+  }
+});
+
 app.get("/api/upload", async (req, res) => {
   try {
     if (!USE_R2) {

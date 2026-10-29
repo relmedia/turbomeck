@@ -33,6 +33,7 @@
     "src/lib/__upload-email-logo.ts",
     "src/lib/__verify-asset-mirror.ts",
     "src/lib/__verify-suggest-seo.ts",
-    "src/lib/__verify-catalogue-seo.ts"
+    "src/lib/__verify-catalogue-seo.ts",
+    "src/lib/__verify-media-library.ts"
   ]
 }

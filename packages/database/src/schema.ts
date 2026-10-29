@@ -705,3 +705,34 @@ export type NewDiscountCode = typeof discountCodes.$inferInsert;
 
 export type PageVisit = typeof pageVisits.$inferSelect;
 export type NewPageVisit = typeof pageVisits.$inferInsert;
+
+/**
+ * Who uploaded an image, and when.
+ *
+ * R2 knows an object's key, size and last-modified date and nothing about the
+ * person behind it; the upload endpoint is called with a service secret, so
+ * the admin's identity is already gone by the time bytes arrive. This is
+ * written by the admin proxy, which is the one hop that still has the
+ * session.
+ *
+ * Images predating this table have no row, and the media library reports them
+ * as unknown rather than inventing an owner.
+ */
+export const mediaUploads = pgTable("media_uploads", {
+  id: serial("id").primaryKey(),
+  /**
+   * The R2 object key, without bucket or query string — the public URL can
+   * carry a ?v= cache-buster and the host can change, so neither is stable.
+   */
+  objectKey: text("object_key").notNull(),
+  uploadedById: text("uploaded_by_id"),
+  /**
+   * Denormalised deliberately: the library must still answer "who uploaded
+   * this" after the account is gone.
+   */
+  uploadedByName: text("uploaded_by_name"),
+  uploadedByEmail: text("uploaded_by_email"),
+  originalName: text("original_name"),
+  byteSize: integer("byte_size"),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});

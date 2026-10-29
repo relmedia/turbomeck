@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 import {
   Home,
   ImageIcon,
+  Images,
   Plus,
   Package,
   Settings,
@@ -82,6 +83,11 @@ const items = [
     title: "Användare",
     url: "/users",
     icon: Users,
+  },
+  {
+    title: "Media",
+    url: "/media",
+    icon: Images,
   },
 ];
 
