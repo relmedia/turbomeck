@@ -1,6 +1,6 @@
 import { auth } from "@repo/auth";
 import { db } from "@repo/database";
-import { mediaUploads, products, emailDesigns } from "@repo/database/schema";
+import { mediaUploads, products, emailDesigns, users } from "@repo/database/schema";
 import { NextResponse } from "next/server";
 import { objectKeyFromUrl } from "@/lib/media-uploads";
 import { inArray } from "drizzle-orm";
@@ -26,7 +26,11 @@ export const runtime = "nodejs";
  * per image.
  */
 
-type Usage = { kind: "product" | "design"; id: number; name: string };
+type Usage = {
+  kind: "product" | "design" | "user" | "setting";
+  id: number | string;
+  name: string;
+};
 
 export async function GET() {
   const session = await auth();
@@ -42,7 +46,7 @@ export async function GET() {
   if (base.endsWith("/api")) base = base.slice(0, -4);
 
   try {
-    const [storageRes, uploads, productRows, designRows] = await Promise.all([
+    const [storageRes, uploads, productRows, designRows, userRows] = await Promise.all([
       fetch(`${base}/api/media`, {
         headers: { Authorization: `Bearer ${secret}` },
         cache: "no-store",
@@ -67,6 +71,12 @@ export async function GET() {
       db
         .select({ id: emailDesigns.id, name: emailDesigns.name, html: emailDesigns.html })
         .from(emailDesigns),
+      /**
+       * Profile pictures. Missed in the first version, which only looked at
+       * products and designs — so an avatar in active use was reported as
+       * safe to delete.
+       */
+      db.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users),
     ]);
 
     if (!storageRes.ok) {
@@ -81,6 +91,7 @@ export async function GET() {
     };
 
     const uploaderByKey = new Map(uploads.map((u) => [u.objectKey, u]));
+    const productById = new Map(productRows.map((p) => [p.id, p.name]));
 
     /**
      * Which products use which object.
@@ -101,6 +112,31 @@ export async function GET() {
       const usage: Usage = { kind: "product", id: p.id, name: p.name };
       addUsage(p.image, usage);
       for (const t of (p.thumbnails as string[] | null) ?? []) addUsage(t, usage);
+    }
+
+    for (const u of userRows) {
+      if (!u.image) continue;
+      addUsage(u.image, {
+        kind: "user",
+        id: u.id,
+        name: u.name || u.email || "Användare",
+      });
+    }
+
+    /**
+     * Images named by CONFIGURATION rather than by a row.
+     *
+     * The shop logo is the case that matters: nothing in the database points
+     * at it, so the first version reported it unused — and deleting it would
+     * have broken the logo in every email. Anything an environment variable
+     * names is in use by definition.
+     */
+    for (const [label, value] of [
+      ["E-postlogotyp", process.env.EMAIL_LOGO_URL],
+      ["Logotyp (standard)", "branding/logo.png"],
+    ] as const) {
+      if (!value) continue;
+      addUsage(value, { kind: "setting", id: label, name: label });
     }
 
     /**
@@ -128,6 +164,27 @@ export async function GET() {
       const folder = obj.key.includes("/") ? obj.key.split("/")[0]! : "övrigt";
       const filename = obj.key.split("/").pop() ?? obj.key;
 
+      /**
+       * Why an unused image can still look familiar.
+       *
+       * Uploads are named `product-{id}-{index}-{hash}.{ext}`. Replacing or
+       * converting an image writes a new file and repoints the product,
+       * leaving the old one behind — visually identical to the one in use.
+       * Reported as a bare "unused" that reads as a false positive: the admin
+       * recognises the picture and concludes the page is wrong.
+       *
+       * So an orphan whose product still exists is labelled as an older
+       * version of that product's image, which is both true and actionable.
+       * The id is only trusted when a product with it actually exists, which
+       * also filters out the older `product-{timestamp}-{random}` naming.
+       */
+      let supersededBy: string | null = null;
+      if (usedBy.length === 0) {
+        const m = /^products\/product-(\d+)-(\d+)-/.exec(obj.key);
+        const owner = m ? productById.get(Number(m[1])) : undefined;
+        if (owner) supersededBy = owner;
+      }
+
       return {
         key: obj.key,
         url: obj.url,
@@ -145,6 +202,7 @@ export async function GET() {
         uploadedByEmail: uploader?.uploadedByEmail ?? null,
         originalName: uploader?.originalName ?? null,
         usedBy,
+        supersededBy,
       };
     });
 

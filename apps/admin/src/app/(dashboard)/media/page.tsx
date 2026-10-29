@@ -79,6 +79,8 @@ type MediaItem = {
   uploadedByEmail: string | null;
   originalName: string | null;
   usedBy: Usage[];
+  /** Set when an unused file is an older copy of a product's image. */
+  supersededBy?: string | null;
 };
 
 type SortKey = "filename" | "folder" | "size" | "uploadedAt" | "uploadedBy" | "usedBy";
@@ -568,15 +570,35 @@ export default function MediaPage() {
 
                   <TableCell>
                     {item.usedBy.length === 0 ? (
-                      <Badge variant="secondary" className="font-normal text-muted-foreground">
-                        Används inte
-                      </Badge>
+                      item.supersededBy ? (
+                        /* Not a bare "unused": this is an older copy of a
+                           product's image, which is why it looks familiar. */
+                        <Badge
+                          variant="secondary"
+                          className="max-w-full truncate font-normal"
+                          title={`Äldre version av en bild på ${item.supersededBy}. Produkten använder en nyare fil.`}
+                        >
+                          Ersatt · {item.supersededBy}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="font-normal text-muted-foreground">
+                          Används inte
+                        </Badge>
+                      )
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {item.usedBy.slice(0, 2).map((u) => (
                           <Link
                             key={`${u.kind}-${u.id}`}
-                            href={u.kind === "product" ? `/products/${u.id}` : `/settings/design/${u.id}`}
+                            href={
+                              u.kind === "product"
+                                ? `/products/${u.id}`
+                                : u.kind === "design"
+                                  ? `/settings/design/${u.id}`
+                                  : u.kind === "user"
+                                    ? `/users/${u.id}`
+                                    : "/settings/mail"
+                            }
                             className="max-w-[150px] truncate rounded border px-1.5 py-0.5 text-xs hover:bg-muted"
                             title={u.name}
                           >

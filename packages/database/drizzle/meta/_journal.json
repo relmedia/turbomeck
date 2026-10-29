@@ -211,6 +211,13 @@
       "when": 1792782612828,
       "tag": "0029_media_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792782612829,
+      "tag": "0030_product_published",
+      "breakpoints": true
     }
   ]
 }

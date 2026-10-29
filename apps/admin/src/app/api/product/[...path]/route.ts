@@ -71,11 +71,19 @@ export async function GET(
   }
   const { path } = await params;
   const pathStr = path.join("/");
+  /**
+   * Admin sees hidden products; the storefront does not.
+   *
+   * Added here rather than in each page so no admin screen can forget it and
+   * silently lose rows from a list. product-service filters unpublished by
+   * default, which is the safe direction: a missing flag shows too few
+   * products rather than publishing something deliberately hidden.
+   */
+  const url = pathStr.startsWith("products")
+    ? `${PRODUCT_SERVICE}/api/${pathStr}${pathStr.includes("?") ? "&" : "?"}includeUnpublished=true`
+    : `${PRODUCT_SERVICE}/api/${pathStr}`;
   try {
-    const res = await fetch(
-      `${PRODUCT_SERVICE}/api/${pathStr}`,
-      withInternalAuth({ cache: "no-store" }),
-    );
+    const res = await fetch(url, withInternalAuth({ cache: "no-store" }));
     const text = await res.text();
     const data = parseUpstreamJson(text);
     return NextResponse.json(data, { status: res.status });

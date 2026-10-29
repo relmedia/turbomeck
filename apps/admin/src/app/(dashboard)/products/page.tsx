@@ -80,6 +80,19 @@ const ProductsPage = () => {
     fetchProducts();
   }, [fetchProducts]);
 
+  /**
+   * Reflect a publish toggle in the table without refetching.
+   *
+   * The row is the only thing that changed, and a full reload would also
+   * recompute every SEO score and lose the scroll position for what is a
+   * one-field edit.
+   */
+  const handlePublishedChange = useCallback((id: number, published: boolean) => {
+    setData((prev) =>
+      prev.map((p) => (Number(p.id) === id ? { ...p, published } : p)),
+    );
+  }, []);
+
   const handleDelete = useCallback(async (ids: number[]) => {
     try {
       await Promise.all(
@@ -96,8 +109,8 @@ const ProductsPage = () => {
   }, [fetchProducts]);
 
   const columns = useMemo(
-    () => createColumns(handleDelete, categories),
-    [handleDelete, categories]
+    () => createColumns(handleDelete, categories, handlePublishedChange),
+    [handleDelete, categories, handlePublishedChange]
   );
 
   return (

@@ -140,6 +140,14 @@ export const products = pgTable("products", {
   sliderOrder: integer("slider_order"),
   /** Sweden kärnretur: product is sold as exchange turbo (core return rules apply in SE) */
   isExchangeTurbo: boolean("is_exchange_turbo").default(false).notNull(),
+  /**
+   * Visible in the shop.
+   *
+   * Defaults to true, and every existing row was backfilled true, so adding
+   * this hid nothing. The storefront filters on it; admin always sees every
+   * product regardless.
+   */
+  published: boolean("published").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

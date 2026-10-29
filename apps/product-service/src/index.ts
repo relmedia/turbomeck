@@ -1101,6 +1101,20 @@ async function getProductRatings(
 }
 
 // GET all products (optional ?ids=1,2,3 for filtering, ?featuredInSlider=1 for homepage slider, ?locale=sv|en for translated content)
+/**
+ * Whether a caller wants hidden products included.
+ *
+ * Filtering is the DEFAULT, so a new caller is safe without knowing this
+ * exists: forgetting the flag shows a customer too few products, where
+ * defaulting the other way would publish something deliberately hidden. The
+ * admin proxy sets it for every product read, so no admin screen has to
+ * remember.
+ */
+function includeUnpublished(req: { query: Record<string, unknown> }): boolean {
+  const v = String(req.query.includeUnpublished ?? "").toLowerCase();
+  return v === "1" || v === "true";
+}
+
 app.get("/api/products", async (req, res) => {
   try {
     const idsParam = req.query.ids as string | undefined;
@@ -1113,6 +1127,7 @@ app.get("/api/products", async (req, res) => {
       id: products.id,
       name: products.name,
       slug: products.slug,
+      published: products.published,
       shortDescription: products.shortDescription,
       description: products.description,
       nameEn: products.nameEn,
@@ -1136,16 +1151,32 @@ app.get("/api/products", async (req, res) => {
       updatedAt: products.updatedAt,
     };
     let allProducts;
+    /**
+     * Hidden products are excluded unless the caller asks for them. Applied
+     * to every branch rather than after the query, so an unpublished product
+     * never leaves the database on a storefront request.
+     */
+    const showHidden = includeUnpublished(req);
+    const visible = showHidden ? undefined : eq(products.published, true);
+
     if (featuredInSliderParam) {
+      const where = visible
+        ? and(eq(products.featuredInSlider, 1), visible)
+        : eq(products.featuredInSlider, 1);
       allProducts = await db
         .select(productCols)
         .from(products)
-        .where(eq(products.featuredInSlider, 1))
+        .where(where)
         .orderBy(asc(products.sliderOrder), asc(products.id));
     } else if (filterIds?.length) {
-      allProducts = await db.select(productCols).from(products).where(inArray(products.id, filterIds));
+      const where = visible
+        ? and(inArray(products.id, filterIds), visible)
+        : inArray(products.id, filterIds);
+      allProducts = await db.select(productCols).from(products).where(where);
     } else {
-      allProducts = await db.select(productCols).from(products);
+      allProducts = visible
+        ? await db.select(productCols).from(products).where(visible)
+        : await db.select(productCols).from(products);
     }
     const productIds = allProducts.map((p) => p.id);
     const categoryMap = await getProductCategoryIds(productIds);
@@ -1183,6 +1214,7 @@ app.get("/api/products", async (req, res) => {
       featuredInSlider: (p as { featuredInSlider?: number | null }).featuredInSlider ?? 0,
       sliderOrder: (p as { sliderOrder?: number | null }).sliderOrder ?? null,
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
+      published: (p as { published?: boolean }).published !== false,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       averageRating: ratingMap.get(p.id)?.avg ?? null,
@@ -1232,6 +1264,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
         id: products.id,
         name: products.name,
         slug: products.slug,
+        published: products.published,
         shortDescription: products.shortDescription,
         description: products.description,
         nameEn: products.nameEn,
@@ -1267,6 +1300,14 @@ app.get("/api/products/slug/:slug", async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
+    /**
+     * A hidden product is a 404, not an empty page: the URL must behave as
+     * though it does not exist, or unpublishing would leave an indexable
+     * shell behind.
+     */
+    if (!includeUnpublished(req) && (product as { published?: boolean }).published === false) {
+      return res.status(404).json({ error: "Product not found" });
+    }
     const p = product;
     const loc = localizeProduct(p, locale);
     const categoryIds = (await getProductCategoryIds([p.id])).get(p.id) ?? [];
@@ -1290,6 +1331,7 @@ app.get("/api/products/slug/:slug", async (req, res) => {
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
+      published: (p as { published?: boolean }).published !== false,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       averageRating: rating?.avg ?? null,
@@ -1311,6 +1353,7 @@ app.get("/api/products/:id", async (req, res) => {
         id: products.id,
         name: products.name,
         slug: products.slug,
+        published: products.published,
         shortDescription: products.shortDescription,
         description: products.description,
         nameEn: products.nameEn,
@@ -1372,6 +1415,7 @@ app.get("/api/products/:id", async (req, res) => {
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
+      published: (p as { published?: boolean }).published !== false,
       orderCount,
       totalRevenue,
       createdAt: p.createdAt,
@@ -1507,6 +1551,7 @@ app.post("/api/products", async (req, res) => {
       attributes: (p as { attributes?: { name: string; options: string[] }[] }).attributes ?? [],
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
+      published: (p as { published?: boolean }).published !== false,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
@@ -1534,7 +1579,7 @@ app.post("/api/products", async (req, res) => {
 app.put("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, shortDescription, description, price, image, thumbnails, stock, weight, shipmentType, lengthCm, widthCm, heightCm, categoryIds, attributes, specifications, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo } = req.body;
+    const { name, shortDescription, description, price, image, thumbnails, stock, weight, shipmentType, lengthCm, widthCm, heightCm, categoryIds, attributes, specifications, nameEn, shortDescriptionEn, descriptionEn, featuredInSlider, sliderOrder, isExchangeTurbo, published } = req.body;
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -1580,6 +1625,14 @@ app.put("/api/products/:id", async (req, res) => {
       updateData.isExchangeTurbo =
         isExchangeTurbo === true || isExchangeTurbo === 1 || isExchangeTurbo === "1" || isExchangeTurbo === "true";
     }
+    /**
+     * Only touched when the caller sends it, so a partial update from any
+     * other screen cannot silently unpublish a product.
+     */
+    if (published !== undefined) {
+      updateData.published =
+        published === true || published === 1 || published === "1" || published === "true";
+    }
 
     const updated = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
 
@@ -1621,6 +1674,7 @@ app.put("/api/products/:id", async (req, res) => {
       categoryIds: categoryIdsRes,
       specifications: (p as { specifications?: { group?: string; label: string; value: string }[] }).specifications ?? [],
       isExchangeTurbo: (p as { isExchangeTurbo?: boolean }).isExchangeTurbo === true,
+      published: (p as { published?: boolean }).published !== false,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });

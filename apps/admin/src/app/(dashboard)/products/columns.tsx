@@ -26,6 +26,9 @@ import { resolveImageUrl } from "@/lib/image-utils";
 import Link from "next/link";
 import { useState } from "react";
 import { Checkbox } from "@repo/ui/components/checkbox";
+import { Switch } from "@repo/ui/components/switch";
+import { toast } from "react-toastify";
+import { PRODUCT_API } from "@/lib/product-api";
 
 export type Product = {
   id: string | number;
@@ -44,6 +47,7 @@ export type Product = {
   /** Filled in by the list page, which can see the whole catalogue. */
   seoScore?: number;
   seoFindings?: { id: string; severity: "good" | "warn" | "bad"; message: string }[];
+  published?: boolean;
 };
 
 function DeleteProductDialog({
@@ -99,6 +103,67 @@ function DeleteProductDialog({
   );
 }
 
+/**
+ * Publish or hide a product from the list.
+ *
+ * Optimistic: the switch moves immediately and reverts if the save fails.
+ * This is a row in a long table and the request is a round trip through two
+ * services — waiting for it would make the control feel broken, and the cost
+ * of being briefly wrong is a switch that flips back with a message.
+ */
+function PublishToggle({
+  product,
+  onChanged,
+}: {
+  product: Product;
+  onChanged?: (id: number, published: boolean) => void;
+}) {
+  const published = product.published !== false;
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async () => {
+    const next = !published;
+    setSaving(true);
+    onChanged?.(Number(product.id), next);
+    try {
+      const res = await fetch(`${PRODUCT_API}/products/${product.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        /**
+         * Only `published` is sent. The update endpoint applies the fields it
+         * receives, so posting the whole row here would let a stale copy in
+         * the table overwrite an edit someone made on the product page.
+         */
+        body: JSON.stringify({ published: next }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      toast.success(next ? "Produkten är publicerad" : "Produkten är dold");
+    } catch (err) {
+      onChanged?.(Number(product.id), published);
+      toast.error(err instanceof Error ? err.message : "Kunde inte ändra status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Switch
+        checked={published}
+        onCheckedChange={() => void toggle()}
+        disabled={saving}
+        aria-label={published ? `Dölj ${product.name}` : `Publicera ${product.name}`}
+      />
+      <span className={`text-xs ${published ? "text-muted-foreground" : "text-amber-600 dark:text-amber-500"}`}>
+        {published ? "Publicerad" : "Dold"}
+      </span>
+    </div>
+  );
+}
+
 export const createColumns = (
   onDelete?: (ids: number[]) => Promise<void>,
   categories: {
@@ -106,7 +171,8 @@ export const createColumns = (
     name: string;
     parentId?: number | null;
     parentName?: string | null;
-  }[] = []
+  }[] = [],
+  onPublishedChange?: (id: number, published: boolean) => void,
 ): ColumnDef<Product>[] => {
   const categoryMap = Object.fromEntries(
     categories.map((c) => [
@@ -240,6 +306,26 @@ export const createColumns = (
     ),
     cell: ({ row }: { row: { original: Product } }) =>
       row.original.sku ?? "—",
+  },
+  {
+    accessorKey: "published",
+    header: ({ column }: { column: { toggleSorting: (asc: boolean) => void; getIsSorted: () => string | false } }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Publicerad
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    /**
+     * A switch rather than a menu item: publishing is the kind of thing done
+     * to several products in a row while scanning the list, and sorting by it
+     * groups the hidden ones together.
+     */
+    cell: ({ row }: { row: { original: Product } }) => (
+      <PublishToggle product={row.original} onChanged={onPublishedChange} />
+    ),
   },
   {
     accessorKey: "seoScore",

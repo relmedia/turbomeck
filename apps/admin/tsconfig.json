@@ -35,6 +35,7 @@
     "src/lib/__verify-suggest-seo.ts",
     "src/lib/__verify-catalogue-seo.ts",
     "src/lib/__verify-media-library.ts",
-    "src/lib/__verify-media-delete.ts"
+    "src/lib/__verify-media-delete.ts",
+    "src/lib/__verify-publish-and-usage.ts"
   ]
 }
