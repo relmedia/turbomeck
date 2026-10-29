@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "@/i18n/context";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
-import { useDominantColor } from "@/hooks/useDominantColor";
 import { Card, CardContent } from "@repo/ui/components/card";
 import { Button } from "@repo/ui/components/button";
 import {
@@ -32,27 +31,6 @@ export function ProductImageGallery({
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const displayImages = images.length > 0 ? images : ["/products/1g.png"];
-
-  /**
-   * The lightbox is tinted with a dark shade of whatever the open image is
-   * made of, so the picture sits in a room of its own colour instead of on a
-   * light grey rectangle floating in black.
-   *
-   * Only sampled while the lightbox is open — there is no reason to fetch a
-   * swatch for an image nobody has enlarged.
-   */
-  /**
-   * Sampled for the image on show, not only while the lightbox is open.
-   *
-   * Gating it on `fullscreenOpen` meant the work started at the moment the
-   * lightbox appeared, so there was always a round trip during which the old
-   * black backdrop was still painted — visible as the previous background
-   * fading away. Working it out up front costs one ~1 kB request against a
-   * product photo of a couple of hundred, and the lightbox opens already
-   * wearing the right colour.
-   */
-  const activeSrc = displayImages[selectedIndex] ?? displayImages[0] ?? null;
-  const backdrop = useDominantColor(activeSrc);
 
   // Native scroll-snap carousel: a horizontal overflow container handles
   // both mouse-wheel and touch scrolling. We sync `selectedIndex` from the
@@ -279,10 +257,12 @@ export function ProductImageGallery({
 
     <Dialog open={fullscreenOpen} onOpenChange={setFullscreenOpen}>
       <DialogContent
-        className="!max-w-[95vw] !max-h-[95vh] w-[95vw] h-[95vh] p-0 gap-0 overflow-hidden border-0 bg-black/90 [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:text-white"
-        /* Falls back to the class above until a colour is known, so a slow
-           sample shows nothing rather than a flash of the wrong shade. */
-        style={backdrop ? { backgroundColor: backdrop } : undefined}
+        /* Edge to edge: no inset, no rounding, no border, and the max-width
+           the dialog primitive sets by default has to be overridden rather
+           than widened. The close button is dark because the background is
+           light — it was white for the old dark backdrop and would be
+           invisible here. */
+        className="!max-w-none !max-h-none w-screen h-screen rounded-none p-0 gap-0 overflow-hidden border-0 bg-neutral-200 [&_[data-slot=dialog-close]]:text-neutral-700 [&_[data-slot=dialog-close]]:hover:text-neutral-900"
         showCloseButton={true}
         /* A lightbox has nothing to say beyond its title; this is Radix's
            documented way to declare that, and it silences the warning. */
@@ -297,19 +277,15 @@ export function ProductImageGallery({
           onTouchMove={handleDialogTouchMove}
           onTouchEnd={handleDialogTouchEnd}
         >
-          {/* The plate behind the image. It exists because the products are
-              cut-outs on transparency and need something to sit on — but a
-              fixed light grey against a dark room is exactly the rectangle
-              this change removes, so it takes the backdrop's colour. */}
-          <span
-            className="inline-block bg-neutral-200 transition-colors duration-300"
-            style={backdrop ? { backgroundColor: backdrop } : undefined}
-          >
+          {/* No background of its own. The dialog is already neutral-200, so
+              anything painted here would only show up as a rectangle a
+              shade off the surrounding room. */}
+          <span className="inline-block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={displayImages[selectedIndex] ?? displayImages[0] ?? "/products/1g.png"}
               alt={imageAlt}
-              className="max-w-full max-h-[90vh] w-auto h-auto object-contain block"
+              className="max-w-screen max-h-screen w-auto h-auto object-contain block"
               referrerPolicy="no-referrer"
               onClick={(e) => e.stopPropagation()}
             />
