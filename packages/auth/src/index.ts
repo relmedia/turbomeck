@@ -8,6 +8,7 @@ import { db, users, accounts, sessions, verificationTokens, appSettings } from "
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import type { DefaultSession } from "next-auth";
+import { resolveActiveDesign, renderDesign } from "@repo/email-design";
 import { renderMagicLinkEmail, renderPasswordResetEmail,
   renderContactMessageEmail,
 } from "./email-templates";
@@ -228,6 +229,67 @@ function buildStaffMagicLinkFromAuthJsUrl(url: string, base: URL): string {
  * Emailed magic links must hit the same Next.js app that sent the email (studio subdomain vs shop).
  * Auth.js may pass the storefront origin or a relative path; rewrite using this app’s PUBLIC_AUTH_ORIGIN.
  */
+/**
+ * The language to send the sign-in mail in.
+ *
+ * Read from the storefront's locale cookie on the request that asked for the
+ * link, because `sendVerificationRequest` gets no locale of its own — it
+ * knows an address and a URL. Swedish when there is no cookie, which is what
+ * the built-in template has always been.
+ */
+function localeFromRequest(request: Request | undefined): "sv" | "en" {
+  try {
+    const cookie = request?.headers?.get("cookie") ?? "";
+    const match = cookie.match(/(?:^|;\s*)turbomeck-locale=([^;]+)/);
+    return match?.[1]?.trim().toLowerCase() === "en" ? "en" : "sv";
+  } catch {
+    return "sv";
+  }
+}
+
+/**
+ * The sign-in mail as an admin designed it, or null to use the built-in one.
+ *
+ * `login_url` is REQUIRED. A design without it is refused outright rather
+ * than sent: a sign-in email with nothing to click locks every user out of
+ * the shop, and that is not a failure anyone would notice until support calls
+ * start. Every other fallback here is the same conservative shape — no
+ * design, empty body, empty subject, a database hiccup — all end up sending
+ * the compiled template.
+ */
+async function designedMagicLinkEmail(
+  link: string,
+  email: string,
+  request: Request | undefined,
+): Promise<{ subject: string; html: string } | null> {
+  try {
+    const locale = localeFromRequest(request);
+    const design = await resolveActiveDesign("magic_link", locale);
+    if (!design) return null;
+
+    return renderDesign(
+      design,
+      {
+        scalars: {
+          login_url: link,
+          customer_email: email,
+          link_expiry_minutes: "15",
+        },
+        blocks: {},
+      },
+      "magic_link",
+      { required: ["login_url"] },
+    );
+  } catch (error) {
+    /**
+     * Never let the design path break sign-in. Anything unexpected falls
+     * through to the template that has always worked.
+     */
+    console.error("[@repo/auth] designed magic link failed; using the built-in:", error);
+    return null;
+  }
+}
+
 function magicLinkUrlForThisApp(url: string): string {
   let baseRaw = getMagicLinkBase();
   if (baseRaw) baseRaw = coerceMagicLinkBaseForStudioProcess(baseRaw);
@@ -364,11 +426,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
         const { html, text } = renderMagicLinkEmail(link);
+        const designed = await designedMagicLinkEmail(link, email, request);
+
         await transporter.sendMail({
           from: config.from || config.user || "noreply@localhost",
           to: email,
-          subject: "Logga in till Turbomeck",
-          html,
+          subject: designed?.subject || "Logga in till Turbomeck",
+          html: designed?.html || html,
+          /**
+           * The plain-text part stays the compiled one either way. A designed
+           * email has no text alternative, and dropping it would hurt
+           * deliverability — a sign-in mail landing in spam is the same
+           * outcome as not sending it.
+           */
           text,
         });
       },

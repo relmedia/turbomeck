@@ -35,6 +35,7 @@ const BINDABLE = [
   { key: "pickup_reminder_2", label: "Påminnelse 2" },
   { key: "order_delivered", label: "Levererad" },
   { key: "core_return_reminder", label: "Kärnretur — påminnelse" },
+  { key: "magic_link", label: "Inloggningslänk (logga in)" },
 ];
 
 /** What `/api/settings/designs/merge-tags` hands back. */

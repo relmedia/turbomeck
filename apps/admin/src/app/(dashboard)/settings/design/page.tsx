@@ -20,6 +20,7 @@ const KEY_LABELS: Record<string, string> = {
   pickup_reminder_2: "Påminnelse 2",
   order_delivered: "Levererad",
   core_return_reminder: "Kärnretur — påminnelse",
+  magic_link: "Inloggningslänk (logga in)",
 };
 
 /**
@@ -29,6 +30,7 @@ const KEY_LABELS: Record<string, string> = {
  * standalone design — sorts last.
  */
 const KEY_ORDER = [
+  "magic_link",
   "order_confirmation",
   "ready_for_pickup",
   "pickup_reminder_1",

@@ -13,6 +13,7 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
     "@repo/database": "workspace:*",
+    "@repo/email-design": "workspace:*",
     "bcryptjs": "^2.4.3",
     "drizzle-orm": "^0.45.2",
     "next-auth": "^5.0.0-beta.25",

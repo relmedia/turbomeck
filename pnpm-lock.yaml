@@ -477,6 +477,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/email-design':
+        specifier: workspace:*
+        version: link:../../packages/email-design
       '@repo/sanitize-html':
         specifier: workspace:*
         version: link:../../packages/sanitize-html
@@ -535,6 +538,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../database
+      '@repo/email-design':
+        specifier: workspace:*
+        version: link:../email-design
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -594,6 +600,19 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
+
+  packages/email-design:
+    dependencies:
+      '@repo/database':
+        specifier: workspace:*
+        version: link:../database
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(gel@2.2.0)(postgres@3.4.8)
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
 
   packages/eslint-config:
     devDependencies:

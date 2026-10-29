@@ -25,6 +25,19 @@
 
 import { escapeHtml } from "./email-escape.js";
 
+/**
+ * The substitution mechanics live in `@repo/email-design` so `@repo/auth` can
+ * use them for the sign-in mail. Re-exported here because this is the module
+ * every caller in this service already imports, and because the token
+ * catalogue below is what gives those functions meaning.
+ */
+export {
+  applyMergeTags,
+  applyMergeTagsPlain,
+  type MergeValues,
+} from "@repo/email-design";
+import { unknownTokens as unknownTokensIn } from "@repo/email-design";
+
 export type MergeTagKind = "scalar" | "block";
 
 export type MergeTagDef = {
@@ -75,6 +88,27 @@ export const MERGE_TAGS: MergeTagDef[] = [
     sample: "2026-11-10",
   },
 
+  // ---- sign-in -----------------------------------------------------------
+  /**
+   * The link itself. A sign-in design that omits this is refused at send
+   * time rather than delivered — an email with nothing to click locks the
+   * recipient out, and nobody notices until support calls start.
+   */
+  {
+    token: "login_url",
+    label: "Inloggningslänk (obligatorisk)",
+    group: "Inloggning",
+    kind: "scalar",
+    sample: "https://turbomeck.se/logga-in?token=...",
+  },
+  {
+    token: "link_expiry_minutes",
+    label: "Länkens giltighet i minuter",
+    group: "Inloggning",
+    kind: "scalar",
+    sample: "15",
+  },
+
   // ---- blocks ------------------------------------------------------------
   {
     token: "order_items",
@@ -117,12 +151,6 @@ export function mergeTagsForEditor(): Record<
   return groups;
 }
 
-export type MergeValues = {
-  scalars: Record<string, string>;
-  /** Pre-rendered HTML, injected as-is. Server-produced only. */
-  blocks: Record<string, string>;
-};
-
 /** The tokens that expand to a whole `<table>` rather than to a value. */
 export const BLOCK_TOKENS: ReadonlySet<string> = new Set(
   MERGE_TAGS.filter((t) => t.kind === "block").map((t) => t.token),
@@ -141,13 +169,6 @@ export const BLOCK_TOKENS: ReadonlySet<string> = new Set(
  * admin putting it somewhere it does not belong, and a visibly wrong layout is
  * a better outcome than silently moving their text.
  */
-function unwrapBlockParagraphs(html: string): string {
-  return html.replace(
-    /<p(?=[\s>])[^>]*>((?:\s|&nbsp;|<br\s*\/?>)*)\{\{\s*([a-z0-9_]+)\s*\}\}((?:\s|&nbsp;|<br\s*\/?>)*)<\/p>/gi,
-    (whole, _before: string, rawToken: string, _after: string) =>
-      BLOCK_TOKENS.has(rawToken.toLowerCase()) ? `{{${rawToken.toLowerCase()}}}` : whole,
-  );
-}
 
 /**
  * Replace every token in a designed email.
@@ -157,21 +178,6 @@ function unwrapBlockParagraphs(html: string): string {
  * test send is a bug someone fixes, where a silent empty space is one that
  * ships.
  */
-export function applyMergeTags(html: string, values: MergeValues): string {
-  return unwrapBlockParagraphs(html).replace(
-    /\{\{\s*([a-z0-9_]+)\s*\}\}/gi,
-    (whole, rawToken: string) => {
-      const token = rawToken.toLowerCase();
-      if (Object.prototype.hasOwnProperty.call(values.blocks, token)) {
-        return values.blocks[token] ?? "";
-      }
-      if (Object.prototype.hasOwnProperty.call(values.scalars, token)) {
-        return escapeHtml(values.scalars[token] ?? "");
-      }
-      return whole;
-    },
-  );
-}
 
 /**
  * Substitution for a subject line.
@@ -181,27 +187,8 @@ export function applyMergeTags(html: string, values: MergeValues): string {
  * line is meaningless — rather than injected, which would put raw markup in
  * the inbox list.
  */
-export function applyMergeTagsPlain(text: string, values: MergeValues): string {
-  return text.replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (whole, rawToken: string) => {
-    const token = rawToken.toLowerCase();
-    if (BLOCK_TOKENS.has(token)) return "";
-    if (Object.prototype.hasOwnProperty.call(values.scalars, token)) {
-      return values.scalars[token] ?? "";
-    }
-    return whole;
-  });
-}
 
 /** Tokens a design uses that nothing will fill — surfaced in the editor. */
-export function unknownTokens(html: string): string[] {
-  const known = new Set(MERGE_TAGS.map((t) => t.token));
-  const found = new Set<string>();
-  for (const m of html.matchAll(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi)) {
-    const t = m[1]?.toLowerCase();
-    if (t && !known.has(t)) found.add(t);
-  }
-  return [...found];
-}
 
 
 /* ------------------------------------------------------------------ *
@@ -350,3 +337,7 @@ export function renderStepsBlock(steps: MergeStep[]): string {
 </table>`;
 }
 
+/** Tokens a design uses that this service cannot fill. */
+export function unknownTokens(html: string): string[] {
+  return unknownTokensIn(html, MERGE_TAGS.map((t) => t.token));
+}
