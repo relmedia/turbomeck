@@ -28,6 +28,9 @@ import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { CompareToggle } from "@/components/compare/CompareToggle";
 import { htmlToText, truncateAtWord } from "@/lib/html-text";
 
+/** How many images a card lets you swipe through before the product page. */
+const MAX_CARD_IMAGES = 3;
+
 const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
   product,
   priority = false,
@@ -57,12 +60,24 @@ const ProductCard: React.FC<{ product: ProductType; priority?: boolean }> = ({
     totalCount: product.reviewCount ?? 0,
   };
 
-  const images: string[] =
+  /**
+   * At most three images per card.
+   *
+   * A card is a teaser, not the gallery: the product page is where every angle
+   * belongs. Capping it keeps the dot row readable (eight dots on a card read
+   * as clutter, and each one is a tap target a thumb has to hit), and bounds
+   * how many images a grid of cards pulls down.
+   *
+   * The first three in the admin's own order, so whichever image was made
+   * first in the product editor still leads.
+   */
+  const images: string[] = (
     product.galleryImages && product.galleryImages.length > 0
       ? product.galleryImages.filter(
           (u): u is string => typeof u === "string" && u.length > 0
         )
-      : [product.images?.default || "/logo.svg"];
+      : [product.images?.default || "/logo.svg"]
+  ).slice(0, MAX_CARD_IMAGES);
   const descriptionExcerpt = truncateAtWord(htmlToText(product.description), 100);
 
 
