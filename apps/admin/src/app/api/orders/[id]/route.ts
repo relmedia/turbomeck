@@ -202,6 +202,11 @@ export async function GET(
       .filter(Boolean)
       .join(", ");
 
+    // "—" means "nothing to show" and the payments view hides the card line
+    // entirely. We used to fall back to "****" on failure, which rendered as
+    // "•••• ****" — indistinguishable from a real card, so a misconfigured
+    // PAYMENT_SERVICE_URL looked like a card with no digits on file instead of
+    // a broken fetch. Failures now stay "—" and get logged.
     let paymentLast4 = "—";
     if (order.stripePaymentId?.startsWith("pi_")) {
       const baseUrl = process.env.PAYMENT_SERVICE_URL || "http://localhost:8002";
@@ -210,10 +215,23 @@ export async function GET(
           `${baseUrl.replace(/\/$/, "")}/payment-method-details?paymentIntentId=${encodeURIComponent(order.stripePaymentId)}`,
           { cache: "no-store" }
         );
-        const data = (await res.json().catch(() => ({}))) as { last4?: string };
-        paymentLast4 = data?.last4 ?? "****";
-      } catch {
-        paymentLast4 = "****";
+        if (!res.ok) {
+          // A public-domain PAYMENT_SERVICE_URL answers with the storefront's
+          // 404 HTML rather than JSON — point at the internal port instead.
+          console.error(
+            `[orders GET] payment-method-details ${res.status} from ${baseUrl} — expected the payment service on http://127.0.0.1:8002`
+          );
+        } else {
+          const data = (await res.json().catch(() => ({}))) as {
+            last4?: string | null;
+          };
+          if (data?.last4) paymentLast4 = String(data.last4);
+        }
+      } catch (err) {
+        console.error(
+          `[orders GET] payment-method-details unreachable at ${baseUrl}:`,
+          err
+        );
       }
     }
 
