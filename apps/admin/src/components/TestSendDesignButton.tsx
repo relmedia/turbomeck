@@ -86,11 +86,16 @@ export default function TestSendDesignButton({ id, name }: { id: number; name: s
 
   return (
     <Button
-      variant="ghost"
+      /**
+       * `outline`, matching Redigera beside it. As a ghost button this was
+       * invisible until hovered, and the one person who needs it — an admin
+       * checking a template before it goes to customers — could not find it.
+       */
+      variant="outline"
       size="sm"
       disabled={sending}
       onClick={() => void send()}
-      title={`Skicka "${name}" till din e-post med exempeldata`}
+      title={`Skicka "${name}" till din e-post med riktiga produkter`}
     >
       {sending ? (
         <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />

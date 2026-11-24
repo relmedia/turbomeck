@@ -26,15 +26,18 @@ const LOGO_URL =
     : "";
 
 function baseWrapper(innerHtml: string) {
+  /**
+   * The logo file already contains the “TURBOMECK” wordmark, so the separate
+   * text wordmark that used to sit beside it printed the brand name twice.
+   * Only the image is kept; the no-logo fallback below still carries the text,
+   * because there it is the only thing identifying the sender.
+   */
   const headerContent = LOGO_URL
     ? `
                     <table role="presentation" align="left" cellspacing="0" cellpadding="0">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 14px;">
-                          <img src="${LOGO_URL}" alt="Turbomeck" width="35" height="35" style="display: block; width: 35px; height: 35px;" />
-                        </td>
                         <td style="vertical-align: middle;">
-                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                          <img src="${LOGO_URL}" alt="Turbomeck" width="150" style="display: block; width: 150px; max-width: 150px; height: auto; border: 0;" />
                         </td>
                       </tr>
                     </table>`
@@ -67,7 +70,7 @@ function baseWrapper(innerHtml: string) {
             <td style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="background-color: #ffffff; padding: 28px 32px; text-align: left; border-bottom: 1px solid ${BORDER_COLOR};">
+                  <td style="background-color: #ffffff; padding: 28px 32px; text-align: left;">
                     ${headerContent}
                   </td>
                 </tr>

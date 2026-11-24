@@ -18,18 +18,29 @@ export const SHOP_CONTACT_EMAIL = "shop@turbomeck.se";
 export { getOrderEmailLogoUrl } from "./email-logo.js";
 
 /**
- * Order confirmation email header: logo + wordmark (or “T” fallback), horizontally centered (email-safe tables).
+ * Order confirmation email header: the logo, horizontally centered
+ * (email-safe tables).
+ *
+ * The logo FILE already contains the “TURBOMECK” wordmark, so the separate
+ * text wordmark that used to sit beside it rendered the brand name twice —
+ * once as artwork and once as text. Only the image is kept.
+ *
+ * Sized by width with `height:auto` rather than the old 44×44 square: the
+ * asset is a wide lockup, and forcing it into a square squashed it. A width
+ * attribute plus an explicit px width is what Outlook needs to not render it
+ * at its natural pixel size.
+ *
+ * The no-logo fallback below still pairs the “T” badge with the text, because
+ * there the text IS the brand — dropping it would leave an unconfigured shop
+ * mailing a grey circle and nothing else.
  */
 export function orderEmailHeaderBrandInner(logoUrl: string): string {
   return logoUrl
     ? `
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 14px;">
-                          <img src="${logoUrl}" alt="Turbomeck" width="44" height="44" style="display: block; width: 44px; height: 44px;" />
-                        </td>
                         <td style="vertical-align: middle;">
-                          <span style="font-size: 24px; font-weight: 700; font-style: italic; letter-spacing: 0.08em;"><span style="color: #66CC33;">TURBO</span><span style="color: #334466;">MECK</span></span>
+                          <img src="${logoUrl}" alt="Turbomeck" width="170" style="display: block; width: 170px; max-width: 170px; height: auto; border: 0;" />
                         </td>
                       </tr>
                     </table>`
@@ -1314,21 +1325,21 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
           <tr>
-            <td style="background:#ffffff;border-bottom:1px solid #e5e7eb;padding:28px 32px;">
+            <td style="background:#ffffff;padding:28px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
                 <tr>
                   ${
                     logoUrl
-                      ? `<td style="vertical-align:middle;padding-right:12px;">
-                          <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="32" height="32" style="display:block;width:32px;height:32px;border-radius:6px;" />
+                      ? `<td style="vertical-align:middle;">
+                          <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="140" style="display:block;width:140px;max-width:140px;height:auto;border:0;" />
                         </td>`
                       : `<td style="vertical-align:middle;padding-right:12px;">
                           <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:#0f172a;color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
+                        </td>
+                        <td style="vertical-align:middle;">
+                          <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
                         </td>`
                   }
-                  <td style="vertical-align:middle;">
-                    <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
-                  </td>
                 </tr>
               </table>
               <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.12em;color:#6b7280;">TURBOMECK · STUDIO</p>
@@ -1517,12 +1528,19 @@ type AdminEmailLayoutOptions = {
 function renderAdminEmailLayout(opts: AdminEmailLayoutOptions): string {
   const sectionsHtml = opts.sections.join("\n");
   const logoUrl = getOrderEmailLogoUrl();
+  /**
+   * The whole brand lockup, image or fallback. The logo file already contains
+   * the wordmark, so the text version only appears when there is no image.
+   */
   const logoCell = logoUrl
-    ? `<td style="vertical-align:middle;padding-right:12px;">
-        <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="32" height="32" style="display:block;width:32px;height:32px;border-radius:6px;" />
+    ? `<td style="vertical-align:middle;">
+        <img src="${escapeHtmlAttr(logoUrl)}" alt="Turbomeck" width="140" style="display:block;width:140px;max-width:140px;height:auto;border:0;" />
       </td>`
     : `<td style="vertical-align:middle;padding-right:12px;">
         <span style="display:inline-block;width:32px;height:32px;border-radius:6px;background:#0f172a;color:#ffffff;font-weight:800;font-size:18px;line-height:32px;text-align:center;">T</span>
+      </td>
+      <td style="vertical-align:middle;">
+        <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
       </td>`;
   const ctaHtml = opts.cta
     ? `<tr>
@@ -1546,13 +1564,10 @@ function renderAdminEmailLayout(opts: AdminEmailLayoutOptions): string {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
           <tr>
-            <td style="background:#ffffff;border-bottom:1px solid #e5e7eb;padding:28px 32px;">
+            <td style="background:#ffffff;padding:28px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
                 <tr>
                   ${logoCell}
-                  <td style="vertical-align:middle;">
-                    <span style="font-size:18px;font-weight:700;font-style:italic;letter-spacing:0.08em;"><span style="color:#66CC33;">TURBO</span><span style="color:#334466;">MECK</span></span>
-                  </td>
                 </tr>
               </table>
               <p style="margin:0;font-size:12px;font-weight:600;letter-spacing:0.12em;color:#6b7280;">TURBOMECK · STUDIO · ${escapeHtml(opts.eyebrow.toUpperCase())}</p>
