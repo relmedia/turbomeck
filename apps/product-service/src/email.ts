@@ -102,47 +102,14 @@ function escapeHtmlAttr(text: string): string {
 }
 
 /**
- * Mail clients need absolute https URLs. Relative paths use R2 public base from env.
+ * Product thumbnails in a mail: absolute-URL resolution and the AVIF/WebP
+ * raster fallback now live in `email-image-url.ts`, because the
+ * `{{order_items}}` block in `email-merge-tags.ts` needs the same rules and
+ * must not import this module — that would pull nodemailer and the settings
+ * table into it. Re-exported here under the name every caller already uses.
  */
-function toAbsoluteProductImageUrl(raw: string | null | undefined): string | null {
-  if (raw == null) return null;
-  const t = String(raw).trim();
-  if (!t) return null;
-  if (t.startsWith("https://") || t.startsWith("http://")) return t;
-  if (t.startsWith("//")) return `https:${t}`;
-  const base = (process.env.R2_PUBLIC_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/$/, "");
-  if (!base) return null;
-  const path = t.startsWith("/") ? t : `/${t}`;
-  return `${base}${path}`;
-}
-
-function isLocalhostUrl(url: string): boolean {
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(url);
-}
-
-/**
- * Many email clients do not render AVIF/WebP in <img>. Optionally route through product-service
- * JPEG proxy when EMAIL_IMAGE_PROXY_BASE_URL or PRODUCT_SERVICE_PUBLIC_URL is a public https URL.
- */
-export function resolveProductImageUrlForEmail(raw: string | null | undefined): string | null {
-  const absolute = toAbsoluteProductImageUrl(raw);
-  if (!absolute) return null;
-  const needsRasterFallback = /\.(avif|webp)(\?|#|$)/i.test(absolute);
-  const proxyBase = (
-    process.env.EMAIL_IMAGE_PROXY_BASE_URL ||
-    process.env.PRODUCT_SERVICE_PUBLIC_URL ||
-    ""
-  ).replace(/\/$/, "");
-  const proxyOk =
-    !!proxyBase &&
-    proxyBase.startsWith("https://") &&
-    !isLocalhostUrl(proxyBase) &&
-    !isLocalhostUrl(absolute);
-  if (needsRasterFallback && proxyOk) {
-    return `${proxyBase}/api/email/img?u=${encodeURIComponent(absolute)}`;
-  }
-  return absolute;
-}
+export { resolveProductImageUrlForEmail } from "./email-image-url.js";
+import { resolveProductImageUrlForEmail } from "./email-image-url.js";
 
 export type AdminEventKey =
   | "newOrder"
@@ -1180,6 +1147,12 @@ export function orderConfirmationMergeValues(data: OrderEmailData): MergeValues 
     order_items: renderItemsBlock(
       data.items.map((i) => ({
         productName: i.productName,
+        /**
+         * Without this a designed confirmation lost the thumbnail the
+         * compiled template shows — the block had the data available and
+         * dropped it, so building a design silently downgraded the mail.
+         */
+        productImage: i.productImage,
         variant: i.variant,
         quantity: i.quantity,
         lineTotal: money(i.price * i.quantity),
@@ -1273,6 +1246,8 @@ export type AdminNewOrderEmailData = {
   paymentMethodDisplay: string;
   items: Array<{
     productName: string;
+    /** `order_items.product_image` — rendered as a thumbnail when usable. */
+    productImage?: string | null;
     variant?: string | null;
     price: number;
     quantity: number;
@@ -1288,12 +1263,29 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
   const logoUrl = getOrderEmailLogoUrl();
 
   const fullName = `${data.firstName} ${data.lastName}`.trim();
+  /**
+   * Thumbnails are dropped entirely when no line has a usable image, rather
+   * than leaving a column of grey squares — same rule as the `{{order_items}}`
+   * block. Smaller than the customer mail's 64px: this is a scan-and-triage
+   * notification, where the image only has to identify the part. The alt text
+   * is deliberately empty, since the product name sits right beside it.
+   */
+  const adminThumbs = data.items.map((it) => resolveProductImageUrlForEmail(it.productImage));
+  const showAdminThumbs = adminThumbs.some(Boolean);
   const itemsText = data.items
-    .map((it) => {
+    .map((it, i) => {
       const variant = it.variant ? ` (${escapeHtml(it.variant)})` : "";
-      return `<tr>
-        <td style="padding:6px 0;color:#111827;font-size:14px;">${escapeHtml(it.productName)}${variant}</td>
-        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right;white-space:nowrap;">${it.quantity} × ${adminMoney(it.price)}</td>
+      const src = adminThumbs[i];
+      const thumbCell = showAdminThumbs
+        ? `<td width="40" style="width:40px;padding:6px 10px 6px 0;vertical-align:middle;">${
+            src
+              ? `<img src="${escapeHtmlAttr(src)}" alt="" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:6px;object-fit:cover;background:#f3f4f6;border:0;" />`
+              : `<div style="width:40px;height:40px;border-radius:6px;background:#f3f4f6;"></div>`
+          }</td>`
+        : "";
+      return `<tr>${thumbCell}
+        <td style="padding:6px 0;color:#111827;font-size:14px;vertical-align:middle;">${escapeHtml(it.productName)}${variant}</td>
+        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right;white-space:nowrap;vertical-align:middle;">${it.quantity} × ${adminMoney(it.price)}</td>
       </tr>`;
     })
     .join("");

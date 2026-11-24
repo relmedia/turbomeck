@@ -24,6 +24,7 @@
  */
 
 import { escapeHtml } from "./email-escape.js";
+import { resolveProductImageUrlForEmail } from "./email-image-url.js";
 
 /**
  * The substitution mechanics live in `@repo/email-design` so `@repo/auth` can
@@ -209,16 +210,59 @@ export type MergeLine = {
   quantity: number;
   /** Already formatted with its currency, e.g. "7 495 kr". */
   lineTotal: string;
+  /**
+   * The stored image reference for the product — whatever sits in
+   * `order_items.product_image`. Resolved here rather than by the caller so a
+   * designed mail and the compiled confirmation apply the same rules: absolute
+   * https only, and AVIF/WebP routed through the JPEG proxy.
+   */
+  productImage?: string | null;
 };
 
-/** One row per product. The editor has no loop, so this is rendered here. */
+/** A 64px thumbnail, sized and rounded like the compiled confirmation's. */
+const THUMB_PX = 64;
+/** The gutter between thumbnail and product name, as text-cell padding. */
+const THUMB_GAP_PX = 16;
+
+/**
+ * One row per product. The editor has no loop, so this is rendered here.
+ *
+ * ## Why the image column is conditional
+ *
+ * A line whose product has no usable image gets a grey placeholder, so rows in
+ * a mixed order stay aligned on the same text baseline. But when NO line
+ * resolves an image — an older order whose snapshot predates R2, or a shop
+ * with `R2_PUBLIC_URL` unset — the whole column is dropped instead of
+ * rendering a column of empty grey squares. The block is injected into a
+ * design of unknown width, where 80px spent on nothing is 80px the product
+ * name needed.
+ */
 export function renderItemsBlock(lines: MergeLine[], labels: { quantity: string }): string {
   if (lines.length === 0) return "";
+
+  const thumbs = lines.map((l) => resolveProductImageUrlForEmail(l.productImage));
+  const showThumbs = thumbs.some(Boolean);
+
   const rows = lines
-    .map(
-      (l) => `
-      <tr>
-        <td style="padding:12px 0;border-bottom:1px solid ${RULE};vertical-align:top;">
+    .map((l, i) => {
+      const src = thumbs[i];
+      /**
+       * `escapeHtml` escapes the double quote, so it is safe for an attribute
+       * value; the alt text carries the product name and needs the same.
+       */
+      const thumbCell = showThumbs
+        ? `
+        <td width="${THUMB_PX}" style="width:${THUMB_PX}px;padding:12px 0;border-bottom:1px solid ${RULE};vertical-align:top;">
+          ${
+            src
+              ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(l.productName)}" width="${THUMB_PX}" height="${THUMB_PX}" style="display:block;width:${THUMB_PX}px;height:${THUMB_PX}px;border-radius:8px;object-fit:cover;background:#f3f4f6;border:0;" />`
+              : `<div style="width:${THUMB_PX}px;height:${THUMB_PX}px;background:#f3f4f6;border-radius:8px;"></div>`
+          }
+        </td>`
+        : "";
+      return `
+      <tr>${thumbCell}
+        <td style="padding:12px 0;${showThumbs ? `padding-left:${THUMB_GAP_PX}px;` : ""}border-bottom:1px solid ${RULE};vertical-align:top;">
           <p style="margin:0;font-weight:600;color:${INK};font-size:15px;">${escapeHtml(l.productName)}</p>
           ${l.variant ? `<p style="margin:2px 0 0 0;font-size:13px;color:${MUTED};">${escapeHtml(l.variant)}</p>` : ""}
           <p style="margin:2px 0 0 0;font-size:13px;color:${MUTED};">${escapeHtml(labels.quantity)}: ${l.quantity}</p>
@@ -226,8 +270,8 @@ export function renderItemsBlock(lines: MergeLine[], labels: { quantity: string 
         <td style="padding:12px 0;border-bottom:1px solid ${RULE};text-align:right;vertical-align:top;white-space:nowrap;">
           <p style="margin:0;font-weight:600;color:${INK};font-size:15px;">${escapeHtml(l.lineTotal)}</p>
         </td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join("");
   return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">${rows}</table>`;
 }

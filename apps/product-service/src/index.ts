@@ -2067,6 +2067,7 @@ async function persistOrder({
     paymentMethodDisplay,
     items: emailItems.map((it) => ({
       productName: it.productName,
+      productImage: it.productImage ?? null,
       variant: it.variant ?? null,
       price: it.price,
       quantity: it.quantity,

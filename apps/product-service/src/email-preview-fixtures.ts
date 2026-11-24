@@ -33,6 +33,18 @@ import {
 import { MERGE_TAGS, applyMergeTags, applyMergeTagsPlain, unknownTokens, type MergeValues } from "./email-merge-tags.js";
 
 /**
+ * Stands in for a product photo in the fixture lines.
+ *
+ * The shop logo rather than an invented product key: it is resolved through
+ * the same path a real `order_items.product_image` takes (relative to the R2
+ * public base), but it is an asset that actually exists — a made-up key would
+ * put a broken-image icon in every preview, which is worse than no thumbnail
+ * for judging a layout. With no R2 base configured it resolves to nothing and
+ * the block falls back to its placeholder, exactly as a real order would.
+ */
+const FIXTURE_THUMBNAIL = "branding/logo.png";
+
+/**
  * A two-line order with a discount, in SEK.
  *
  * Two lines rather than one so the repeating block visibly repeats, and a
@@ -64,14 +76,14 @@ const FIXTURE_ORDER: OrderEmailData = {
   items: [
     {
       productName: "Turbo Garrett GT2860RS",
-      productImage: null,
+      productImage: FIXTURE_THUMBNAIL,
       variant: "Steg 2",
       price: 16490,
       quantity: 1,
     },
     {
       productName: "Oljeslang & packningskit",
-      productImage: null,
+      productImage: FIXTURE_THUMBNAIL,
       variant: null,
       price: 375,
       quantity: 2,

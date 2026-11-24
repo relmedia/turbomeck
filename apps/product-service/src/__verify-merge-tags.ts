@@ -114,6 +114,79 @@ const XSS = '<img src=x onerror=alert(1)>';
   check("renderItemsBlock shows the quantity", html.includes("Antal: 2"));
   check("an empty order renders nothing", renderItemsBlock([], { quantity: "Antal" }) === "");
 
+  /**
+   * The thumbnail column. Images are the one part of this block that reaches
+   * outside the email — an absolute https URL in a `src` — so both halves are
+   * asserted: that a usable image renders, and that an unusable one costs the
+   * product name no width.
+   *
+   * `productImage` goes through the same resolver as the compiled
+   * confirmation, which needs an absolute URL or an R2 base to produce
+   * anything; the fixture supplies the absolute form so this check does not
+   * depend on the environment.
+   */
+  const withImage = renderItemsBlock(
+    [
+      {
+        productName: "Turbo GT2860RS",
+        productImage: "https://cdn.example.test/products/turbo.png",
+        variant: null,
+        quantity: 1,
+        lineTotal: "16 490 kr",
+      },
+    ],
+    { quantity: "Antal" },
+  );
+  check(
+    "a product image renders as a thumbnail",
+    withImage.includes('<img src="https://cdn.example.test/products/turbo.png"'),
+    withImage.slice(0, 200),
+  );
+  check(
+    "the thumbnail carries the product name as alt text",
+    withImage.includes('alt="Turbo GT2860RS"'),
+  );
+  check("no image means no thumbnail column", !html.includes("width=\"64\""), html.slice(0, 160));
+
+  /**
+   * A quoted character in an image URL must not be able to close the `src`
+   * attribute and open another one.
+   */
+  const quotedUrl = renderItemsBlock(
+    [
+      {
+        productName: "Turbo",
+        productImage: 'https://cdn.example.test/a.png" onerror="alert(1)',
+        variant: null,
+        quantity: 1,
+        lineTotal: "1 kr",
+      },
+    ],
+    { quantity: "Antal" },
+  );
+  check(
+    "an image URL cannot break out of its attribute",
+    !quotedUrl.includes("onerror=\"") && quotedUrl.includes("&quot;"),
+    quotedUrl.slice(0, 200),
+  );
+
+  /**
+   * A mixed order keeps its rows aligned: the line without an image still
+   * occupies the column, with a placeholder rather than a collapsed cell.
+   */
+  const mixed = renderItemsBlock(
+    [
+      { productName: "Med bild", productImage: "https://cdn.example.test/a.png", quantity: 1, lineTotal: "1 kr" },
+      { productName: "Utan bild", productImage: null, quantity: 1, lineTotal: "2 kr" },
+    ],
+    { quantity: "Antal" },
+  );
+  check(
+    "a line without an image keeps the column with a placeholder",
+    (mixed.match(/width="64"/g) ?? []).length >= 2 && mixed.includes("background:#f3f4f6;border-radius:8px"),
+    (mixed.match(/width="64"/g) ?? []).length,
+  );
+
   const totals = renderTotalsBlock([
     { label: "Delsumma", value: "16 990 kr" },
     { label: "Rabatt", value: "" },
