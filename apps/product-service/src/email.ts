@@ -1439,6 +1439,86 @@ function renderAdminNewOrderEmail(data: AdminNewOrderEmailData): string {
  * (or env `ADMIN_NOTIFICATION_EMAILS` if the DB row is absent).
  * Silently no-ops when no recipients or SMTP config exist.
  */
+/**
+ * The merge values an admin new-order design can draw on.
+ *
+ * Separate from `orderConfirmationMergeValues` because the two mails answer
+ * different questions. The customer's copy is a receipt; this one is a work
+ * order — it carries the phone number and the deep link into the studio, and
+ * it has no "what happens next" to offer.
+ *
+ * Swedish only, like the compiled template it replaces: these go to the shop,
+ * not to customers, so there is no second locale to keep in step.
+ */
+export function adminNewOrderMergeValues(data: AdminNewOrderEmailData): MergeValues {
+  const money = (amount: number) => formatMoney(amount, data.currency);
+  const t = translations.sv;
+
+  const addressLine = [
+    data.address,
+    `${data.postalCode} ${data.city}`.trim(),
+    getCountryName(data.country, "sv"),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const scalars: Record<string, string> = {
+    customer_first_name: data.firstName ?? "",
+    customer_last_name: data.lastName ?? "",
+    customer_email: data.email ?? "",
+    customer_phone: data.phone ?? "",
+    order_number: String(data.orderNumber ?? ""),
+    order_date: new Date().toLocaleDateString("sv-SE"),
+    order_subtotal: money(data.subtotal),
+    order_shipping: data.shippingCost > 0 ? money(data.shippingCost) : t.free,
+    /** Blank, not "0 kr", so a design's discount line can simply disappear. */
+    order_discount: data.discount > 0 ? `-${money(data.discount)}` : "",
+    /**
+     * Left blank deliberately. This payload carries no `vatTreatment`, so the
+     * 25 % assumption the customer receipt makes would print a confident wrong
+     * number on an export order. The totals block drops valueless rows, so a
+     * design using {{order_totals}} simply shows no VAT line.
+     */
+    order_vat: "",
+    order_total: money(data.total),
+    payment_method: data.paymentMethodDisplay ?? "",
+    delivery_address: addressLine,
+    service_point: data.servicePointName ?? "",
+    /** Nothing is booked at order time; blank rather than a dead link. */
+    tracking_number: "",
+    tracking_url: "",
+    admin_order_url: `${getAdminBaseUrl()}/payments/${data.orderId}`,
+  };
+
+  return {
+    scalars,
+    blocks: {
+      order_items: renderItemsBlock(
+        data.items.map((i) => ({
+          productName: i.productName,
+          productImage: i.productImage,
+          variant: i.variant,
+          quantity: i.quantity,
+          lineTotal: money(i.price * i.quantity),
+        })),
+        { quantity: t.quantity },
+      ),
+      order_totals: renderTotalsBlock([
+        { label: t.subtotal, value: scalars.order_subtotal ?? "" },
+        { label: t.shipping, value: scalars.order_shipping ?? "" },
+        { label: t.discount, value: scalars.order_discount ?? "", accent: true },
+        { label: t.total, value: scalars.order_total ?? "", strong: true },
+      ]),
+      /**
+       * Empty rather than absent: an unfilled block token survives into the
+       * mail as a literal `{{next_steps}}`, and the admin mail has no next
+       * steps to describe.
+       */
+      next_steps: "",
+    },
+  };
+}
+
 export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Promise<boolean> {
   const config = await getMailConfig();
   if (!config) {
@@ -1463,15 +1543,39 @@ export async function sendAdminNewOrderEmail(data: AdminNewOrderEmailData): Prom
 
   const transporter = buildMailTransport(config);
 
-  const html = renderAdminNewOrderEmail(data);
   const orderRef = String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber;
   const customer = `${data.firstName} ${data.lastName}`.trim() || data.email;
+
+  /**
+   * An admin-built design replaces the compiled notice, same rule as the
+   * customer mails: no design, an empty body or an empty subject all fall
+   * through to the built-in template, so a half-finished design can never
+   * send the shop a blank order alert.
+   *
+   * Locale "sv" is hard-coded because the compiled template is — this mail
+   * goes to the shop, not to a customer whose language we follow.
+   */
+  let subject = `Ny order #${orderRef} – ${customer} (${formatMoney(data.total, data.currency)})`;
+  let html = renderAdminNewOrderEmail(data);
+
+  const design = await resolveActiveDesign("admin_new_order", "sv");
+  if (design) {
+    const rendered = renderDesign(design, adminNewOrderMergeValues(data), "admin_new_order");
+    if (rendered) {
+      subject = rendered.subject;
+      html = rendered.html;
+    } else {
+      console.warn(
+        `[email] admin_new_order design #${design.id} was unusable; sent the built-in template`,
+      );
+    }
+  }
 
   try {
     await transporter.sendMail({
       from: `"Turbomeck Admin" <${config.from}>`,
       to: recipients.join(", "),
-      subject: `Ny order #${orderRef} – ${customer} (${formatMoney(data.total, data.currency)})`,
+      subject,
       html,
     });
     console.log(

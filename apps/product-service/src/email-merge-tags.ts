@@ -58,6 +58,12 @@ export const MERGE_TAGS: MergeTagDef[] = [
   { token: "customer_first_name", label: "Förnamn", group: "Kund", kind: "scalar", sample: "Johan" },
   { token: "customer_last_name", label: "Efternamn", group: "Kund", kind: "scalar", sample: "Berg" },
   { token: "customer_email", label: "E-post", group: "Kund", kind: "scalar", sample: "kund@example.se" },
+  /**
+   * Only the admin's own new-order mail carries this. A customer design that
+   * drops it in gets an empty string rather than a stray token: we hold the
+   * number, it is just not something to print back to its owner.
+   */
+  { token: "customer_phone", label: "Telefon", group: "Kund", kind: "scalar", sample: "070-123 45 67" },
 
   // ---- order -------------------------------------------------------------
   { token: "order_number", label: "Ordernummer", group: "Order", kind: "scalar", sample: "ORD-912" },
@@ -108,6 +114,20 @@ export const MERGE_TAGS: MergeTagDef[] = [
     group: "Inloggning",
     kind: "scalar",
     sample: "15",
+  },
+
+  // ---- admin ------------------------------------------------------------
+  /**
+   * Deep link into the studio for the order the mail is about. Admin-only by
+   * nature: it goes to a page a customer cannot open, so it is grouped apart
+   * to keep it from being dragged into a customer template by accident.
+   */
+  {
+    token: "admin_order_url",
+    label: "Länk till ordern i studion",
+    group: "Admin",
+    kind: "scalar",
+    sample: "https://studio.turbomeck.se/payments/42",
   },
 
   // ---- blocks ------------------------------------------------------------

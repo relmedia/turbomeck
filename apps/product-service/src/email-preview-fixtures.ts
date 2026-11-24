@@ -23,10 +23,12 @@ import { db } from "@repo/database";
 import { products } from "@repo/database/schema";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import {
+  adminNewOrderMergeValues,
   buildMailTransport,
   getMailConfig,
   orderConfirmationMergeValues,
   resolveProductImageUrlForEmail,
+  type AdminNewOrderEmailData,
   type OrderEmailData,
 } from "./email.js";
 import {
@@ -93,6 +95,35 @@ const FIXTURE_ORDER: OrderEmailData = {
       quantity: 2,
     },
   ],
+};
+
+/**
+ * The same order as the shop sees it.
+ *
+ * Derived from FIXTURE_ORDER rather than written out again, so a preview of
+ * the admin alert and a preview of the customer receipt describe one purchase
+ * — two sets of invented numbers would make the pair impossible to compare.
+ */
+const FIXTURE_ADMIN: AdminNewOrderEmailData = {
+  orderNumber: FIXTURE_ORDER.orderNumber,
+  orderId: 42,
+  currency: FIXTURE_ORDER.currency,
+  firstName: FIXTURE_ORDER.firstName,
+  lastName: FIXTURE_ORDER.lastName,
+  email: FIXTURE_ORDER.email,
+  phone: "070-123 45 67",
+  address: FIXTURE_ORDER.address,
+  city: FIXTURE_ORDER.city,
+  postalCode: FIXTURE_ORDER.postalCode,
+  country: FIXTURE_ORDER.country,
+  servicePointName: FIXTURE_ORDER.servicePointName,
+  deliveryOption: FIXTURE_ORDER.deliveryOption,
+  subtotal: FIXTURE_ORDER.subtotal,
+  shippingCost: FIXTURE_ORDER.shippingCost,
+  discount: FIXTURE_ORDER.discount,
+  total: FIXTURE_ORDER.total,
+  paymentMethodDisplay: FIXTURE_ORDER.paymentMethodDisplay,
+  items: FIXTURE_ORDER.items,
 };
 
 const FIXTURE_PARCEL: ShippingNoticeData = {
@@ -176,8 +207,16 @@ export function sampleMergeValues(
     FIXTURE_PARCEL.orderNumber,
   );
 
-  const scalars = { ...notice.scalars, ...order.scalars };
-  const blocks = { ...notice.blocks, ...order.blocks };
+  /**
+   * The admin alert contributes the tokens only it carries — the phone number
+   * and the studio deep link. It is applied BEFORE the order values so that
+   * where the two overlap the customer receipt still wins: its builder is the
+   * richer of the two (it states VAT, which the admin payload cannot).
+   */
+  const admin = adminNewOrderMergeValues({ ...FIXTURE_ADMIN, items });
+
+  const scalars = { ...notice.scalars, ...admin.scalars, ...order.scalars };
+  const blocks = { ...notice.blocks, ...admin.blocks, ...order.blocks };
 
   /**
    * Any catalogued token the two builders between them do not produce would

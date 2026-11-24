@@ -252,6 +252,64 @@ function orderConfirmationDesign(locale: SeedLocale): Record<string, unknown> {
  * The catalogue
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * The admin's own new-order alert
+ *
+ * Swedish only, like the compiled template it replaces: it goes to the shop,
+ * not to a customer whose language we follow.
+ *
+ * Shaped as a work order rather than a receipt. The customer's copy opens
+ * with thanks and closes with "what happens next"; this one opens with who
+ * bought what and closes with a button into the studio, because the person
+ * reading it is about to pick and pack. That is also why the phone number is
+ * on it — it is the fastest way to resolve a bad address.
+ * ------------------------------------------------------------------ */
+
+function adminNewOrderDesign(): Record<string, unknown> {
+  return design([
+    brandRow(),
+    headingRow("🛒", "Ny order mottagen"),
+    textBlock(
+      `<p style="line-height: 150%;">En kund har just slutfört ett köp. Öppna ordern i studion för att hantera frakt och status.</p>`,
+    ),
+    textBlock(
+      `<p style="line-height: 150%; color: ${MUTED}; font-size: 13px;">Ordernummer: <strong style="color: ${INK};">{{order_number}}</strong> &nbsp;·&nbsp; Datum: <strong style="color: ${INK};">{{order_date}}</strong></p>`,
+      { padding: "0px 24px 8px" },
+    ),
+    dividerBlock(),
+
+    sectionLabel("Kund"),
+    textBlock(
+      `<p style="line-height: 150%;"><strong>{{customer_first_name}} {{customer_last_name}}</strong></p>` +
+        `<p style="line-height: 150%; color: ${MUTED}; font-size: 13px;">{{customer_email}} &nbsp;·&nbsp; {{customer_phone}}</p>`,
+      { padding: "4px 24px 12px" },
+    ),
+    dividerBlock(),
+
+    sectionLabel("Produkter"),
+    /** Each block token gets a text block to itself: it expands to a whole
+     *  table, and a table inside a shared paragraph breaks Outlook. */
+    textBlock("<p>{{order_items}}</p>", { padding: "0px 24px" }),
+    textBlock("<p>{{order_totals}}</p>", { padding: "8px 24px 16px" }),
+    dividerBlock(),
+
+    sectionLabel("Betalning och leverans"),
+    textBlock(
+      `<p style="line-height: 150%; color: ${MUTED}; font-size: 13px;">Betalning: <strong style="color: ${INK};">{{payment_method}}</strong></p>` +
+        `<p style="line-height: 150%; color: ${MUTED}; font-size: 13px;">Levereras till: <strong style="color: ${INK};">{{delivery_address}}</strong></p>` +
+        `<p style="line-height: 150%; color: ${MUTED}; font-size: 13px;">Utlämningsställe: <strong style="color: ${INK};">{{service_point}}</strong></p>`,
+      { padding: "4px 24px 12px" },
+    ),
+
+    buttonBlock("Öppna ordern i studion", "{{admin_order_url}}", INK),
+    dividerBlock(),
+    textBlock(
+      `<p style="line-height: 150%; color: ${MUTED}; font-size: 12px;">Internt meddelande från Turbomeck. Skickas till adresserna under Inställningar → Notiser.</p>`,
+      { align: "center", padding: "8px 24px 28px" },
+    ),
+  ]);
+}
+
 const NOTICE_NAMES: Record<ShippingNoticeKind, Record<SeedLocale, string>> = {
   ready_for_pickup: { sv: "Klar att hämta", en: "Ready for pickup" },
   pickup_reminder_1: { sv: "Påminnelse 1", en: "Reminder 1" },
@@ -288,6 +346,17 @@ export function seedTemplates(): SeedTemplate[] {
       design: orderConfirmationDesign(locale),
     });
   }
+
+  /**
+   * One template, not one per locale: the admin alert exists only in Swedish.
+   */
+  out.push({
+    templateKey: "admin_new_order",
+    locale: "sv",
+    name: "Ny order (till admin)",
+    subject: "Ny order #{{order_number}} — {{customer_first_name}} {{customer_last_name}}",
+    design: adminNewOrderDesign(),
+  });
 
   for (const kind of NOTICE_KINDS) {
     for (const locale of LOCALES) {

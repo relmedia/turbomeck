@@ -3,6 +3,8 @@ import { emailDesigns } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import DesignerClient from "./DesignerClient";
+import { fetchSeedTemplate } from "@/lib/email-seed";
+import { templateKeyLabel } from "@/lib/email-template-keys";
 
 export const metadata = { title: "E-postdesign" };
 
@@ -10,19 +12,35 @@ export const metadata = { title: "E-postdesign" };
  * `ny` creates a blank design; any numeric id opens an existing one. One route
  * rather than two because the editor is identical either way — only the
  * starting document differs.
+ *
+ * `?from=<templateKey>` starts from that mail's built-in design instead of a
+ * blank canvas, which is what makes "Skapa" on the list useful: a template
+ * nobody has designed yet opens as the mail the shop already sends, ready to
+ * restyle, rather than as an empty page.
  */
-export default async function DesignPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DesignPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; locale?: string }>;
+}) {
   const { id } = await params;
 
   if (id === "ny") {
+    const { from, locale: wantedLocale } = await searchParams;
+    const locale = wantedLocale === "en" ? "en" : "sv";
+    const seed = from ? await fetchSeedTemplate(from, locale) : null;
+
     return (
       <DesignerClient
         initial={{
-          name: "Ny mall",
-          locale: "sv",
-          templateKey: null,
-          subject: "",
-          design: null,
+          name: seed?.name ?? (from ? templateKeyLabel(from) : "Ny mall"),
+          /** The seed decides: a Swedish-only mail must not open as English. */
+          locale: seed?.locale ?? locale,
+          templateKey: from ?? null,
+          subject: seed?.subject ?? "",
+          design: seed?.design ?? null,
           html: "",
           isActive: false,
         }}

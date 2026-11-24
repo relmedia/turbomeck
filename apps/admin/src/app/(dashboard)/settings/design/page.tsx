@@ -7,41 +7,21 @@ import { Plus, Pencil, CheckCircle2, Circle } from "lucide-react";
 import TestSendDesignButton from "@/components/TestSendDesignButton";
 import ApplyLogoClient from "@/components/ApplyLogoClient";
 import DeleteDesignButton from "@/components/DeleteDesignButton";
+import {
+  EMAIL_TEMPLATE_KEYS,
+  templateKeyLabel,
+  templateKeyRank,
+  isAdminTemplateKey,
+} from "@/lib/email-template-keys";
 
 export const metadata = {
   title: "E-postdesign",
   description: "Bygg e-postmallar visuellt",
 };
 
-const KEY_LABELS: Record<string, string> = {
-  order_confirmation: "Orderbekräftelse (tack för ditt köp)",
-  ready_for_pickup: "Klar att hämta",
-  pickup_reminder_1: "Påminnelse 1",
-  pickup_reminder_2: "Påminnelse 2",
-  order_delivered: "Levererad",
-  core_return_reminder: "Kärnretur — påminnelse",
-  magic_link: "Inloggningslänk (logga in)",
-};
-
-/**
- * The order templates are presented in, rather than alphabetically or by edit
- * date: it is the order a customer meets them in, which is how someone
- * checking a set of mails reads down the list. Anything not listed — a
- * standalone design — sorts last.
- */
-const KEY_ORDER = [
-  "magic_link",
-  "order_confirmation",
-  "ready_for_pickup",
-  "pickup_reminder_1",
-  "pickup_reminder_2",
-  "order_delivered",
-  "core_return_reminder",
-];
-
 const LOCALE_SECTIONS: Array<{ locale: string; title: string; note: string }> = [
-  { locale: "sv", title: "Svenska", note: "Skickas till kunder med svensk order" },
-  { locale: "en", title: "Engelska", note: "Skickas till kunder med engelsk order" },
+  { locale: "sv", title: "Svenska", note: "Svensk order" },
+  { locale: "en", title: "Engelska", note: "Engelsk order" },
 ];
 
 type DesignRow = {
@@ -68,11 +48,9 @@ export default async function DesignListPage() {
     .from(emailDesigns)
     .orderBy(asc(emailDesigns.name));
 
-  const rank = (key: string | null) => {
-    const i = key ? KEY_ORDER.indexOf(key) : -1;
-    return i === -1 ? KEY_ORDER.length : i;
-  };
-  const sorted = [...rows].sort((a, b) => rank(a.templateKey) - rank(b.templateKey));
+  const sorted = [...rows].sort(
+    (a, b) => templateKeyRank(a.templateKey) - templateKeyRank(b.templateKey),
+  );
 
   /** Any locale someone has created beyond sv/en still gets a section. */
   const knownLocales = new Set(LOCALE_SECTIONS.map((s) => s.locale));
@@ -137,6 +115,13 @@ export default async function DesignListPage() {
                   {group.map((d) => (
                     <DesignListRow key={d.id} design={d} />
                   ))}
+                  {EMAIL_TEMPLATE_KEYS.filter(
+                    (t) =>
+                      t.locales.includes(section.locale) &&
+                      !group.some((d) => d.templateKey === t.key),
+                  ).map((t) => (
+                    <MissingTemplateRow key={t.key} templateKey={t.key} locale={section.locale} />
+                  ))}
                 </ul>
               </div>
             );
@@ -144,6 +129,49 @@ export default async function DesignListPage() {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * A mail that has no design yet.
+ *
+ * Listed rather than simply absent: "we do not have the admin order mail" was
+ * a real report, and the only way to notice was knowing the full set by heart.
+ * A greyed row says the mail exists, is currently sent from the built-in
+ * template, and can be designed in one click.
+ */
+function MissingTemplateRow({
+  templateKey,
+  locale,
+}: {
+  templateKey: string;
+  locale: string;
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <Circle className="size-4 shrink-0 text-muted-foreground/40" aria-hidden />
+          <span className="truncate text-sm text-muted-foreground">
+            {templateKeyLabel(templateKey)}
+          </span>
+          {isAdminTemplateKey(templateKey) && (
+            <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+              Till admin
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          Ingen mall — använder den inbyggda
+        </p>
+      </div>
+      <Button variant="outline" size="sm" asChild>
+        <Link href={`/settings/design/ny?from=${templateKey}&locale=${locale}`}>
+          <Plus className="mr-1.5 size-3.5" aria-hidden />
+          Skapa
+        </Link>
+      </Button>
+    </li>
   );
 }
 
@@ -161,6 +189,16 @@ function DesignListRow({ design: d }: { design: DesignRow }) {
             <Circle className="size-4 shrink-0 text-muted-foreground/40" aria-label="Inaktiv" />
           )}
           <span className="truncate text-sm font-medium">{d.name}</span>
+          {isAdminTemplateKey(d.templateKey) && (
+            /**
+             * The Svenska section otherwise reads as "mails customers get".
+             * This one goes to the shop, and activating it by mistake while
+             * thinking it was the customer receipt would be a bad surprise.
+             */
+            <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+              Till admin
+            </span>
+          )}
           {!d.isActive && (
             <span className="rounded border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
               Inaktiv
@@ -169,7 +207,7 @@ function DesignListRow({ design: d }: { design: DesignRow }) {
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {d.templateKey
-            ? `Ersätter: ${KEY_LABELS[d.templateKey] ?? d.templateKey}`
+            ? `Ersätter: ${templateKeyLabel(d.templateKey)}`
             : "Fristående"}
           {d.subject ? ` — ${d.subject}` : ""}
         </p>

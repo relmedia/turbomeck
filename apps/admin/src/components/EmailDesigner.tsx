@@ -25,17 +25,18 @@ import { Switch } from "@repo/ui/components/switch";
 import { Textarea } from "@repo/ui/components/textarea";
 import { Loader2, Save, ArrowLeft, Braces, Copy, Send, Sparkles } from "lucide-react";
 import { toast } from "react-toastify";
+import { EMAIL_TEMPLATE_KEYS } from "@/lib/email-template-keys";
 
-/** The automated emails a design can replace. Null = standalone. */
+/**
+ * The automated emails a design can replace. Null = standalone.
+ *
+ * Sourced from the shared registry so this cannot drift from the labels on
+ * the design list — a template bindable here but unlabelled there shows up as
+ * a raw key.
+ */
 const BINDABLE = [
   { key: "", label: "Fristående (skickas för hand)" },
-  { key: "order_confirmation", label: "Orderbekräftelse (tack för ditt köp)" },
-  { key: "ready_for_pickup", label: "Klar att hämta" },
-  { key: "pickup_reminder_1", label: "Påminnelse 1" },
-  { key: "pickup_reminder_2", label: "Påminnelse 2" },
-  { key: "order_delivered", label: "Levererad" },
-  { key: "core_return_reminder", label: "Kärnretur — påminnelse" },
-  { key: "magic_link", label: "Inloggningslänk (logga in)" },
+  ...EMAIL_TEMPLATE_KEYS.map((t) => ({ key: t.key, label: t.label })),
 ];
 
 /** What `/api/settings/designs/merge-tags` hands back. */
