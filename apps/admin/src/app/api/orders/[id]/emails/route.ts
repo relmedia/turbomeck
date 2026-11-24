@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/require-admin";
 import { listOrderEmails } from "@/lib/order-email-ledger";
+import { orderEmailState } from "@/lib/order-email-state";
 
 /**
  * GET /api/orders/[id]/emails
@@ -27,11 +28,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Newest first; a claimed-but-unsent row sorts by when it was claimed.
     const emails = rows
       .map((r) => ({
+        id: r.id,
         kind: r.kind,
         sentAt: r.sentAt?.toISOString() ?? null,
         claimedAt: r.claimedAt.toISOString(),
         recipient: r.recipient,
         error: r.error,
+        /**
+         * Derived here, from the same function the E-postlogg uses, so the two
+         * views cannot disagree about a row. It is also the only way this
+         * endpoint can distinguish a superseded row — `sentAt` set, nothing
+         * emailed — from a real send; it previously could not, and showed both
+         * as plain green.
+         */
+        state: orderEmailState(r),
       }))
       .sort((a, b) => (b.sentAt ?? b.claimedAt).localeCompare(a.sentAt ?? a.claimedAt));
 

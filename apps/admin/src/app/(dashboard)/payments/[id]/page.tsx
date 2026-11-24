@@ -40,6 +40,11 @@ import {
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
 import { toast } from "react-toastify";
+import {
+  ORDER_EMAIL_STATE_META,
+  orderEmailLabel,
+  type OrderEmailState,
+} from "@/lib/order-email-state";
 import { LabelPrintDialog } from "@/components/LabelPrintDialog";
 import { postNordTrackingUrl } from "@repo/shipping";
 import { DashboardOrderDetailSkeleton } from "@/components/dashboard-skeletons";
@@ -133,22 +138,8 @@ type OrderEmailRow = {
   claimedAt: string;
   recipient: string | null;
   error: string | null;
-};
-
-/**
- * Swedish names for the ledger kinds. An unknown kind falls back to its raw
- * value rather than disappearing — a mail that went out should always be
- * visible here, even one added after this map was written.
- */
-const ORDER_EMAIL_LABELS: Record<string, string> = {
-  order_confirmation: "Orderbekräftelse",
-  shipment_dispatched: "Skickad + spårlänk",
-  ready_for_pickup: "Klar att hämta",
-  pickup_reminder_1: "Påminnelse 1",
-  pickup_reminder_2: "Påminnelse 2",
-  order_delivered: "Levererad",
-  core_return_reminder: "Kärnretur — påminnelse",
-  core_return_overdue: "Kärnretur — försenad (till er)",
+  /** Derived by the API from the shared helper — see order-email-state.ts. */
+  state: OrderEmailState;
 };
 
 const DELIVERY_STEPS = [
@@ -1373,7 +1364,7 @@ export default function OrderDetailPage() {
                     )}
                     {sendingConfirmation ? "Skickar…" : "Skicka orderbekräftelse"}
                   </Button>
-                  {!orderEmails.some((m) => m.kind === "order_confirmation" && m.sentAt) && (
+                  {!orderEmails.some((m) => m.kind === "order_confirmation" && m.state === "sent") && (
                     <span className="text-[11px] text-muted-foreground">
                       Kunden har inte fått någon bekräftelse än.
                     </span>
@@ -1387,9 +1378,15 @@ export default function OrderDetailPage() {
                     </p>
                     <ul className="space-y-1.5">
                       {orderEmails.map((mail) => {
-                        const label = ORDER_EMAIL_LABELS[mail.kind] ?? mail.kind;
-                        const failed = !mail.sentAt && mail.error;
-                        const pending = !mail.sentAt && !mail.error;
+                        /**
+                         * State comes from the API, which derives it with the
+                         * same helper the E-postlogg uses. This used to be a
+                         * local `!sentAt && error` ternary, which painted a
+                         * superseded row green and told staff the customer had
+                         * been mailed when nothing was sent.
+                         */
+                        const meta = ORDER_EMAIL_STATE_META[mail.state];
+                        const showDate = mail.state === "sent" && mail.sentAt;
                         return (
                           <li
                             key={mail.kind}
@@ -1397,23 +1394,18 @@ export default function OrderDetailPage() {
                           >
                             <span className="flex items-center gap-1.5 min-w-0">
                               <span
-                                className={`mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full ${
-                                  failed
-                                    ? "bg-destructive"
-                                    : pending
-                                      ? "bg-muted-foreground/40"
-                                      : "bg-emerald-500"
-                                }`}
+                                className={`mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full ${meta.dotClassName}`}
                                 aria-hidden
                               />
-                              <span className="truncate text-foreground">{label}</span>
+                              <span className="truncate text-foreground">
+                                {orderEmailLabel(mail.kind)}
+                              </span>
                             </span>
-                            <span className="shrink-0 text-muted-foreground">
-                              {mail.sentAt
-                                ? formatDate(mail.sentAt)
-                                : failed
-                                  ? "misslyckades"
-                                  : "skickas…"}
+                            <span
+                              className="shrink-0 text-muted-foreground"
+                              title={meta.hint}
+                            >
+                              {showDate ? formatDate(mail.sentAt!) : meta.label}
                             </span>
                           </li>
                         );

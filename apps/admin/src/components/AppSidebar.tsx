@@ -25,6 +25,7 @@ import {
   Send,
   Users,
   LayoutTemplate,
+  MailCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,6 +107,7 @@ const settingsItems = [
   { title: "Kundutskick", url: "/settings/kundutskick", icon: Send },
   { title: "Frakt & PostNord", url: "/settings/frakt", icon: Truck },
   { title: "E-postdesign", url: "/settings/design", icon: LayoutTemplate },
+  { title: "E-postlogg", url: "/settings/epostlogg", icon: MailCheck },
 ];
 
 /**

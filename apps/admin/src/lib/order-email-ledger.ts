@@ -22,42 +22,40 @@
  */
 
 import { db } from "@repo/database";
-import { orderEmails } from "@repo/database/schema";
-import { and, eq, isNull, lt } from "drizzle-orm";
+import { orderEmails, orders } from "@repo/database/schema";
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 
 /**
- * Every automated mail this system can send.
- *
- * Adding one needs no migration — `kind` is free text in the table — but it
- * must be listed here so the dry-run report and the admin "Utskick" list can
- * name it.
+ * The kinds, labels and state derivation live in `order-email-state.ts` — a
+ * module with no database import, so a `"use client"` page can read them
+ * without pulling drizzle and `pg` into the browser bundle. Re-exported here
+ * because this is the path every existing caller already imports.
  */
-export const ORDER_EMAIL_KINDS = [
-  /**
-   * The "tack för ditt köp" mail. Sent automatically at checkout, but NOT for
-   * orders staff create in admin — persistOrder suppresses it there. Recording
-   * it here means a manual send is tracked like any other, and the Utskick
-   * list shows whether the customer was ever told.
-   */
-  "order_confirmation",
-  "shipment_dispatched",
-  "ready_for_pickup",
-  "pickup_reminder_1",
-  "pickup_reminder_2",
-  "order_delivered",
-  "core_return_reminder",
-  "core_return_overdue",
-] as const;
+export {
+  ORDER_EMAIL_KINDS,
+  ORDER_EMAIL_LABELS,
+  ORDER_EMAIL_STATE_META,
+  ORDER_EMAIL_ORIGIN_LABELS,
+  RECLAIM_AFTER_MS,
+  orderEmailLabel,
+  orderEmailOrigin,
+  orderEmailState,
+  type OrderEmailKind,
+  type OrderEmailState,
+  type OrderEmailStateInput,
+} from "./order-email-state";
 
-export type OrderEmailKind = (typeof ORDER_EMAIL_KINDS)[number];
+import {
+  RECLAIM_AFTER_MS,
+  orderEmailState,
+  type OrderEmailKind,
+  type OrderEmailStateInput,
+} from "./order-email-state";
 
-/**
- * How long a claim may sit unconfirmed before another run may take it.
- *
- * Long enough that a slow SMTP handshake is never treated as a crash; short
- * enough that a genuine crash retries within one poll cycle.
- */
-const RECLAIM_AFTER_MS = 15 * 60 * 1000;
+/** True when this row represents a mail that actually reached the transport. */
+export function orderEmailWasSent(row: OrderEmailStateInput): boolean {
+  return orderEmailState(row) === "sent";
+}
 
 export type ClaimResult =
   | { claimed: true; id: number }
@@ -154,25 +152,105 @@ export async function releaseOrderEmail(id: number): Promise<void> {
 }
 
 export type OrderEmailRecord = {
+  id: number;
   kind: string;
   claimedAt: Date;
   sentAt: Date | null;
   recipient: string | null;
   error: string | null;
+  /**
+   * Carried so the caller can derive a state. Without it a superseded row —
+   * `sentAt` set, nothing emailed — is indistinguishable from a real send,
+   * which is exactly what the order page used to get wrong.
+   */
+  meta: Record<string, unknown> | null;
 };
 
 /** Everything sent (or attempted) for one order — powers the admin "Utskick" list. */
 export async function listOrderEmails(orderId: number): Promise<OrderEmailRecord[]> {
-  return db
+  const rows = await db
     .select({
+      id: orderEmails.id,
       kind: orderEmails.kind,
       claimedAt: orderEmails.claimedAt,
       sentAt: orderEmails.sentAt,
       recipient: orderEmails.recipient,
       error: orderEmails.error,
+      meta: orderEmails.meta,
     })
     .from(orderEmails)
     .where(eq(orderEmails.orderId, orderId));
+
+  return rows.map((r) => ({
+    ...r,
+    meta: (r.meta as Record<string, unknown> | null) ?? null,
+  }));
+}
+
+/**
+ * One row per recorded mail across every order, newest first.
+ *
+ * Powers the E-postlogg page. Separate from `listOrderEmails` rather than a
+ * parameterised version of it because the two need different columns: this one
+ * must return `meta` (to tell a real send from a superseded one) and the joined
+ * order so a row can name its customer, where the per-order list already has
+ * both from its page.
+ *
+ * Ordered by when the mail happened — `sentAt` when there is one, the claim
+ * otherwise — so a failed or in-flight row sorts among the sends rather than
+ * sinking to the bottom on a null.
+ *
+ * `limit` rather than offset pagination, matching `api/refunds/route.ts`: the
+ * table grows about eight rows per order, and the page filters client-side.
+ */
+export type OrderEmailLogRow = {
+  id: number;
+  orderId: number;
+  orderNumber: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
+  kind: string;
+  claimedAt: Date;
+  sentAt: Date | null;
+  recipient: string | null;
+  error: string | null;
+  meta: Record<string, unknown> | null;
+};
+
+export async function listAllOrderEmails(limit = 500): Promise<OrderEmailLogRow[]> {
+  const rows = await db
+    .select({
+      id: orderEmails.id,
+      orderId: orderEmails.orderId,
+      orderNumber: orders.orderNumber,
+      firstName: orders.firstName,
+      lastName: orders.lastName,
+      customerEmail: orders.email,
+      kind: orderEmails.kind,
+      claimedAt: orderEmails.claimedAt,
+      sentAt: orderEmails.sentAt,
+      recipient: orderEmails.recipient,
+      error: orderEmails.error,
+      meta: orderEmails.meta,
+    })
+    .from(orderEmails)
+    .leftJoin(orders, eq(orderEmails.orderId, orders.id))
+    .orderBy(desc(sql`COALESCE(${orderEmails.sentAt}, ${orderEmails.claimedAt})`))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    orderId: r.orderId,
+    orderNumber: r.orderNumber ?? null,
+    customerName: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || null,
+    customerEmail: r.customerEmail ?? null,
+    kind: r.kind,
+    claimedAt: r.claimedAt,
+    sentAt: r.sentAt,
+    recipient: r.recipient,
+    error: r.error,
+    meta: (r.meta as Record<string, unknown> | null) ?? null,
+  }));
 }
 
 /**
