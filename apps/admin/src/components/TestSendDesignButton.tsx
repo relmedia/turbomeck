@@ -53,15 +53,29 @@ export default function TestSendDesignButton({ id, name }: { id: number; name: s
         error?: string;
         recipient?: string;
         unknown?: string[];
+        products?: string[];
+        imageWarning?: string;
       };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
 
-      toast.success(`"${name}" skickad till ${json.recipient ?? "dig"}`);
+      /**
+       * Naming the products tells the admin at a glance whether the mail
+       * carried real catalogue photos or fell back to the sample line — the
+       * difference matters when they are testing images specifically.
+       */
+      const withProducts =
+        json.products && json.products.length > 0
+          ? ` med ${json.products.join(" och ")}`
+          : " med exempelprodukter";
+      toast.success(`"${name}" skickad till ${json.recipient ?? "dig"}${withProducts}`);
       if (json.unknown && json.unknown.length > 0) {
         toast.warn(
           `Okända taggar i "${name}": ${json.unknown.map((t) => `{{${t}}}`).join(", ")} — de skickas som text.`,
           { autoClose: 10000 },
         );
+      }
+      if (json.imageWarning) {
+        toast.warn(json.imageWarning, { autoClose: 15000 });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kunde inte skicka testmejlet");

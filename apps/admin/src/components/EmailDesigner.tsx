@@ -229,9 +229,15 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
           error?: string;
           recipient?: string;
           unknown?: string[];
+          products?: string[];
+          imageWarning?: string;
         };
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-        toast.success(`Testmejl skickat till ${json.recipient ?? "dig"}`);
+        const withProducts =
+          json.products && json.products.length > 0
+            ? ` med ${json.products.join(" och ")}`
+            : " med exempelprodukter";
+        toast.success(`Testmejl skickat till ${json.recipient ?? "dig"}${withProducts}`);
         /**
          * Unknown tokens are reported rather than silently left: a typo like
          * {{order_nummer}} renders as literal text in the mail, and seeing it
@@ -242,6 +248,13 @@ export default function EmailDesigner({ initial }: { initial: DesignRecord }) {
             `Okända taggar i mallen: ${json.unknown.map((t) => `{{${t}}}`).join(", ")} — de skickas som text.`,
             { autoClose: 10000 },
           );
+        }
+        /**
+         * An image that will not render is reported here rather than left for
+         * the admin to discover in Outlook, where the cause is invisible.
+         */
+        if (json.imageWarning) {
+          toast.warn(json.imageWarning, { autoClose: 15000 });
         }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Kunde inte skicka testmejlet");

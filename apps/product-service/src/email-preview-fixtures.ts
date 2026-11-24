@@ -19,10 +19,14 @@
  * set covers whatever the admin dragged in.
  */
 
+import { db } from "@repo/database";
+import { products } from "@repo/database/schema";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import {
   buildMailTransport,
   getMailConfig,
   orderConfirmationMergeValues,
+  resolveProductImageUrlForEmail,
   type OrderEmailData,
 } from "./email.js";
 import {
@@ -106,14 +110,66 @@ const FIXTURE_PARCEL: ShippingNoticeData = {
 };
 
 /**
+ * One real catalogue product, standing in for a fixture line.
+ *
+ * Only the name and the image: prices and quantities stay fixture values, so
+ * the hard-coded subtotal and total keep adding up.
+ */
+export type PreviewProduct = { productName: string; productImage: string | null };
+
+/**
+ * The newest published products that actually have an image.
+ *
+ * A test send is the admin asking "what will my customer get", and until now
+ * it answered with the shop logo pasted in as a product photo. That is enough
+ * to judge spacing and nothing else: it cannot show whether THEIR images
+ * reach an inbox, which is the part that actually breaks (wrong format, a
+ * stale snapshot URL, an R2 base that is not public).
+ *
+ * Returns an empty list rather than throwing. A catalogue with no usable
+ * image is a normal state for a new shop, and a preview that refuses to send
+ * because of it would be worse than one that falls back to the fixture.
+ */
+export async function resolvePreviewProducts(limit = 2): Promise<PreviewProduct[]> {
+  try {
+    const rows = await db
+      .select({ name: products.name, image: products.image })
+      .from(products)
+      .where(and(isNotNull(products.image), eq(products.published, true)))
+      .orderBy(desc(products.id))
+      .limit(limit);
+    return rows
+      .filter((r) => r.image && String(r.image).trim())
+      .map((r) => ({ productName: r.name, productImage: r.image }));
+  } catch (error) {
+    console.error("[preview] could not read a sample product:", error);
+    return [];
+  }
+}
+
+/**
  * Every token filled with sample data.
  *
  * Notice values are applied first and order values second, so where both
  * define a token the order confirmation wins — its builder is the richer of
  * the two (it formats money in the order's own currency).
+ *
+ * `realProducts` replaces the leading fixture lines positionally, so a test
+ * send shows the shop's own products while the money stays fixture money.
+ * Passed in rather than queried here: this stays synchronous and
+ * database-free, which is what `__verify-preview-fixtures` relies on.
  */
-export function sampleMergeValues(locale: LocaleCode): MergeValues {
-  const order = orderConfirmationMergeValues({ ...FIXTURE_ORDER, locale });
+export function sampleMergeValues(
+  locale: LocaleCode,
+  realProducts: PreviewProduct[] = [],
+): MergeValues {
+  const items = FIXTURE_ORDER.items.map((item, i) => {
+    const real = realProducts[i];
+    return real
+      ? { ...item, productName: real.productName, productImage: real.productImage }
+      : item;
+  });
+  const order = orderConfirmationMergeValues({ ...FIXTURE_ORDER, items, locale });
   const notice = shippingNoticeMergeValues(
     { ...FIXTURE_PARCEL, locale },
     locale,
@@ -167,7 +223,50 @@ export type PreviewSendResult = {
   recipient: string;
   /** Tokens the design uses that nothing fills — shown back to the admin. */
   unknown: string[];
+  /**
+   * The catalogue products the test used, so the admin can tell a real
+   * product photo from the fixture fallback without opening the mail.
+   */
+  products: string[];
+  /**
+   * Why a product image will not reach some inboxes, when that is the case.
+   * Reported because the alternative is an admin seeing a broken image and
+   * concluding the template is wrong, when the cause is image format or
+   * configuration.
+   */
+  imageWarning?: string;
 };
+
+/**
+ * Whether the images in this test will actually render for a recipient.
+ *
+ * Checks the URL the mail will really carry — the output of the same resolver
+ * the live mail uses — rather than what is stored, so a working JPEG proxy is
+ * correctly reported as fine.
+ *
+ * AVIF and WebP are the formats at issue: the storefront serves them because
+ * they are small, and Outlook will not draw either. `/api/email/img` exists to
+ * hand those clients a JPEG, and when it is unreachable the resolver returns
+ * the original URL untouched — which is exactly what this detects.
+ */
+export function describeImageProblem(lines: PreviewProduct[]): string | undefined {
+  const resolved = lines
+    .map((l) => resolveProductImageUrlForEmail(l.productImage))
+    .filter((u): u is string => !!u);
+
+  if (lines.length > 0 && resolved.length === 0) {
+    return "Produktbilderna kunde inte göras om till publika adresser (saknad R2-bas) — mejlet visar gråa platshållare.";
+  }
+  const stillVector = resolved.filter((u) => /\.(avif|webp)(\?|#|$)/i.test(u));
+  if (stillVector.length > 0) {
+    return (
+      `${stillVector.length} av ${resolved.length} produktbilder skickas som AVIF/WebP. ` +
+      "Outlook visar dem inte. Sätt EMAIL_IMAGE_PROXY_BASE_URL till en publik https-adress " +
+      "som når /api/email/img, så skickas de som JPEG."
+    );
+  }
+  return undefined;
+}
 
 /**
  * Mail a design to one address, filled with sample data.
@@ -193,7 +292,13 @@ export async function sendDesignPreview(args: {
   const config = await getMailConfig();
   if (!config) throw new Error("E-post är inte konfigurerat (SMTP saknas)");
 
-  const values = sampleMergeValues(locale);
+  /**
+   * Real products, so the test answers "will my customers see their product
+   * photos" instead of only "does the layout hold". Falls back to the fixture
+   * line silently when the catalogue has nothing usable.
+   */
+  const realProducts = await resolvePreviewProducts();
+  const values = sampleMergeValues(locale, realProducts);
   const filledHtml = applyMergeTags(html, values);
   const filledSubject = applyMergeTagsPlain(subject, values).trim();
 
@@ -215,5 +320,17 @@ export async function sendDesignPreview(args: {
   });
 
   console.log(`[email] design preview sent to ${to}`);
-  return { recipient: to, unknown: unknownTokens(html) };
+  return {
+    recipient: to,
+    unknown: unknownTokens(html),
+    products: realProducts.map((p) => p.productName),
+    imageWarning: describeImageProblem(
+      realProducts.length > 0
+        ? realProducts
+        : FIXTURE_ORDER.items.map((i) => ({
+            productName: i.productName,
+            productImage: i.productImage ?? null,
+          })),
+    ),
+  };
 }

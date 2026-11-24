@@ -7,14 +7,20 @@
  * to come back with a value, and a design using all of them is asserted to
  * render clean.
  *
- * Sends no mail and touches no database — `sampleMergeValues` is pure.
+ * Sends no mail and touches no database — `sampleMergeValues` is pure, which
+ * is why the real-product lookup lives in the async caller and the sample
+ * products are injected here instead.
  *
  * Run:
  *   node node_modules/.pnpm/tsx@4.20.6/node_modules/tsx/dist/cli.mjs \
  *     apps/product-service/src/__verify-preview-fixtures.ts
  */
 
-import { sampleMergeValues, previewBanner } from "./email-preview-fixtures.js";
+import {
+  sampleMergeValues,
+  previewBanner,
+  describeImageProblem,
+} from "./email-preview-fixtures.js";
 import { MERGE_TAGS, applyMergeTags, applyMergeTagsPlain, unknownTokens } from "./email-merge-tags.js";
 import { seedTemplates } from "./email-designs-seed.js";
 
@@ -138,6 +144,89 @@ function designText(design: Record<string, unknown>): string {
     }
   }
   return parts.join("\n");
+}
+
+/* ------------------------------------------------------------------ *
+ * The real-product override used by a test send
+ *
+ * A test send swaps the leading fixture lines for real catalogue products so
+ * the admin sees their own photos. Two things must hold: the products reach
+ * the mail, and the money does NOT change — the fixture subtotal and total
+ * are hard-coded, so adopting a real product's price would make the summary
+ * contradict the lines above it.
+ * ------------------------------------------------------------------ */
+{
+  /** Public https URLs, so these resolve unchanged with no R2 base set. */
+  const REAL = [
+    { productName: "Turbo BorgWarner EFR-7064", productImage: "https://cdn.example.test/p/efr.jpg" },
+    { productName: "Oljematningskit AN4", productImage: "https://cdn.example.test/p/kit.jpg" },
+  ];
+
+  /**
+   * The fixture's own thumbnail is a path RELATIVE to the R2 public base, so
+   * whether it becomes an `<img>` depends on the environment. Pinned here so
+   * this asserts the fallback's behaviour rather than the machine's config.
+   */
+  const r2Before = process.env.R2_PUBLIC_URL;
+  process.env.R2_PUBLIC_URL = "https://cdn.example.test";
+
+  const plain = sampleMergeValues("sv");
+  const real = sampleMergeValues("sv", REAL);
+
+  check(
+    "a real product name replaces the fixture line",
+    (real.blocks.order_items ?? "").includes("Turbo BorgWarner EFR-7064") &&
+      !(real.blocks.order_items ?? "").includes("Turbo Garrett GT2860RS"),
+  );
+  check(
+    "a real product image is the one that gets sent",
+    (real.blocks.order_items ?? "").includes('src="https://cdn.example.test/p/efr.jpg"'),
+  );
+  check(
+    "the totals are untouched by the override",
+    real.scalars.order_total === plain.scalars.order_total &&
+      real.scalars.order_subtotal === plain.scalars.order_subtotal,
+    { withReal: real.scalars.order_total, fixture: plain.scalars.order_total },
+  );
+  check(
+    "one real product still leaves the second fixture line intact",
+    (sampleMergeValues("sv", [REAL[0]!]).blocks.order_items ?? "").includes(
+      "Oljeslang &amp; packningskit",
+    ),
+  );
+  check(
+    "no real products falls back to the fixture, image included",
+    (plain.blocks.order_items ?? "").includes("Turbo Garrett GT2860RS") &&
+      (plain.blocks.order_items ?? "").includes("<img"),
+    (plain.blocks.order_items ?? "").match(/<img[^>]*>/)?.[0],
+  );
+  /**
+   * And with no base at all it degrades to the placeholder rather than
+   * emitting a relative `src` no mail client could fetch.
+   */
+  delete process.env.R2_PUBLIC_URL;
+  check(
+    "with no R2 base the fixture degrades to a placeholder, not a broken src",
+    !(sampleMergeValues("sv").blocks.order_items ?? "").includes("<img"),
+  );
+  if (r2Before === undefined) delete process.env.R2_PUBLIC_URL;
+  else process.env.R2_PUBLIC_URL = r2Before;
+
+  /* ---- the warning that explains an image the admin cannot see -------- */
+  check(
+    "a jpeg product image raises no warning",
+    describeImageProblem(REAL) === undefined,
+    describeImageProblem(REAL),
+  );
+  const avifWarning = describeImageProblem([
+    { productName: "A", productImage: "https://cdn.example.test/p/a.avif" },
+    { productName: "B", productImage: "https://cdn.example.test/p/b.jpg" },
+  ]);
+  check(
+    "an avif product image warns, and counts only the broken ones",
+    !!avifWarning && avifWarning.includes("1 av 2") && avifWarning.includes("Outlook"),
+    avifWarning,
+  );
 }
 
 console.log(`\n${failures === 0 ? "ALL PASS" : `${failures} FAILED`}`);
