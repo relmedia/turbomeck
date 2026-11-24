@@ -29,6 +29,7 @@ export function PageTitle() {
   if (pathname.startsWith("/settings/kundutskick")) return "Automatiska kundutskick";
   if (pathname.startsWith("/settings/frakt")) return "Frakt & PostNord";
   if (pathname.startsWith("/settings/design")) return "E-postdesign";
+  if (/^\/settings\/epostlogg\/\d+$/.test(pathname)) return "Skickat mejl";
   if (pathname.startsWith("/settings/epostlogg")) return "E-postlogg";
   if (pathname.startsWith("/settings")) return "Inställningar";
     if (pathname.startsWith("/slider")) return "Startsidan slider";

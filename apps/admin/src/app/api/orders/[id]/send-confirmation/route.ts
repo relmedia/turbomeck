@@ -44,7 +44,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const sent = await sendOrderNotification(orderId, "order_confirmation");
     if (!sent.sent) throw new Error(sent.skipped ?? "Mejlet skickades inte");
-    if (claimId != null) await markOrderEmailSent(claimId, sent.recipient ?? null);
+    if (claimId != null) {
+      await markOrderEmailSent(claimId, sent.recipient ?? null, {
+        subject: sent.subject,
+        html: sent.html,
+      });
+    }
     return NextResponse.json({ success: true, recipient: sent.recipient });
   } catch (err) {
     if (claimId != null) await markOrderEmailFailed(claimId, err);

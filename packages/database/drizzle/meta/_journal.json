@@ -225,6 +225,13 @@
       "when": 1792782612830,
       "tag": "0031_page_visit_geo",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795544979436,
+      "tag": "0032_order_email_archive",
+      "breakpoints": true
     }
   ]
 }

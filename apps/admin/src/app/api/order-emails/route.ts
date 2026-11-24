@@ -46,6 +46,9 @@ export async function GET() {
         at: (r.sentAt ?? r.claimedAt).toISOString(),
         recipient: r.recipient,
         error: r.error,
+        subject: r.subject,
+        /** Whether there is an archived copy to open — not the copy itself. */
+        hasHtml: r.hasHtml,
         /**
          * Only the one field the table shows. The rest of `meta` is internal
          * (tracking ids, claim reasons) and has no place in an admin list.

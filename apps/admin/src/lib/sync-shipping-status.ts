@@ -343,7 +343,10 @@ async function syncOne(order: Candidate, dryRun: boolean): Promise<OrderOutcome>
         console.log(`[shipping-sync] ${due.kind} skipped for order #${order.id}: ${sent.skipped}`);
         continue;
       }
-      await markOrderEmailSent(claim.id, sent.recipient ?? null);
+      await markOrderEmailSent(claim.id, sent.recipient ?? null, {
+        subject: sent.subject,
+        html: sent.html,
+      });
       emailed++;
     } catch (err) {
       await markOrderEmailFailed(claim.id, err);

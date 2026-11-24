@@ -231,5 +231,29 @@ const SENT = new Date("2026-11-24T17:00:02Z");
   );
 }
 
+/* ---- what the archive link may and may not be offered for ------------- */
+{
+  /**
+   * The log only offers "Visa" when a stored copy exists. These assert the
+   * rule the UI depends on: a row the poller ticked off without sending has
+   * nothing to show, and must never be presented as a viewable mail.
+   */
+  const neverSent: OrderEmailState[] = ["superseded", "backfilled"];
+  check(
+    "the never-sent states are exactly the ones with no mail to show",
+    neverSent.every((s) => ORDER_EMAIL_STATE_META[s].hint.match(/inte|inget/i)),
+    neverSent.map((s) => ORDER_EMAIL_STATE_META[s].hint),
+  );
+
+  /**
+   * An archived copy is only meaningful for a row that actually sent, so the
+   * sent state must remain the only green one — the link sits beside it.
+   */
+  const greens = (
+    ["sent", "superseded", "backfilled", "failed", "sending", "stale"] as OrderEmailState[]
+  ).filter((s) => ORDER_EMAIL_STATE_META[s].className.includes("emerald"));
+  check("exactly one state is presented as a success", greens.length === 1 && greens[0] === "sent", greens);
+}
+
 console.log(`\n${failures === 0 ? "ALL PASS" : `${failures} FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

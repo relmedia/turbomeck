@@ -68,12 +68,21 @@ export async function triggerShipmentDispatchedEmail(
       const text = await res.text().catch(() => "");
       throw new Error(`Shipment notification HTTP ${res.status}: ${text || res.statusText}`);
     }
-    const payload = (await res.json().catch(() => ({}))) as { success?: boolean };
+    const payload = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      subject?: string | null;
+      html?: string | null;
+    };
     if (payload.success === false) {
       throw new Error("Product-service reported shipment email was not sent");
     }
 
-    if (claimId != null) await markOrderEmailSent(claimId);
+    if (claimId != null) {
+      await markOrderEmailSent(claimId, null, {
+        subject: payload.subject,
+        html: payload.html,
+      });
+    }
     return { sent: true };
   } catch (err) {
     // Leave sentAt NULL so the claim ages out and the poller can retry.

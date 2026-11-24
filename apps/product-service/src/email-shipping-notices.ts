@@ -65,6 +65,15 @@ export type ShippingNoticeResult = {
   recipient?: string;
   /** Set when configuration declined the send; not a failure. */
   skipped?: string;
+  /**
+   * The mail exactly as sent, for the caller to archive on its ledger row.
+   *
+   * Returned rather than written here because the ledger belongs to admin —
+   * it holds the claim for this (order, kind) and is the only side that knows
+   * which row this send is confirming. Absent when nothing was sent.
+   */
+  subject?: string;
+  html?: string;
 };
 
 /* ------------------------------------------------------------------ *
@@ -492,5 +501,5 @@ export async function sendShippingNoticeEmail(
   });
 
   console.log(`[email] ${kind} sent to ${data.email} order ${data.orderNumber}`);
-  return { sent: true, recipient: data.email };
+  return { sent: true, recipient: data.email, subject, html };
 }

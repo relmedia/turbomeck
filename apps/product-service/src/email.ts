@@ -122,6 +122,19 @@ function escapeHtmlAttr(text: string): string {
 export { resolveProductImageUrlForEmail } from "./email-image-url.js";
 import { resolveProductImageUrlForEmail } from "./email-image-url.js";
 
+/**
+ * What a sender hands back so the caller can archive what went out.
+ *
+ * `sent` keeps the old boolean meaning; `subject`/`html` are the message
+ * exactly as handed to SMTP. Returned rather than written here because the
+ * ledger row belongs to admin, which holds the claim for this (order, kind).
+ */
+export type SentMailResult = {
+  sent: boolean;
+  subject?: string;
+  html?: string;
+};
+
 export type AdminEventKey =
   | "newOrder"
   | "newReview"
@@ -890,11 +903,13 @@ function renderShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): strin
   `.trim();
 }
 
-export async function sendShipmentDispatchedEmail(data: ShipmentDispatchedEmailData): Promise<boolean> {
+export async function sendShipmentDispatchedEmail(
+  data: ShipmentDispatchedEmailData,
+): Promise<SentMailResult> {
   const config = await getMailConfig();
   if (!config) {
     console.warn("[email] No mail config, skipping shipment-dispatched email");
-    return false;
+    return { sent: false };
   }
 
   const transporter = buildMailTransport(config);
@@ -902,19 +917,20 @@ export async function sendShipmentDispatchedEmail(data: ShipmentDispatchedEmailD
   const locale = data.locale === "en" ? "en" : "sv";
   const t = shipmentDispatchedTranslations[locale];
   const html = renderShipmentDispatchedEmail(data);
+  const subject = `${t.subject} (#${String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber}) - Turbomeck`;
 
   try {
     await transporter.sendMail({
       from: `"Turbomeck" <${config.from}>`,
       to: data.email,
-      subject: `${t.subject} (#${String(data.orderNumber).replace(/^#+/u, "").trim() || data.orderNumber}) - Turbomeck`,
+      subject,
       html,
     });
     console.log(`[email] Shipment dispatched notice sent to ${data.email} order ${data.orderNumber}`);
-    return true;
+    return { sent: true, subject, html };
   } catch (error) {
     console.error("[email] Failed to send shipment-dispatched email:", error);
-    return false;
+    return { sent: false };
   }
 }
 
@@ -1183,11 +1199,11 @@ export function orderConfirmationMergeValues(data: OrderEmailData): MergeValues 
   return { scalars, blocks };
 }
 
-export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<boolean> {
+export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<SentMailResult> {
   const config = await getMailConfig();
   if (!config) {
     console.warn("[email] No mail config found, skipping order confirmation email");
-    return false;
+    return { sent: false };
   }
 
   const transporter = buildMailTransport(config);
@@ -1225,10 +1241,10 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
       html,
     });
     console.log(`[email] Order confirmation sent to ${data.email} for ${data.orderNumber}`);
-    return true;
+    return { sent: true, subject, html };
   } catch (error) {
     console.error("[email] Failed to send order confirmation:", error);
-    return false;
+    return { sent: false };
   }
 }
 

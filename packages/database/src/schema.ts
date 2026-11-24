@@ -550,6 +550,18 @@ export const orderEmails = pgTable("order_emails", {
   error: text("error"),
   /** Anything worth keeping for support: tracking id, service point, status at send time. */
   meta: jsonb("meta").$type<Record<string, unknown> | null>(),
+  /**
+   * The mail exactly as it was sent, archived so the E-postlogg can show it.
+   *
+   * Not re-rendered on demand: the template is editable afterwards and the
+   * order itself changes, so a re-render shows what we WOULD send today rather
+   * than what the customer got. For a log that is the one thing it must not be.
+   *
+   * NULL for mail sent before archiving existed, and for a superseded row,
+   * where nothing was sent at all.
+   */
+  subject: text("subject"),
+  html: text("html"),
 }, (table) => [
   uniqueIndex("order_emails_order_kind_unique").on(table.orderId, table.kind),
 ]);

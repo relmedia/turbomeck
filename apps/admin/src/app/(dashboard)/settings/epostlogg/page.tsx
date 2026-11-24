@@ -29,7 +29,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Inbox } from "lucide-react";
+import { ExternalLink, Eye, Inbox } from "lucide-react";
 import { Input } from "@repo/ui/components/input";
 import {
   Select,
@@ -68,6 +68,8 @@ type EmailLogRow = {
   recipient: string | null;
   error: string | null;
   observedStatus: string | null;
+  subject: string | null;
+  hasHtml: boolean;
 };
 
 /** Problem states first — those are what someone opens this page to find. */
@@ -182,7 +184,8 @@ export default function EmailLogPage() {
         </Link>{" "}
         lämnar inget spår alls. <strong>Skickad</strong> betyder att mejlservern tog
         emot utskicket — inte att det bevisligen nådde inkorgen. Studsar registreras
-        inte.
+        inte. Kopior av utskicken sparas från och med nu — rader som skickades
+        tidigare har ingen kopia att visa.
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -244,24 +247,25 @@ export default function EmailLogPage() {
               <TableHead className="w-[180px]">Status</TableHead>
               <TableHead className="w-[110px]">Källa</TableHead>
               <TableHead>Detalj</TableHead>
+              <TableHead className="w-[110px] text-right">Mejlet</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">
                   Hämtar utskick…
                 </TableCell>
               </TableRow>
             ) : failedToLoad ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-sm text-destructive">
+                <TableCell colSpan={8} className="h-24 text-center text-sm text-destructive">
                   Kunde inte hämta utskicksloggen. Ladda om sidan för att försöka igen.
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={8} className="h-32 text-center">
                   <Inbox className="mx-auto mb-2 size-5 text-muted-foreground/50" aria-hidden />
                   <p className="text-sm text-muted-foreground">
                     {rows.length === 0
@@ -319,6 +323,34 @@ export default function EmailLogPage() {
                       >
                         {detailFor(r)}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {/*
+                        Only offered when there is a stored copy. A link that
+                        opened an empty page, or worse a re-render passed off as
+                        the sent mail, would be worse than no link.
+                      */}
+                      {r.hasHtml ? (
+                        <Link
+                          href={`/settings/epostlogg/${r.id}`}
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                          title={r.subject ?? "Visa mejlet som det skickades"}
+                        >
+                          <Eye className="size-3.5" aria-hidden />
+                          Visa
+                        </Link>
+                      ) : (
+                        <span
+                          className="text-xs text-muted-foreground"
+                          title={
+                            r.state === "superseded" || r.state === "backfilled"
+                              ? "Inget mejl skickades för den här raden."
+                              : "Mejlet skickades innan kopior började sparas."
+                          }
+                        >
+                          —
+                        </span>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

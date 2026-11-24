@@ -25,6 +25,9 @@ export type NotificationResult = {
   recipient?: string | null;
   /** Set when the send was declined by configuration rather than failing. */
   skipped?: string;
+  /** The mail as sent, for the caller to archive on its ledger row. */
+  subject?: string | null;
+  html?: string | null;
 };
 
 export async function sendOrderNotification(
@@ -48,6 +51,8 @@ export async function sendOrderNotification(
     recipient?: string | null;
     skipped?: string;
     error?: string;
+    subject?: string | null;
+    html?: string | null;
   };
 
   if (!res.ok) {
@@ -64,5 +69,10 @@ export async function sendOrderNotification(
     throw new Error(`Product-service reported ${kind} was not sent`);
   }
 
-  return { sent: true, recipient: payload.recipient ?? null };
+  return {
+    sent: true,
+    recipient: payload.recipient ?? null,
+    subject: payload.subject ?? null,
+    html: payload.html ?? null,
+  };
 }

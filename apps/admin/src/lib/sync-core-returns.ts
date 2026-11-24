@@ -134,7 +134,10 @@ export async function syncCoreReturns(): Promise<CoreReturnSyncResult> {
           await releaseOrderEmail(claim.id);
           continue;
         }
-        await markOrderEmailSent(claim.id, sent.recipient ?? null);
+        await markOrderEmailSent(claim.id, sent.recipient ?? null, {
+          subject: sent.subject,
+          html: sent.html,
+        });
         if (kind === "core_return_overdue") result.flaggedOverdue++;
         else result.reminded++;
       } catch (err) {

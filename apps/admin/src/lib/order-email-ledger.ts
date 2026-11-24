@@ -120,14 +120,33 @@ export async function claimOrderEmail(
   };
 }
 
-/** Confirms the transport accepted the message. Only now is it truly "sent". */
+/**
+ * Confirms the transport accepted the message. Only now is it truly "sent".
+ *
+ * `archive` is the message exactly as it went out, kept so the E-postlogg can
+ * show what the customer actually received. Optional because not every path
+ * has it: a superseded row sends nothing, and the staff core-return notice
+ * does not surface its body. Those rows stay empty rather than being filled
+ * with a re-render that only resembles the real mail.
+ */
 export async function markOrderEmailSent(
   id: number,
   recipient?: string | null,
+  archive?: { subject?: string | null; html?: string | null },
 ): Promise<void> {
   await db
     .update(orderEmails)
-    .set({ sentAt: new Date(), recipient: recipient ?? null, error: null })
+    .set({
+      sentAt: new Date(),
+      recipient: recipient ?? null,
+      error: null,
+      /**
+       * Only written when supplied. A retry that cannot produce the body must
+       * not blank an archive a previous attempt already stored.
+       */
+      ...(archive?.subject ? { subject: archive.subject } : {}),
+      ...(archive?.html ? { html: archive.html } : {}),
+    })
     .where(eq(orderEmails.id, id));
 }
 
@@ -177,6 +196,8 @@ export async function listOrderEmails(orderId: number): Promise<OrderEmailRecord
       recipient: orderEmails.recipient,
       error: orderEmails.error,
       meta: orderEmails.meta,
+      subject: orderEmails.subject,
+      hasHtml: sql<boolean>`${orderEmails.html} IS NOT NULL AND ${orderEmails.html} <> ''`,
     })
     .from(orderEmails)
     .where(eq(orderEmails.orderId, orderId));
@@ -215,6 +236,13 @@ export type OrderEmailLogRow = {
   recipient: string | null;
   error: string | null;
   meta: Record<string, unknown> | null;
+  subject: string | null;
+  /**
+   * Whether an archived copy exists — not the copy itself. Each mail is tens
+   * of kilobytes of HTML, so selecting 500 of them to render a list would
+   * move megabytes to answer a yes/no question.
+   */
+  hasHtml: boolean;
 };
 
 export async function listAllOrderEmails(limit = 500): Promise<OrderEmailLogRow[]> {
@@ -232,6 +260,8 @@ export async function listAllOrderEmails(limit = 500): Promise<OrderEmailLogRow[
       recipient: orderEmails.recipient,
       error: orderEmails.error,
       meta: orderEmails.meta,
+      subject: orderEmails.subject,
+      hasHtml: sql<boolean>`${orderEmails.html} IS NOT NULL AND ${orderEmails.html} <> ''`,
     })
     .from(orderEmails)
     .leftJoin(orders, eq(orderEmails.orderId, orders.id))
@@ -250,7 +280,53 @@ export async function listAllOrderEmails(limit = 500): Promise<OrderEmailLogRow[
     recipient: r.recipient,
     error: r.error,
     meta: (r.meta as Record<string, unknown> | null) ?? null,
+    subject: r.subject ?? null,
+    hasHtml: Boolean(r.hasHtml),
   }));
+}
+
+/**
+ * The archived copy of one sent mail, for the preview page.
+ *
+ * Its own query because `listAllOrderEmails` deliberately does not select the
+ * body — this is the only place the HTML is actually wanted.
+ */
+export type ArchivedOrderEmail = {
+  id: number;
+  orderId: number;
+  orderNumber: string | null;
+  kind: string;
+  sentAt: Date | null;
+  claimedAt: Date;
+  recipient: string | null;
+  error: string | null;
+  meta: Record<string, unknown> | null;
+  subject: string | null;
+  html: string | null;
+};
+
+export async function getArchivedOrderEmail(id: number): Promise<ArchivedOrderEmail | null> {
+  const [row] = await db
+    .select({
+      id: orderEmails.id,
+      orderId: orderEmails.orderId,
+      orderNumber: orders.orderNumber,
+      kind: orderEmails.kind,
+      sentAt: orderEmails.sentAt,
+      claimedAt: orderEmails.claimedAt,
+      recipient: orderEmails.recipient,
+      error: orderEmails.error,
+      meta: orderEmails.meta,
+      subject: orderEmails.subject,
+      html: orderEmails.html,
+    })
+    .from(orderEmails)
+    .leftJoin(orders, eq(orderEmails.orderId, orders.id))
+    .where(eq(orderEmails.id, id))
+    .limit(1);
+
+  if (!row) return null;
+  return { ...row, meta: (row.meta as Record<string, unknown> | null) ?? null };
 }
 
 /**
